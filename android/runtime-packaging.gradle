@@ -1,0 +1,11 @@
+// Dart FFI calls ORT's stable C API. Use sherpa's ORT 1.28.2 on Android;
+// the onnxruntime Dart plugin's older Android binary must not enter the APK.
+subprojects { sub ->
+    if (sub.name == 'onnxruntime') {
+        sub.plugins.withId('com.android.library') {
+            sub.android.packaging.jniLibs.excludes.add('**/libonnxruntime.so')
+            // Its Dart FFI surface is reused, not its outdated Android build defaults.
+            sub.androidComponents.finalizeDsl { dsl -> dsl.compileSdk = 36 }
+        }
+    }
+}

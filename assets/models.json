@@ -1,0 +1,44 @@
+[
+  {
+    "id": "sensevoice",
+    "version": "2365baeacb507f821a0c8120fcee3d484dba7a07",
+    "label": "离线语音",
+    "license": "SenseVoice / FunASR model license",
+    "source": "https://huggingface.co/csukuangfj/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17",
+    "files": [
+      {
+        "name": "model.int8.onnx",
+        "url": "https://huggingface.co/csukuangfj/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17/resolve/2365baeacb507f821a0c8120fcee3d484dba7a07/model.int8.onnx",
+        "bytes": 239233841,
+        "sha256": "c71f0ce00bec95b07744e116345e33d8cbbe08cef896382cf907bf4b51a2cd51"
+      },
+      {
+        "name": "tokens.txt",
+        "url": "https://huggingface.co/csukuangfj/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17/resolve/2365baeacb507f821a0c8120fcee3d484dba7a07/tokens.txt",
+        "bytes": 315894,
+        "sha256": "f449eb28dc567533d7fa59be34e2abca8784f771850c78a47fb731a31429a1dc"
+      }
+    ]
+  },
+  {
+    "id": "bge",
+    "version": "75c43b069aac4d136ba6bc1122f995fedcfd2781",
+    "label": "语义查找",
+    "license": "MIT",
+    "source": "https://huggingface.co/Xenova/bge-small-zh-v1.5",
+    "files": [
+      {
+        "name": "model.int8.onnx",
+        "url": "https://huggingface.co/Xenova/bge-small-zh-v1.5/resolve/75c43b069aac4d136ba6bc1122f995fedcfd2781/onnx/model_int8.onnx",
+        "bytes": 23903394,
+        "sha256": "b9837c19ce154ff0726d398ee77abbc03a7faf0476c6f93016c84e531be7ebb5"
+      },
+      {
+        "name": "vocab.txt",
+        "url": "https://huggingface.co/Xenova/bge-small-zh-v1.5/resolve/75c43b069aac4d136ba6bc1122f995fedcfd2781/vocab.txt",
+        "bytes": 109540,
+        "sha256": "45bbac6b341c319adc98a532532882e91a9cefc0329aa57bac9ae761c27b291c"
+      }
+    ]
+  }
+]

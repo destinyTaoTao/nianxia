@@ -1,0 +1,43 @@
+name: nianxia
+description: 本地优先的语音灵感本，随时记，随时查。
+publish_to: none
+version: 0.1.0+1
+environment:
+  sdk: ^3.13.0
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  sqlite3: 3.9.0
+  path_provider: 2.1.6
+  path: 1.9.1
+  uuid: 4.6.0
+  record: 7.1.2
+  just_audio: 0.10.6
+  flutter_secure_storage: 11.2.0
+  file_picker: 13.3.2
+  share_plus: 13.3.1
+  crypto: 3.0.8
+  archive: 4.6.0
+  quick_actions: 1.1.1
+  sherpa_onnx: 2.0.1
+  onnxruntime: 1.4.1
+dev_dependencies:
+  integration_test:
+    sdk: flutter
+  flutter_test:
+    sdk: flutter
+  flutter_lints: 6.0.0
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/models.json
+    - assets/licenses/
+hooks:
+  user_defines:
+    sqlite3:
+      source:
+        macos: system
+        ios: system
+        default: sqlite3
