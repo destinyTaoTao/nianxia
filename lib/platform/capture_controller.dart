@@ -79,6 +79,7 @@ class CaptureController extends ChangeNotifier with WidgetsBindingObserver {
   StreamSubscription<void>? _states;
   StreamSubscription<Uint8List>? _pcm;
   bool _disposed = false;
+  bool _startInterrupted = false;
   bool get active =>
       state == 'recording' || state == 'starting' || state == 'saving';
   int get elapsed => _watch.elapsedMilliseconds.clamp(0, 120000);
@@ -113,7 +114,9 @@ class CaptureController extends ChangeNotifier with WidgetsBindingObserver {
       if (!await microphone.allowed()) {
         throw const NotebookException('没有麦克风权限。可改用文字，或到系统设置允许麦克风。');
       }
+      _ensureStartAllowed();
       draft = await book.beginCapture(parentId: parentId, query: query);
+      _ensureStartAllowed();
       models?.queue.paused = true;
       _writer = await PcmWaveWriter.open(
         draft!.path,
@@ -128,13 +131,9 @@ class CaptureController extends ChangeNotifier with WidgetsBindingObserver {
           }
         },
       );
+      _ensureStartAllowed();
       final stream = await microphone.start();
-      if (_disposed) {
-        await microphone.stop();
-        await _closeWriter();
-        await _cleanQuery();
-        return;
-      }
+      _ensureStartAllowed();
       state = 'recording';
       _watch.start();
       _pcm = stream.listen(
@@ -186,6 +185,12 @@ class CaptureController extends ChangeNotifier with WidgetsBindingObserver {
       error = e is NotebookException ? e.message : '无法开始录音，请检查麦克风权限和剩余空间。';
       models?.queue.paused = false;
       _notify();
+    }
+  }
+
+  void _ensureStartAllowed() {
+    if (_disposed || _startInterrupted || state != 'starting') {
+      throw const NotebookException('录音启动被中断，未继续采集。请返回后重新呼出，或改用文字。');
     }
   }
 
@@ -302,8 +307,20 @@ class CaptureController extends ChangeNotifier with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if ((state == AppLifecycleState.inactive ||
-            state == AppLifecycleState.paused) &&
+    if (this.state == 'starting' &&
+        (state == AppLifecycleState.paused ||
+            state == AppLifecycleState.hidden ||
+            state == AppLifecycleState.detached)) {
+      // Permission prompts may briefly be inactive; a genuinely backgrounded
+      // launch must never resume microphone startup after its future completes.
+      _startInterrupted = true;
+    }
+    // Android re-delivering an intent and system prompts can be inactive while
+    // still visible. Native audio interruptions handle actual focus loss;
+    // stop when the application becomes hidden rather than on that transition.
+    if ((state == AppLifecycleState.hidden ||
+            state == AppLifecycleState.paused ||
+            state == AppLifecycleState.detached) &&
         this.state == 'recording') {
       finish();
     }

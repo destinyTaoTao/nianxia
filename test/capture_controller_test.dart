@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter/widgets.dart';
 import 'package:nianxia/app/notebook.dart';
 import 'package:nianxia/data/model_store.dart';
 import 'package:nianxia/platform/capture_controller.dart';
@@ -49,6 +50,24 @@ class QueryReadyStore extends ModelStore {
   Future<bool> ready(String id) async => true;
 }
 
+class PendingPermissionMicrophone extends TestMicrophone {
+  final permission = Completer<bool>();
+  bool started = false;
+  @override
+  Future<bool> allowed() => permission.future;
+  @override
+  Future<Stream<Uint8List>> start() {
+    started = true;
+    return super.start();
+  }
+
+  @override
+  Future<void> stop() async {
+    if (!chunks.hasListener) chunks.stream.listen((_) {});
+    await super.stop();
+  }
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   late Directory home;
@@ -60,6 +79,41 @@ void main() {
   tearDown(() async {
     book.dispose();
     await home.delete(recursive: true);
+  });
+  test('等待权限时退到后台，不会在授权返回后偷偷开始采集', () async {
+    final mic = PendingPermissionMicrophone();
+    final capture = CaptureController(book, microphone: mic);
+    try {
+      final starting = capture.start();
+      capture.didChangeAppLifecycleState(AppLifecycleState.paused);
+      mic.permission.complete(true);
+      await starting;
+      expect(mic.started, isFalse);
+      expect(capture.state, 'failed');
+      expect(book.captureActive, isFalse);
+      expect(book.records, isEmpty);
+    } finally {
+      capture.dispose();
+    }
+  });
+  test('短暂 inactive 不截断当前录音，真正进入后台才停止保存', () async {
+    final mic = TestMicrophone();
+    final capture = CaptureController(book, microphone: mic);
+    try {
+      await capture.start();
+      mic.chunks.add(Uint8List(32000));
+      capture.didChangeAppLifecycleState(AppLifecycleState.inactive);
+      expect(capture.state, 'recording');
+      final done = Completer<void>();
+      capture.addListener(() {
+        if (capture.state == 'done' && !done.isCompleted) done.complete();
+      });
+      capture.didChangeAppLifecycleState(AppLifecycleState.paused);
+      await done.future.timeout(const Duration(seconds: 5));
+      expect(book.records.single.durationMs, 1000);
+    } finally {
+      capture.dispose();
+    }
   });
   test('两分钟采样边界自动保存，原生停止延迟不会使整段丢失', () async {
     final mic = TestMicrophone();

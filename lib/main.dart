@@ -40,20 +40,30 @@ class _BootstrapState extends State<_Bootstrap> {
   BackgroundTasks? tasks;
   String? error;
   final shortcut = ValueNotifier<String?>(null);
+  static const bridge = MethodChannel('app.nianxia/system');
   @override
   void initState() {
     super.initState();
+    bridge.setMethodCallHandler((call) async {
+      if (call.method == 'launch' && call.arguments is String) {
+        shortcut.value = call.arguments as String;
+      }
+    });
     load();
   }
 
   Future<void> load() async {
     setState(() => error = null);
     try {
+      final initialAction = await bridge.invokeMethod<String>(
+        'getLaunchAction',
+      );
+      if (initialAction != null) shortcut.value = initialAction;
+      if (mounted) setState(() {});
       final root = Directory(
         p.join((await getApplicationSupportDirectory()).path, 'nianxia'),
       );
       await root.create(recursive: true);
-      const bridge = MethodChannel('app.nianxia/system');
       final protected = await bridge.invokeMethod<bool>('protectFiles', {
         'path': root.path,
       });
@@ -84,7 +94,9 @@ class _BootstrapState extends State<_Bootstrap> {
       // Only system shortcuts are registered. No account, telemetry or model
       // download is started as a side effect of opening the app.
       const actions = QuickActions();
-      await actions.initialize((type) => shortcut.value = type);
+      await actions.initialize(
+        (type) => shortcut.value = type == 'capture' ? 'capsule' : type,
+      );
       await actions.setShortcutItems(const [
         ShortcutItem(
           type: 'capture',
@@ -114,6 +126,7 @@ class _BootstrapState extends State<_Bootstrap> {
     models?.store.dispose();
     book?.dispose();
     shortcut.dispose();
+    bridge.setMethodCallHandler(null);
     super.dispose();
   }
 
@@ -127,6 +140,9 @@ class _BootstrapState extends State<_Bootstrap> {
       theme: notebookTheme(Brightness.light),
       darkTheme: notebookTheme(Brightness.dark),
       home: Scaffold(
+        backgroundColor: shortcut.value == 'capsule'
+            ? Colors.transparent
+            : null,
         body: SafeArea(
           child: Center(
             child: Padding(

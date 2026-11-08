@@ -19,9 +19,20 @@ import EventKitUI
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
     guard let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "NianxiaSystem") else { return }
     let channel = FlutterMethodChannel(name: "app.nianxia/system", binaryMessenger: registrar.messenger())
+    LaunchActions.channel = channel
+    LaunchActions.ready = false
     channel.setMethodCallHandler { [weak self] call, result in
       guard let self = self else { return }
       switch call.method {
+      case "getLaunchAction":
+        LaunchActions.channel = channel
+        LaunchActions.ready = true
+        result(LaunchActions.pending)
+        LaunchActions.pending = nil
+      case "dismissCapsule":
+        // iOS has no public API to return to an arbitrary previous app.
+        // Flutter switches to the notebook; no private suspension API is used.
+        result(nil)
       case "protectFiles":
         guard let args = call.arguments as? [String: Any], let path = args["path"] as? String else {
           result(FlutterError(code: "invalid_path", message: "Missing private path", details: nil)); return

@@ -51,7 +51,7 @@ class _HomePageState extends State<HomePage> {
 
   void _shortcut() {
     final action = widget.shortcut?.value;
-    if (action == null || !mounted) {
+    if ((action != 'capture' && action != 'search') || !mounted) {
       return;
     }
     widget.shortcut!.value = null;
@@ -59,7 +59,6 @@ class _HomePageState extends State<HomePage> {
       notice(context, '正在录音，请先停止保存或丢弃。');
       return;
     }
-    Navigator.of(context).popUntil((r) => r.isFirst);
     if (action == 'capture') {
       record();
     } else if (action == 'search') {

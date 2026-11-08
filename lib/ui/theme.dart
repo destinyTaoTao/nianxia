@@ -30,6 +30,11 @@ ThemeData notebookTheme(Brightness brightness, {String? fontFamily}) {
   );
   return base.copyWith(
     scaffoldBackgroundColor: bg,
+    progressIndicatorTheme: ProgressIndicatorThemeData(
+      color: ink,
+      linearTrackColor: line,
+      circularTrackColor: line,
+    ),
     textTheme: base.textTheme
         .copyWith(
           headlineMedium: TextStyle(

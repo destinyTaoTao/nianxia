@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../app/notebook.dart';
@@ -274,6 +275,28 @@ class _SettingsPageState extends State<SettingsPage> {
                   widget.onTheme(v);
                 }
               },
+            ),
+            const SizedBox(height: 32),
+            Text('快捷呼出', style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 8),
+            Text(
+              Platform.isIOS
+                  ? '在系统“快捷指令”中选择念下的“记一下”，可绑定操作按钮。呼出后直接进入录音胶囊；系统可能要求解锁。'
+                  : '下拉系统快捷设置，编辑并添加“记一下”磁贴，即可直接呼出录音胶囊。AI 键若支持应用快捷动作或打开链接，可绑定“记一下”；是否可选取决于手机系统。',
+            ),
+            const SizedBox(height: 8),
+            const Text('只在主动呼出后录音。切换应用或锁屏会停止并尝试保存，不在后台持续监听。'),
+            TextButton.icon(
+              onPressed: () async {
+                await Clipboard.setData(
+                  const ClipboardData(text: 'nianxia://capture'),
+                );
+                if (context.mounted) {
+                  notice(context, '录音链接已复制，可用于系统快捷指令的“打开 URL”动作。');
+                }
+              },
+              icon: const Icon(Icons.link_rounded),
+              label: const Text('复制录音快捷链接'),
             ),
             const SizedBox(height: 32),
             Text('离线模型', style: Theme.of(context).textTheme.titleMedium),

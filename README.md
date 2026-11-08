@@ -8,10 +8,20 @@
 - 两分钟短录音、原音频回放、启动恢复检查；先保存，再本地转写。
 - 关键词/日期查找、BGE 语义增强、临时语音查询；模型不可用保留文字路径。
 - 可信清单固定模型文件和 SHA-256，流式下载后原子启用，默认不下载模型。
-- 系统桌面“记一下 / 找一下”快捷动作、原创声纹便笺图标、黑白灰浅深主题。
+- 系统桌面“记一下 / 找一下”快捷动作、Android 快捷设置录音磁贴与透明胶囊、iOS App Intents 接入、原创声纹便笺图标、黑白灰浅深主题。
 - 手动事项或整理候选进入系统日历编辑器；Android 保存结果显示未确认，iOS 仅 saved 回调表示成功。
 - 用户自带 DeepSeek Key，每次确认单条正文后整理；结果与正文分开，编辑后标过期。不自动重放付费请求。
 - 未加密 ZIP 备份（包含可读文本与 WAV），重复跳过、冲突副本和追加关系重映射。索引可重建。
+
+## 快捷呼出录音
+
+Android 下拉快捷设置，编辑并添加“记一下”磁贴；也可长按桌面图标选择“记一下”。无需先进入记录列表，直接显示顶部录音胶囊。停止落盘成功才显示已保存，系统返回键也会停止保存；确认丢弃会删除未保存音频。完成后点击“返回原应用”。离开前保留尚未保存的文字编辑，后续查找也不清空编辑栈。
+
+支持只含操作的 `nianxia://capture` / `nianxia://search` 链接；Android 还提供 `app.nianxia.CAPTURE` Intent。手机 AI 键若允许绑定应用快捷动作或 URL，可指向录音入口；不宣称所有厂商按键都可绑定。应用设置中提供说明及复制录音链接。没有新增悬浮窗、无障碍服务、后台麦克风或常驻监听权限；切换应用/锁屏停止保存，启动阶段退到后台也不继续开始采集。
+
+iOS 接入“记一下/找一下”App Intents，可供系统快捷指令及操作按钮配置；也可用“打开 URL”动作。系统会将应用带到前台的胶囊界面，可能需要解锁，不是跨应用悬浮窗或 Dynamic Island Live Activity。iOS 不使用私有退后台 API，“完成”返回记录页。**这些 iOS 原生代码尚未通过完整 Xcode 构建或设备验证。**
+
+平台接口依据：[Android TileService](https://developer.android.com/reference/android/service/quicksettings/TileService)、[Flutter 透明 Activity](https://docs.flutter.dev/add-to-app/android/add-flutter-screen)、[Apple AppShortcutsProvider](https://developer.apple.com/documentation/appintents/appshortcutsprovider)。Android 14+ 磁贴使用 PendingIntent，旧系统使用对应旧 API；URL 交接保留冷启动 pending 动作，并禁用重复的 Flutter 默认深链处理。
 
 ## 本地运行
 
@@ -82,6 +92,8 @@ DeepSeek 使用集成时核验的 [V4-Flash](https://api-docs.deepseek.com/updat
 
 该轴共 3 项，最严重为 P1，已修；没有额外保留的 code smell 建议。
 
+胶囊增量的独立 Standards 评审未发现新增硬性规范违例，另提出 **P1 待核对路径**：胶囊完成后转查找仍会弹出并销毁隐藏编辑器。现已移除强制清空导航栈，回归覆盖“未保存编辑 → 胶囊保存 → 查找 → 返回原编辑”，正文保留。
+
 ## Spec
 
 独立评审初稿发现 3 项实现错误，均已修复：
@@ -92,18 +104,22 @@ DeepSeek 使用集成时核验的 [V4-Flash](https://api-docs.deepseek.com/updat
 
 未发现实质范围扩张。该轴另有 **1 项未完成的验收范围**：#15 的 Magic8/iPhone 17、iOS 安装、真实提醒、50 条口述、30 条人工标注查询及手机性能/发热。代码和模拟器通过不能替代这些验收，因此不关闭对应 Issue。该轴最严重实现错误为 P1，已修；完整产品验收仍未完成。
 
+胶囊增量独立 Spec 评审发现 **1 项 P2 缺口**：拒绝麦克风后缺少规格要求的文字入口，现已添加“写文字”并通过用户操作回归；未发现范围蔓延或其他已确认的增量错误。该轴仍保留双端真机及 iOS 原生行为的验收缺口。
+
 ## 本轮实际验证
 
 - `flutter analyze`：通过。
-- `flutter test`：31 项主机测试通过，覆盖应用行为、真实 SQLite/文件、故障注入与界面；包含浅深主题、两倍字体、无障碍触控/标签及减少动态效果。
+- `flutter test`：37 项主机测试通过，覆盖应用行为、真实 SQLite/文件、故障注入与界面；包含浅深主题、两倍字体、无障碍触控/标签及减少动态效果。新增胶囊重复呼出、返回保存、编辑保留、拒绝权限转文字、确认丢弃及启动期间退后台回归。
 - Android API 36 ARM64 模拟器、飞行模式：通过 `flutter drive` 执行真实 SenseVoice + BGE 同包、语义有/无结果、原生 PCM 录音和 WAV 回放。仅使用公开模型样本和合成文本。
-- 1,000 条合成短记录、主机 20 次关键词查询 P95：约 8.5 ms，非手机指标。
+- 1,000 条合成短记录、主机 20 次关键词查询 P95：约 12.1 ms，非手机指标。
 - [浅色时间线](docs/screenshots/home-light.png)、[深色时间线](docs/screenshots/home-dark.png)、[查找](docs/screenshots/search-light.png)、[详情](docs/screenshots/detail-light.png)为实际 widget 运行截图，非真机截图。
+- Android API 36 ARM64 Release、飞行模式：实际运行通过 URL 冷启动、重复呼出不截断、系统返回保存并返回原系统设置页面、实际点击快捷设置磁贴的热启动、深色主题、原生权限拒绝与首次授权；截图见[录音胶囊](docs/screenshots/android-capsule-recording.png)、[深色胶囊](docs/screenshots/android-capsule-dark.png)、[保存完成](docs/screenshots/android-capsule-saved.png)、[权限失败](docs/screenshots/android-capsule-permission.png)。均为模拟器，未冒充真机。
+- 原生重复呼出验证捕获并修复了短暂 `inactive` 被当作退后台而截断录音的问题；隐藏/暂停/分离才触发自动保存，真正的音频中断仍通过原生录音状态处理，符合 [Flutter 生命周期语义](https://api.flutter.dev/flutter/dart-ui/AppLifecycleState.html)。冷启动一次 `am start -W` 活动展示约 0.7 秒，只是系统展示耗时，不是采集延迟或 P95。
 - Swift 前端语法解析通过；`flutter build ios --no-codesign` 未能构建，提示 `Application not configured for iOS`。本机只有 Command Line Tools，缺少完整 Xcode 与 CocoaPods；此结果不表示 iOS 已构建或安装通过。
 - 模拟器 ExoPlayer 释放时观察到 `Handler ... on a dead thread` 警告，回放完成断言及整个 driver 均通过；尚未在真机确认是否复现。
 - 真实付费 API、真实日历提醒、双端系统备份排除的设备实测均未执行。
 
-Android ARM64 Release 试用包已构建并安装启动，约 **50.9 MB**（不含首次下载的模型），仍使用本地 debug 签名；APK 仅包含 ARM64 与单一 ORT 运行时。产物为 `build/app/outputs/flutter-apk/app-release.apk`，SHA-256：`07b7a03f7dd78134d625a43a87fb6f80fd852f028ee7b66f57eec11bda3f7817`。
+Android ARM64 Release 试用包已构建并安装启动，约 **50.9 MB**（不含首次下载的模型），仍使用本地 debug 签名；APK 仅包含 ARM64 与单一 ORT 运行时。产物为 `build/app/outputs/flutter-apk/app-release.apk`，SHA-256：`e65dfa23360b7b9bccba33b8e20b61082613abaddd38f466a84aaa6f8c000504`。
 
 运行集成测试后再构建 Release 时使用上面的正常 `flutter build apk --release --target-platform android-arm64`，让 Flutter 重新生成排除测试插件的注册文件；不要复用测试阶段生成的注册文件直接加 `--no-pub`。Flutter 平台构建应串行执行。
 

@@ -2,20 +2,64 @@ package app.nianxia.nianxia
 
 import android.content.ActivityNotFoundException
 import android.content.Intent
+import android.os.Bundle
 import android.provider.CalendarContract
 import io.flutter.embedding.android.FlutterActivity
+import io.flutter.embedding.android.FlutterActivityLaunchConfigs.BackgroundMode
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
     private var pendingCalendar: MethodChannel.Result? = null
     private val calendarRequest = 9011
+    private var systemChannel: MethodChannel? = null
+    private var launchReady = false
+    private var pendingLaunch: String? = null
+
+    // A single activity/engine owns SQLite and the microphone. Translucency is
+    // used only by the small Flutter capsule; regular pages paint an opaque UI.
+    override fun getBackgroundMode() = BackgroundMode.transparent
+    override fun getInitialRoute() = "/"
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        pendingLaunch = actionFor(intent)
+        super.onCreate(savedInstanceState)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        val action = actionFor(intent) ?: return
+        if (launchReady) systemChannel?.invokeMethod("launch", action)
+        else pendingLaunch = action
+    }
+
+    private fun actionFor(intent: Intent): String? {
+        val uri = intent.data
+        if (uri != null) {
+            // No caller-supplied content, file paths, destinations or operations.
+            if (uri.scheme != "nianxia" || !uri.path.isNullOrEmpty() ||
+                uri.query != null || uri.fragment != null || uri.userInfo != null || uri.port != -1) return null
+            return when (uri.host) { "capture" -> "capsule"; "search" -> "search"; else -> null }
+        }
+        return when (intent.action) {
+            "app.nianxia.CAPTURE" -> "capsule"
+            Intent.ACTION_MAIN -> "home"
+            else -> null
+        }
+    }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
-        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "app.nianxia/system")
-            .setMethodCallHandler { call, result ->
+        systemChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "app.nianxia/system")
+        systemChannel!!.setMethodCallHandler { call, result ->
                 when (call.method) {
+                    "getLaunchAction" -> {
+                        launchReady = true
+                        result.success(pendingLaunch)
+                        pendingLaunch = null
+                    }
+                    "dismissCapsule" -> { moveTaskToBack(true); result.success(null) }
                     "protectFiles" -> result.success(true) // Private storage; backup disabled in manifest/rules.
                     "calendar" -> {
                         if (pendingCalendar != null) {

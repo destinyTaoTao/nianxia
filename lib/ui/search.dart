@@ -93,6 +93,12 @@ class _SearchPageState extends State<SearchPage> {
   }
 
   Future<void> voice() async {
+    if (widget.models == null ||
+        !await widget.models!.store.ready('sensevoice')) {
+      if (mounted) notice(context, '语音模型未就绪，可直接输入文字查找，或在设置下载模型。');
+      return;
+    }
+    if (!mounted) return;
     final result = await openRecorder(
       context,
       widget.book,
