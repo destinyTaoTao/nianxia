@@ -106,7 +106,7 @@ flutter drive --driver=test_driver/local_models_driver.dart \
 
 模型归属：SenseVoiceSmall / FunASR，BGE / BAAI；转换分发：k2-fsa 的 csukuangfj 与 Xenova。SenseVoice 依据 [官方模型卡](https://huggingface.co/FunAudioLLM/SenseVoiceSmall)及 [FunASR 模型许可](docs/licenses/FunASR-MODEL-LICENSE.txt)，BGE 为 [MIT](https://huggingface.co/BAAI/bge-small-zh-v1.5)。运行时及 Dart 依赖许可可在应用“版本与开源许可”中查看。源码归属和模型许可分别核对，不能将 sherpa 的 Apache-2.0 直接当作权重许可。
 
-DeepSeek 使用集成时核验的 [V4-Flash](https://api-docs.deepseek.com/updates/) 非思考、非流式 JSON 输出；固定官方 HTTPS 地址，不允许任意 Base URL。云端格式与来源校验不保证语义完全正确，整理结果仍需用户核对。
+DeepSeek 请求使用 `deepseek-v4-flash` 兼容别名，明确关闭思考并使用非流式 JSON 输出。2026-11-10 核对[官方模型说明](https://api-docs.deepseek.com/quick_start/pricing/)：该旧别名仍被接受，原对应模型已退役，实际由 DeepSeek-V4.1-Flash-1017 提供服务；因此不能将请求中的别名视为锁定的模型版本。[请求参数](https://api-docs.deepseek.com/api/create-chat-completion/)与[JSON 输出规则](https://api-docs.deepseek.com/guides/json_mode/)仍兼容当前实现，包括空白响应检查。固定官方 HTTPS 地址，不允许任意 Base URL。此核对未调用付费 API；格式与来源校验不保证语义完全正确，整理结果仍需用户核对。
 
 ## Standards
 
