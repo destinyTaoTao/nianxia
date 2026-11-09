@@ -2,6 +2,12 @@ package app.nianxia.nianxia
 
 import android.content.ActivityNotFoundException
 import android.content.Intent
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.IntentFilter
+import android.app.KeyguardManager
+import android.os.Build
+import android.os.PowerManager
 import android.os.Bundle
 import android.provider.CalendarContract
 import io.flutter.embedding.android.FlutterActivity
@@ -15,6 +21,14 @@ class MainActivity : FlutterActivity() {
     private var systemChannel: MethodChannel? = null
     private var launchReady = false
     private var pendingLaunch: String? = null
+    private var screenReceiverRegistered = false
+    private val screenOffReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            if (intent.action == Intent.ACTION_SCREEN_OFF) {
+                systemChannel?.invokeMethod("screenOff", null)
+            }
+        }
+    }
 
     // A single activity/engine owns SQLite and the microphone. Translucency is
     // used only by the small Flutter capsule; regular pages paint an opaque UI.
@@ -24,6 +38,16 @@ class MainActivity : FlutterActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         pendingLaunch = actionFor(intent)
         super.onCreate(savedInstanceState)
+        // SCREEN_OFF is a protected system broadcast. Unlike inactive, it
+        // remains unambiguous if the screen wakes before onStop is dispatched.
+        val filter = IntentFilter(Intent.ACTION_SCREEN_OFF)
+        if (Build.VERSION.SDK_INT >= 33) {
+            registerReceiver(screenOffReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            @Suppress("DEPRECATION")
+            registerReceiver(screenOffReceiver, filter)
+        }
+        screenReceiverRegistered = true
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -54,6 +78,10 @@ class MainActivity : FlutterActivity() {
         systemChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "app.nianxia/system")
         systemChannel!!.setMethodCallHandler { call, result ->
                 when (call.method) {
+                    "recordingScreenAvailable" -> result.success(
+                        getSystemService(PowerManager::class.java).isInteractive &&
+                            !getSystemService(KeyguardManager::class.java).isKeyguardLocked
+                    )
                     "getLaunchAction" -> {
                         launchReady = true
                         result.success(pendingLaunch)
@@ -110,6 +138,10 @@ class MainActivity : FlutterActivity() {
     }
 
     override fun onDestroy() {
+        if (screenReceiverRegistered) {
+            unregisterReceiver(screenOffReceiver)
+            screenReceiverRegistered = false
+        }
         pendingCalendar?.success("unknown")
         pendingCalendar = null
         super.onDestroy()

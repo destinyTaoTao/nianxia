@@ -12,6 +12,7 @@ import 'app/background_tasks.dart';
 import 'app/notebook.dart';
 import 'data/model_store.dart';
 import 'platform/local_models.dart';
+import 'platform/capture_controller.dart';
 import 'ui/app.dart';
 import 'ui/theme.dart';
 
@@ -47,6 +48,8 @@ class _BootstrapState extends State<_Bootstrap> {
     bridge.setMethodCallHandler((call) async {
       if (call.method == 'launch' && call.arguments is String) {
         shortcut.value = call.arguments as String;
+      } else if (call.method == 'screenOff') {
+        CaptureController.screenTurnedOff();
       }
     });
     load();

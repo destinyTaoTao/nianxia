@@ -16,6 +16,23 @@ void main() {
     book.dispose();
     await home.delete(recursive: true);
   });
+  testWidgets('Android 日历入口明确说明提醒仍需在系统页手动设置', (tester) async {
+    await tester.runAsync(() => book.saveText('待安排的模拟器验收事项'));
+    await tester.pumpWidget(NianxiaApp(book: book));
+    await tester.tap(find.text('待安排的模拟器验收事项'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('加入日历'));
+    await tester.pumpAndSettle();
+    expect(find.text('计划提醒时间'), findsOneWidget);
+    expect(find.textContaining('本页尚未设置提醒'), findsOneWidget);
+    final reminder = find.byType(DropdownButtonFormField<int>);
+    await tester.ensureVisible(reminder);
+    await tester.tap(reminder);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('开始时').last);
+    await tester.pumpAndSettle();
+    expect(find.textContaining('请在系统日历中手动设置提醒：开始时'), findsOneWidget);
+  });
   testWidgets('用户可从文字入口保存、查看、编辑并查找记录', (tester) async {
     await tester.pumpWidget(NianxiaApp(book: book));
     expect(find.text('记一下'), findsOneWidget);

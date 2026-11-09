@@ -50,6 +50,11 @@ class _CalendarFormState extends State<_CalendarForm> {
   bool attempted = false;
   CalendarOutcome? outcome;
   final bridge = CalendarBridge();
+  String get plannedReminder => reminder == null
+      ? '不提醒'
+      : reminder == 0
+      ? '开始时'
+      : '开始前 $reminder 分钟';
   @override
   void dispose() {
     title.dispose();
@@ -205,7 +210,11 @@ class _CalendarFormState extends State<_CalendarForm> {
           const SizedBox(height: 16),
           DropdownButtonFormField<int>(
             initialValue: reminder,
-            decoration: const InputDecoration(labelText: '提醒时间'),
+            decoration: InputDecoration(
+              labelText: Theme.of(context).platform == TargetPlatform.android
+                  ? '计划提醒时间'
+                  : '提醒时间',
+            ),
             items: const [
               DropdownMenuItem(value: -1, child: Text('不提醒')),
               DropdownMenuItem(value: 0, child: Text('开始时')),
@@ -219,9 +228,11 @@ class _CalendarFormState extends State<_CalendarForm> {
                 : (v) => setState(() => reminder = v == -1 ? null : v),
           ),
           const SizedBox(height: 24),
-          const Text(
-            '接下来由你在系统日历中决定保存或取消。同步日历可能使事项离开设备。只传标题、地点、时间和提醒；请在系统页再次核对提醒。',
-            style: TextStyle(fontSize: 14, height: 1.6),
+          Text(
+            Theme.of(context).platform == TargetPlatform.android
+                ? '请在系统日历中手动设置提醒：$plannedReminder。本页尚未设置提醒，由你在系统页决定保存或取消。同步日历可能使事项离开设备。'
+                : '接下来由你在系统日历中决定保存或取消。同步日历可能使事项离开设备。只传标题、地点、时间和提醒；请在系统页再次核对提醒。',
+            style: const TextStyle(fontSize: 14, height: 1.6),
           ),
           const SizedBox(height: 24),
           FilledButton.icon(

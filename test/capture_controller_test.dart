@@ -4,6 +4,7 @@ import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter/widgets.dart';
+import 'package:flutter/services.dart' show MethodChannel, PlatformException;
 import 'package:nianxia/app/notebook.dart';
 import 'package:nianxia/data/model_store.dart';
 import 'package:nianxia/platform/capture_controller.dart';
@@ -52,9 +53,14 @@ class QueryReadyStore extends ModelStore {
 
 class PendingPermissionMicrophone extends TestMicrophone {
   final permission = Completer<bool>();
+  final permissionRequested = Completer<void>();
   bool started = false;
   @override
-  Future<bool> allowed() => permission.future;
+  Future<bool> allowed() {
+    permissionRequested.complete();
+    return permission.future;
+  }
+
   @override
   Future<Stream<Uint8List>> start() {
     started = true;
@@ -72,13 +78,109 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   late Directory home;
   late Notebook book;
+  bool? screenAvailable = true;
   setUp(() async {
+    screenAvailable = true;
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+          const MethodChannel('app.nianxia/system'),
+          (call) async => call.method == 'recordingScreenAvailable'
+              ? screenAvailable
+              : null,
+        );
     home = await Directory.systemTemp.createTemp('nianxia-microphone-');
     book = await Notebook.open(home);
   });
   tearDown(() async {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+          const MethodChannel('app.nianxia/system'),
+          null,
+        );
     book.dispose();
     await home.delete(recursive: true);
+  });
+  test('Android 快速息屏仅触发 inactive 也停止保存，唤醒不自动续录', () async {
+    final mic = TestMicrophone();
+    final capture = CaptureController(book, microphone: mic);
+    try {
+      await capture.start();
+      mic.chunks.add(Uint8List(32000));
+      final done = Completer<void>();
+      capture.addListener(() {
+        if (capture.state == 'done' && !done.isCompleted) done.complete();
+      });
+      screenAvailable = false;
+      capture.didChangeAppLifecycleState(AppLifecycleState.inactive);
+      CaptureController.screenTurnedOff();
+      await done.future.timeout(const Duration(seconds: 2));
+      screenAvailable = true;
+      capture.didChangeAppLifecycleState(AppLifecycleState.resumed);
+      expect(capture.state, 'done');
+      expect(book.records.single.durationMs, 1000);
+    } finally {
+      capture.dispose();
+    }
+  });
+  test('Android 启动前锁屏或屏幕状态无法核验，不启动麦克风', () async {
+    for (final available in [false, null]) {
+      screenAvailable = available;
+      final mic = PendingPermissionMicrophone()..permission.complete(true);
+      final capture = CaptureController(book, microphone: mic);
+      try {
+        await capture.start();
+        expect(mic.started, isFalse);
+        expect(capture.state, 'failed');
+        expect(book.records, isEmpty);
+        expect(book.recoveryDrafts, isEmpty);
+      } finally {
+        capture.dispose();
+      }
+    }
+  });
+  test('等待权限时收到系统息屏通知，授权返回也不会开始采集', () async {
+    final mic = PendingPermissionMicrophone();
+    final capture = CaptureController(book, microphone: mic);
+    try {
+      final starting = capture.start();
+      await mic.permissionRequested.future;
+      CaptureController.screenTurnedOff();
+      mic.permission.complete(true);
+      await starting;
+      expect(mic.started, isFalse);
+      expect(capture.state, 'failed');
+      expect(book.records, isEmpty);
+      expect(book.recoveryDrafts, isEmpty);
+    } finally {
+      capture.dispose();
+    }
+  });
+  test('屏幕状态异常或超时不启动采集，迟到响应也不重新启动', () async {
+    for (final timeout in [false, true]) {
+      final response = Completer<Object?>();
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(const MethodChannel('app.nianxia/system'), (
+            call,
+          ) async {
+            if (!timeout) throw PlatformException(code: 'screen_unavailable');
+            return response.future;
+          });
+      final mic = PendingPermissionMicrophone()..permission.complete(true);
+      final capture = CaptureController(book, microphone: mic);
+      try {
+        await capture.start().timeout(const Duration(seconds: 2));
+        expect(capture.state, 'failed');
+        expect(capture.error, contains('无法核验屏幕状态'));
+        expect(mic.started, isFalse);
+        response.complete(true);
+        await Future<void>.delayed(Duration.zero);
+        expect(mic.started, isFalse);
+        expect(book.records, isEmpty);
+      } finally {
+        if (!response.isCompleted) response.complete(true);
+        capture.dispose();
+      }
+    }
   });
   test('等待权限时退到后台，不会在授权返回后偷偷开始采集', () async {
     final mic = PendingPermissionMicrophone();

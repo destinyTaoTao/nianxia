@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show MethodChannel;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nianxia/app/notebook.dart';
 import 'package:nianxia/ui/app.dart';
@@ -24,10 +25,21 @@ void main() {
   late Directory home;
   late Notebook book;
   setUp(() async {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+          const MethodChannel('app.nianxia/system'),
+          (call) async =>
+              call.method == 'recordingScreenAvailable' ? true : null,
+        );
     home = await Directory.systemTemp.createTemp('nianxia-capsule-');
     book = await Notebook.open(home);
   });
   tearDown(() async {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+          const MethodChannel('app.nianxia/system'),
+          null,
+        );
     book.dispose();
     await home.delete(recursive: true);
   });

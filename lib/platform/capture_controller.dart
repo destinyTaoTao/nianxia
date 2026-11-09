@@ -3,6 +3,9 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter/widgets.dart';
+import 'package:flutter/foundation.dart'
+    show defaultTargetPlatform, TargetPlatform;
+import 'package:flutter/services.dart' show MethodChannel;
 import 'package:record/record.dart';
 
 import '../app/notebook.dart';
@@ -61,7 +64,12 @@ class CaptureController extends ChangeNotifier with WidgetsBindingObserver {
     MicrophoneInput? microphone,
   }) : microphone = microphone ?? DeviceMicrophone() {
     WidgetsBinding.instance.addObserver(this);
+    _screenOff.addListener(_onScreenOff);
   }
+  static final _screenOff = ChangeNotifier();
+
+  /// Entry point for the protected Android screen-off broadcast.
+  static void screenTurnedOff() => _screenOff.notifyListeners();
   final Notebook book;
   final LocalModels? models;
   final bool query;
@@ -107,6 +115,10 @@ class CaptureController extends ChangeNotifier with WidgetsBindingObserver {
   Future<void> start() async {
     book.captureActive = true;
     try {
+      if (!await _recordingScreenAvailable()) {
+        throw const NotebookException('请先解锁并保持屏幕亮起，再开始录音。');
+      }
+      _ensureStartAllowed();
       if (query &&
           (models == null || !await models!.store.ready('sensevoice'))) {
         throw const NotebookException('语音模型未就绪，请先输入文字查找，或在设置下载模型。');
@@ -326,6 +338,27 @@ class CaptureController extends ChangeNotifier with WidgetsBindingObserver {
     }
   }
 
+  Future<bool> _recordingScreenAvailable() async {
+    if (defaultTargetPlatform != TargetPlatform.android) return true;
+    try {
+      final available = await const MethodChannel('app.nianxia/system')
+          .invokeMethod<bool>('recordingScreenAvailable')
+          .timeout(const Duration(milliseconds: 500));
+      if (available == null) {
+        throw const FormatException('Missing screen state');
+      }
+      return available;
+    } catch (_) {
+      throw const NotebookException('无法核验屏幕状态，请重新打开录音。');
+    }
+  }
+
+  void _onScreenOff() {
+    if (_disposed) return;
+    if (state == 'starting') _startInterrupted = true;
+    if (state == 'recording') unawaited(finish());
+  }
+
   Future<void> _release() async {
     try {
       await _pcm?.cancel();
@@ -342,6 +375,7 @@ class CaptureController extends ChangeNotifier with WidgetsBindingObserver {
     book.captureActive = false;
     _disposed = true;
     WidgetsBinding.instance.removeObserver(this);
+    _screenOff.removeListener(_onScreenOff);
     _timer?.cancel();
     _amplitude?.cancel();
     _states?.cancel();

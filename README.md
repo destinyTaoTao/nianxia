@@ -109,18 +109,37 @@ DeepSeek 使用集成时核验的 [V4-Flash](https://api-docs.deepseek.com/updat
 ## 本轮实际验证
 
 - `flutter analyze`：通过。
-- `flutter test`：37 项主机测试通过，覆盖应用行为、真实 SQLite/文件、故障注入与界面；包含浅深主题、两倍字体、无障碍触控/标签及减少动态效果。新增胶囊重复呼出、返回保存、编辑保留、拒绝权限转文字、确认丢弃及启动期间退后台回归。
+- `flutter test`：42 项主机测试通过，覆盖应用行为、真实 SQLite/文件、故障注入与界面；包含浅深主题、两倍字体、无障碍触控/标签及减少动态效果。新增胶囊重复呼出、返回保存、编辑保留、拒绝权限转文字、确认丢弃及启动期间退后台回归。
 - Android API 36 ARM64 模拟器、飞行模式：通过 `flutter drive` 执行真实 SenseVoice + BGE 同包、语义有/无结果、原生 PCM 录音和 WAV 回放。仅使用公开模型样本和合成文本。
-- 1,000 条合成短记录、主机 20 次关键词查询 P95：约 12.1 ms，非手机指标。
+- 1,000 条合成短记录、主机 20 次关键词查询 P95：约 9.4 ms，非手机指标。
 - [浅色时间线](docs/screenshots/home-light.png)、[深色时间线](docs/screenshots/home-dark.png)、[查找](docs/screenshots/search-light.png)、[详情](docs/screenshots/detail-light.png)为实际 widget 运行截图，非真机截图。
 - Android API 36 ARM64 Release、飞行模式：实际运行通过 URL 冷启动、重复呼出不截断、系统返回保存并返回原系统设置页面、实际点击快捷设置磁贴的热启动、深色主题、原生权限拒绝与首次授权；截图见[录音胶囊](docs/screenshots/android-capsule-recording.png)、[深色胶囊](docs/screenshots/android-capsule-dark.png)、[保存完成](docs/screenshots/android-capsule-saved.png)、[权限失败](docs/screenshots/android-capsule-permission.png)。均为模拟器，未冒充真机。
-- 原生重复呼出验证捕获并修复了短暂 `inactive` 被当作退后台而截断录音的问题；隐藏/暂停/分离才触发自动保存，真正的音频中断仍通过原生录音状态处理，符合 [Flutter 生命周期语义](https://api.flutter.dev/flutter/dart-ui/AppLifecycleState.html)。冷启动一次 `am start -W` 活动展示约 0.7 秒，只是系统展示耗时，不是采集延迟或 P95。
+- 原生重复呼出验证捕获并修复了短暂 `inactive` 被当作退后台而截断录音的问题；隐藏/暂停/分离及 Android 系统息屏事件触发自动保存，音频中断仍通过原生录音状态处理，符合 [Flutter 生命周期语义](https://api.flutter.dev/flutter/dart-ui/AppLifecycleState.html)。冷启动一次 `am start -W` 活动展示约 0.7 秒，只是系统展示耗时，不是采集延迟或 P95。
 - Swift 前端语法解析通过；`flutter build ios --no-codesign` 未能构建，提示 `Application not configured for iOS`。本机只有 Command Line Tools，缺少完整 Xcode 与 CocoaPods；此结果不表示 iOS 已构建或安装通过。
 - 模拟器 ExoPlayer 释放时观察到 `Handler ... on a dead thread` 警告，回放完成断言及整个 driver 均通过；尚未在真机确认是否复现。
-- 真实付费 API、真实日历提醒、双端系统备份排除的设备实测均未执行。
+- 真实付费 API、双端真机日历提醒、双端系统备份排除的设备实测均未执行；Android 模拟器通知链路的结果见下节。
 
-Android ARM64 Release 试用包已构建并安装启动，约 **50.9 MB**（不含首次下载的模型），仍使用本地 debug 签名；APK 仅包含 ARM64 与单一 ORT 运行时。产物为 `build/app/outputs/flutter-apk/app-release.apk`，SHA-256：`e65dfa23360b7b9bccba33b8e20b61082613abaddd38f466a84aaa6f8c000504`。
+Android ARM64 Release 试用包已构建并安装启动，约 **50.9 MB**（不含首次下载的模型），仍使用本地 debug 签名；APK 仅包含 ARM64 与单一 ORT 运行时。产物为 `build/app/outputs/flutter-apk/app-release.apk`，SHA-256：`788f58310869a82e12e6bdf314d7ea897c6c72a64bca0995c2bb649db384584a`。
 
 运行集成测试后再构建 Release 时使用上面的正常 `flutter build apk --release --target-platform android-arm64`，让 Flutter 重新生成排除测试插件的注册文件；不要复用测试阶段生成的注册文件直接加 `--no-pub`。Flutter 平台构建应串行执行。
 
-Release 包还在模拟器中通过实际界面完成了文字创建、持久显示和关键词查找；Android 包管理器核验未设置 ALLOW_BACKUP，当前模拟器没有日历编辑应用，因此真实保存及提醒仍未验证。
+Release 包还在模拟器中通过实际界面完成了文字创建、持久显示和关键词查找；Android 包管理器核验未设置 ALLOW_BACKUP，此前仅凭 `resolve-activity` 的空结果判断缺少日历应用不充分。本轮实际启动验证发现 Google 日历存在，但离线首启进入联网账号页；专用模拟器现配置 Etar 离线日历用于接入验证，真机保存与提醒仍未验收。
+
+## 当前模拟器阶段
+
+用户于 2026-11-09 明确将真机验收后移，先使用模拟器推进。当前 Android API 36 ARM64 已验证；物理 AI 键、真机录音质量、耗电和发热仍留在后续验收中。
+
+- **录音生命周期**：Release 中连续验证 0.5 秒、0.5 秒、1 秒息屏，均停止落盘且唤醒不自动续录；录音中强杀后重启恢复有效片段。短暂 `inactive` 不可靠地代表息屏，最终实现使用受保护的系统 `SCREEN_OFF` 广播；亮屏解锁的重复快捷动作仍不截断。启动时检查交互/锁屏状态，未知、异常和 500ms 超时不开始采集。回归还覆盖权限等待中息屏和迟到响应。
+- **日历接入**：通过念下记录进入 Etar 1.0.57 的系统编辑器，核对标题、日期、08:20–08:50 和时区正确传递；提醒没有通用预填，Android 页现明确为“计划提醒时间”，逐项展示需手动设置的值。本次在接收端手动设为 0 分钟后保存，观察到对应合成事项的日历通知，返回念下仍如实显示保存未确认；另验证系统页取消后也返回未确认，没有虚报保存成功。这条合成事项保存时已略过开始时刻，因此不作为准点或通知延迟验证。
+- **测试环境**：Etar 仅安装在专用 AVD 中，不进入念下安装包。使用无同步账号的离线日历和合成内容，联系人访问拒绝；Google 日历在此 AVD 中停用以避免离线首启账号页，非产品要求。Etar 来自其项目链接的 [F-Droid 分发页](https://f-droid.org/packages/ws.xsoh.etar/)，APK SHA-256 `dae01d93c8920aa63845868db2190bcc4aa6ff8410b1289de1ce27b1bb89c599`，安装前通过 APK 签名验证。
+- **验证边界**：虚拟 GSM 注入尚未可靠形成可观察的来电中断，未标记通过。iOS Simulator 同样需要完整 Xcode；本机 macOS 26.5.1 当前只有 Command Line Tools。App Store 查询到的最新版 Xcode 27.2 最低要求 macOS 26.6，需使用兼容旧版；官方下载需要 Apple 登录，命令行安装要求管理员认证，电脑控制工具另报告 Mac 锁屏。iOS 构建/运行仍未执行，参见 [Apple 模拟器安装说明](https://developer.apple.com/documentation/safari-developer-tools/installing-xcode-and-simulators)。
+
+### Standards
+
+本阶段独立审阅未发现新增的确定性规范缺陷。系统接收器注册/注销、Dart 监听释放成对；不增加权限、生产依赖或内容外发。运行时发现的息屏时序问题已改为系统事件驱动，并补回归。
+
+### Spec
+
+本阶段独立审阅未发现新增的确定性规格偏差。提醒核对、息屏保存、重复入口保护保持既定范围；iOS 和真机延期项不计为已完成。本阶段新增确定性问题：Standards 0，Spec 0。
+
+本阶段运行截图：[提醒计划](docs/screenshots/android-calendar-plan.png)、[接收端字段](docs/screenshots/android-calendar-editor.png)、[通知](docs/screenshots/android-calendar-notification.png)、[取消回执](docs/screenshots/android-calendar-cancel.png)、[强杀恢复](docs/screenshots/android-recovery.png)、[息屏保存](docs/screenshots/android-screen-off-saved.png)。
