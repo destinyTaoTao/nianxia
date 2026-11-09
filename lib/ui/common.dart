@@ -34,6 +34,27 @@ class ReadingWidth extends StatelessWidget {
   );
 }
 
+/// A shared quiet surface for related controls or a piece of note content.
+class PaperSurface extends StatelessWidget {
+  const PaperSurface({
+    super.key,
+    required this.child,
+    this.padding = const EdgeInsets.all(18),
+  });
+  final Widget child;
+  final EdgeInsetsGeometry padding;
+  @override
+  Widget build(BuildContext context) => Material(
+    color: Theme.of(context).colorScheme.surface,
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(20),
+      side: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
+    ),
+    clipBehavior: Clip.antiAlias,
+    child: Padding(padding: padding, child: child),
+  );
+}
+
 class EmptyState extends StatelessWidget {
   const EmptyState({
     super.key,

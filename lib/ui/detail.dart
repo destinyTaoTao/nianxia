@@ -203,69 +203,81 @@ class _DetailPageState extends State<DetailPage> {
           child: ListView(
             padding: const EdgeInsets.fromLTRB(24, 8, 24, 40),
             children: [
-              Text(recordDate(r), style: Theme.of(context).textTheme.bodySmall),
-              const SizedBox(height: 20),
-              if (r.parentId != null)
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: TextButton.icon(
-                    onPressed: () => openDetail(
-                      context,
-                      widget.book,
-                      r.parentId!,
-                      models: widget.models,
+              PaperSurface(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      recordDate(r),
+                      style: Theme.of(context).textTheme.bodySmall,
                     ),
-                    icon: const Icon(Icons.subdirectory_arrow_left),
-                    label: const Text('查看所属记录'),
-                  ),
-                ),
-              SelectableText(
-                r.body.isEmpty ? '音频已保存，等待转写。' : r.body,
-                style: Theme.of(context).textTheme.bodyLarge,
-              ),
-              if (r.audio != null) ...[
-                const SizedBox(height: 24),
-                AudioPlayback(
-                  path: widget.book.audioPath(r),
-                  duration: r.durationMs,
-                ),
-                const SizedBox(height: 8),
-                Wrap(
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  spacing: 8,
-                  children: [
-                    Text(switch (r.transcription) {
-                      'pending' => '待转写，模型就绪后处理',
-                      'running' => '正在本地转写',
-                      'failed' => '转写失败，音频已保留',
-                      'stale' => '正文已改变，旧转写未写回',
-                      _ => '原音频已保留',
-                    }, style: Theme.of(context).textTheme.bodySmall),
-                    if (r.transcription != 'running')
-                      TextButton(
-                        onPressed: transcribing ? null : () => transcribe(r),
-                        child: Text(transcribing ? '转写中' : '重新转写'),
-                      ),
-                  ],
-                ),
-              ],
-              if (r.transcript != null)
-                ExpansionTile(
-                  tilePadding: EdgeInsets.zero,
-                  title: const Text('查看原始转写'),
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 16),
-                      child: Align(
+                    const SizedBox(height: 20),
+                    if (r.parentId != null)
+                      Align(
                         alignment: Alignment.centerLeft,
-                        child: SelectableText(
-                          r.transcript!,
-                          style: Theme.of(context).textTheme.bodyMedium,
+                        child: TextButton.icon(
+                          onPressed: () => openDetail(
+                            context,
+                            widget.book,
+                            r.parentId!,
+                            models: widget.models,
+                          ),
+                          icon: const Icon(Icons.subdirectory_arrow_left),
+                          label: const Text('查看所属记录'),
                         ),
                       ),
+                    SelectableText(
+                      r.body.isEmpty ? '音频已保存，等待转写。' : r.body,
+                      style: Theme.of(context).textTheme.bodyLarge,
                     ),
+                    if (r.audio != null) ...[
+                      const SizedBox(height: 24),
+                      AudioPlayback(
+                        path: widget.book.audioPath(r),
+                        duration: r.durationMs,
+                      ),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        spacing: 8,
+                        children: [
+                          Text(switch (r.transcription) {
+                            'pending' => '待转写，模型就绪后处理',
+                            'running' => '正在本地转写',
+                            'failed' => '转写失败，音频已保留',
+                            'stale' => '正文已改变，旧转写未写回',
+                            _ => '原音频已保留',
+                          }, style: Theme.of(context).textTheme.bodySmall),
+                          if (r.transcription != 'running')
+                            TextButton(
+                              onPressed: transcribing
+                                  ? null
+                                  : () => transcribe(r),
+                              child: Text(transcribing ? '转写中' : '重新转写'),
+                            ),
+                        ],
+                      ),
+                    ],
+                    if (r.transcript != null)
+                      ExpansionTile(
+                        tilePadding: EdgeInsets.zero,
+                        title: const Text('查看原始转写'),
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 16),
+                            child: Align(
+                              alignment: Alignment.centerLeft,
+                              child: SelectableText(
+                                r.transcript!,
+                                style: Theme.of(context).textTheme.bodyMedium,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                   ],
                 ),
+              ),
               const SizedBox(height: 20),
               Wrap(
                 spacing: 12,

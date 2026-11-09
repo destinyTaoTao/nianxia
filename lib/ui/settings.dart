@@ -244,59 +244,66 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   List<Widget> modelSection(BuildContext context) => [
-    Text('离线模型', style: Theme.of(context).textTheme.titleMedium),
-    const SizedBox(height: 8),
-    const Text(
-      '首次下载需要联网，完成后可离线使用。不会发送你的录音或文字。',
-      style: TextStyle(fontSize: 14, height: 1.6),
-    ),
-    if (widget.models == null)
-      const Padding(
-        padding: EdgeInsets.symmetric(vertical: 16),
-        child: Text('当前环境未接入模型，请使用文字记录和关键词查找。'),
-      ),
-    for (final m in widget.models?.store.models ?? [])
-      Padding(
-        padding: const EdgeInsets.symmetric(vertical: 16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(switch (m.id) {
-              'sensevoice' => '语音转文字',
-              'bge' => '按意思查找',
-              _ => m.label,
-            }, style: Theme.of(context).textTheme.titleMedium),
-            Text(
-              '下载约 ${(m.bytes / 1000000).toStringAsFixed(1)} MB',
-              style: Theme.of(context).textTheme.bodySmall,
+    PaperSurface(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text('离线模型', style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 8),
+          const Text(
+            '首次下载需要联网，完成后可离线使用。不会发送你的录音或文字。',
+            style: TextStyle(fontSize: 14, height: 1.6),
+          ),
+          if (widget.models == null)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 16),
+              child: Text('当前环境未接入模型，请使用文字记录和关键词查找。'),
             ),
-            const SizedBox(height: 8),
-            if (widget.models!.store.progress.containsKey(m.id)) ...[
-              LinearProgressIndicator(
-                value: widget.models!.store.progress[m.id],
+          for (final m in widget.models?.store.models ?? [])
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(switch (m.id) {
+                    'sensevoice' => '语音转文字',
+                    'bge' => '按意思查找',
+                    _ => m.label,
+                  }, style: Theme.of(context).textTheme.titleMedium),
+                  Text(
+                    '下载约 ${(m.bytes / 1000000).toStringAsFixed(1)} MB',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                  const SizedBox(height: 8),
+                  if (widget.models!.store.progress.containsKey(m.id)) ...[
+                    LinearProgressIndicator(
+                      value: widget.models!.store.progress[m.id],
+                    ),
+                    TextButton(
+                      onPressed: () => widget.models!.store.cancel(m.id),
+                      child: const Text('取消下载'),
+                    ),
+                  ] else if (ready[m.id] == true)
+                    const Text('已就绪，可离线使用')
+                  else
+                    OutlinedButton.icon(
+                      onPressed: downloading.contains(m.id)
+                          ? null
+                          : () => download(m.id),
+                      icon: const Icon(Icons.download_outlined),
+                      label: Text(downloading.contains(m.id) ? '正在校验' : '下载模型'),
+                    ),
+                  if (widget.models!.store.errors[m.id] != null)
+                    Text(
+                      widget.models!.store.errors[m.id]!,
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                ],
               ),
-              TextButton(
-                onPressed: () => widget.models!.store.cancel(m.id),
-                child: const Text('取消下载'),
-              ),
-            ] else if (ready[m.id] == true)
-              const Text('已就绪，可离线使用')
-            else
-              OutlinedButton.icon(
-                onPressed: downloading.contains(m.id)
-                    ? null
-                    : () => download(m.id),
-                icon: const Icon(Icons.download_outlined),
-                label: Text(downloading.contains(m.id) ? '正在校验' : '下载模型'),
-              ),
-            if (widget.models!.store.errors[m.id] != null)
-              Text(
-                widget.models!.store.errors[m.id]!,
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-          ],
-        ),
+            ),
+        ],
       ),
+    ),
   ];
 
   @override
@@ -311,136 +318,177 @@ class _SettingsPageState extends State<SettingsPage> {
       appBar: AppBar(title: Text(widget.modelsFirst ? '离线功能' : '设置')),
       body: ReadingWidth(
         child: ListView(
-          padding: const EdgeInsets.all(24),
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
           children: [
             if (widget.modelsFirst) ...[
               ...modelSection(context),
-              const SizedBox(height: 28),
-            ],
-            Text('保存在这里', style: Theme.of(context).textTheme.titleLarge),
-            const SizedBox(height: 12),
-            const Text(
-              '记录、音频、转写和查找保存在设备上，无需账号。模型下载完成后可离线记查。应用数据未声明加密；请保护设备访问权限。',
-            ),
-            const SizedBox(height: 28),
-            DropdownButtonFormField<ThemeMode>(
-              initialValue: mode,
-              decoration: const InputDecoration(labelText: '外观'),
-              items: const [
-                DropdownMenuItem(value: ThemeMode.system, child: Text('跟随系统')),
-                DropdownMenuItem(value: ThemeMode.light, child: Text('浅色')),
-                DropdownMenuItem(value: ThemeMode.dark, child: Text('深色')),
-              ],
-              onChanged: (v) {
-                if (v != null) {
-                  setState(() => mode = v);
-                  widget.onTheme(v);
-                }
-              },
-            ),
-            const SizedBox(height: 32),
-            Text('快捷呼出', style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 8),
-            Text(
-              Platform.isIOS
-                  ? '在系统“快捷指令”中选择念下的“记一下”，可绑定操作按钮。呼出后直接进入录音胶囊；系统可能要求解锁。'
-                  : '下拉系统快捷设置，编辑并添加“记一下”磁贴，即可直接呼出录音胶囊。AI 键若支持应用快捷动作或打开链接，可绑定“记一下”；是否可选取决于手机系统。',
-            ),
-            const SizedBox(height: 8),
-            const Text('只在主动呼出后录音。切换应用或锁屏会停止并尝试保存，不在后台持续监听。'),
-            TextButton.icon(
-              onPressed: () async {
-                await Clipboard.setData(
-                  const ClipboardData(text: 'nianxia://capture'),
-                );
-                if (context.mounted) {
-                  notice(context, '录音链接已复制，可用于系统快捷指令的“打开 URL”动作。');
-                }
-              },
-              icon: const Icon(Icons.link_rounded),
-              label: const Text('复制录音快捷链接'),
-            ),
-            const SizedBox(height: 32),
-            if (!widget.modelsFirst) ...modelSection(context),
-            const SizedBox(height: 20),
-            const Divider(),
-            const SizedBox(height: 24),
-            Text('可选云端整理', style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 8),
-            Text(
-              configured
-                  ? '已配置 DeepSeek 密钥。每次仅在你确认后发送单条正文。'
-                  : '默认关闭。配置自己的 DeepSeek API Key 后，才可逐次确认整理。',
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: key,
-              obscureText: true,
-              enableSuggestions: false,
-              autocorrect: false,
-              decoration: const InputDecoration(
-                labelText: 'DeepSeek API Key',
-                hintText: '仅保存在设备安全存储',
-              ),
-            ),
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 12,
-              children: [
-                FilledButton(
-                  onPressed: keyBusy ? null : () => saveKey(),
-                  child: const Text('保存密钥'),
-                ),
-                if (configured)
-                  TextButton(
-                    onPressed: keyBusy ? null : () => saveKey(clear: true),
-                    child: const Text('清除密钥'),
-                  ),
-              ],
-            ),
-            if (keyError != null) Text(keyError!),
-            const SizedBox(height: 28),
-            const Divider(),
-            const SizedBox(height: 24),
-            Text('导出与恢复', style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 8),
-            const Text(
-              '备份未加密，包含可读文本与原音频；不包含模型、密钥或查询音频。系统分享和同步日历可能使所选内容离开设备。',
-              style: TextStyle(fontSize: 14, height: 1.6),
-            ),
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 12,
-              runSpacing: 12,
-              children: [
-                OutlinedButton.icon(
-                  onPressed: busy ? null : export,
-                  icon: const Icon(Icons.ios_share_outlined),
-                  label: const Text('导出备份'),
-                ),
-                OutlinedButton.icon(
-                  onPressed: busy ? null : restore,
-                  icon: const Icon(Icons.restore_outlined),
-                  label: const Text('恢复备份'),
-                ),
-              ],
-            ),
-            if (busy) ...[
               const SizedBox(height: 16),
-              LinearProgressIndicator(value: progress),
-              TextButton(
-                onPressed: () {
-                  backup.cancelled = true;
-                  setState(() => status = '正在取消，请等待当前校验结束');
-                },
-                child: const Text('取消操作'),
-              ),
             ],
-            if (status != null)
-              Padding(
-                padding: const EdgeInsets.only(top: 16),
-                child: Semantics(liveRegion: true, child: Text(status!)),
+            PaperSurface(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text('保存在这里', style: Theme.of(context).textTheme.titleMedium),
+                  const SizedBox(height: 12),
+                  const Text(
+                    '记录、音频、转写和查找保存在设备上，无需账号。模型下载完成后可离线记查。应用数据未声明加密；请保护设备访问权限。',
+                  ),
+                  const SizedBox(height: 28),
+                  DropdownButtonFormField<ThemeMode>(
+                    initialValue: mode,
+                    decoration: const InputDecoration(labelText: '外观'),
+                    items: const [
+                      DropdownMenuItem(
+                        value: ThemeMode.system,
+                        child: Text('跟随系统'),
+                      ),
+                      DropdownMenuItem(
+                        value: ThemeMode.light,
+                        child: Text('浅色'),
+                      ),
+                      DropdownMenuItem(
+                        value: ThemeMode.dark,
+                        child: Text('深色'),
+                      ),
+                    ],
+                    onChanged: (v) {
+                      if (v != null) {
+                        setState(() => mode = v);
+                        widget.onTheme(v);
+                      }
+                    },
+                  ),
+                ],
               ),
+            ),
+            const SizedBox(height: 16),
+            PaperSurface(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text('快捷呼出', style: Theme.of(context).textTheme.titleMedium),
+                  const SizedBox(height: 8),
+                  Text(
+                    Platform.isIOS
+                        ? '在系统“快捷指令”中选择念下的“记一下”，可绑定操作按钮。呼出后直接进入录音胶囊；系统可能要求解锁。'
+                        : '下拉系统快捷设置，编辑并添加“记一下”磁贴，即可直接呼出录音胶囊。AI 键若支持应用快捷动作或打开链接，可绑定“记一下”；是否可选取决于手机系统。',
+                  ),
+                  const SizedBox(height: 8),
+                  const Text('只在主动呼出后录音。切换应用或锁屏会停止并尝试保存，不在后台持续监听。'),
+                  TextButton.icon(
+                    onPressed: () async {
+                      await Clipboard.setData(
+                        const ClipboardData(text: 'nianxia://capture'),
+                      );
+                      if (context.mounted) {
+                        notice(context, '录音链接已复制，可用于系统快捷指令的“打开 URL”动作。');
+                      }
+                    },
+                    icon: const Icon(Icons.link_rounded),
+                    label: const Text('复制录音快捷链接'),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            if (!widget.modelsFirst) ...[
+              ...modelSection(context),
+              const SizedBox(height: 16),
+            ],
+            PaperSurface(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    '可选云端整理',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    configured
+                        ? '已配置 DeepSeek 密钥。每次仅在你确认后发送单条正文。'
+                        : '默认关闭。配置自己的 DeepSeek API Key 后，才可逐次确认整理。',
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: key,
+                    obscureText: true,
+                    enableSuggestions: false,
+                    autocorrect: false,
+                    decoration: const InputDecoration(
+                      labelText: 'DeepSeek API Key',
+                      hintText: '仅保存在设备安全存储',
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 12,
+                    children: [
+                      FilledButton(
+                        onPressed: keyBusy ? null : () => saveKey(),
+                        child: const Text('保存密钥'),
+                      ),
+                      if (configured)
+                        TextButton(
+                          onPressed: keyBusy
+                              ? null
+                              : () => saveKey(clear: true),
+                          child: const Text('清除密钥'),
+                        ),
+                    ],
+                  ),
+                  if (keyError != null) Text(keyError!),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            PaperSurface(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text('导出与恢复', style: Theme.of(context).textTheme.titleMedium),
+                  const SizedBox(height: 8),
+                  const Text(
+                    '备份未加密，包含可读文本与原音频；不包含模型、密钥或查询音频。系统分享和同步日历可能使所选内容离开设备。',
+                    style: TextStyle(fontSize: 14, height: 1.6),
+                  ),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 12,
+                    runSpacing: 12,
+                    children: [
+                      OutlinedButton.icon(
+                        onPressed: busy ? null : export,
+                        icon: const Icon(Icons.ios_share_outlined),
+                        label: const Text('导出备份'),
+                      ),
+                      OutlinedButton.icon(
+                        onPressed: busy ? null : restore,
+                        icon: const Icon(Icons.restore_outlined),
+                        label: const Text('恢复备份'),
+                      ),
+                    ],
+                  ),
+                  if (busy) ...[
+                    const SizedBox(height: 16),
+                    LinearProgressIndicator(value: progress),
+                    TextButton(
+                      onPressed: () {
+                        backup.cancelled = true;
+                        setState(() => status = '正在取消，请等待当前校验结束');
+                      },
+                      child: const Text('取消操作'),
+                    ),
+                  ],
+                  if (status != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 16),
+                      child: Semantics(liveRegion: true, child: Text(status!)),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
             if (widget.book.recoveryDrafts.isNotEmpty) ...[
               const SizedBox(height: 28),
               Text('待恢复录音', style: Theme.of(context).textTheme.titleMedium),

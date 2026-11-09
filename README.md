@@ -13,6 +13,16 @@
 - 用户自带 DeepSeek Key，每次确认单条正文后整理；结果与正文分开，编辑后标过期。不自动重放付费请求。
 - 未加密 ZIP 备份（包含可读文本与 WAV），重复跳过、冲突副本和追加关系重映射。索引可重建。
 
+## 当前视觉样式（awesome-flutter）
+
+参考 awesome-flutter 中的 [Forui 分组列表](https://forui.dev/docs/widgets/tile/tile-group) 和 [Shadcn 卡片](https://mariuti.com/flutter-shadcn-ui/components/card/)，将相关内容放在统一的中性面板中。已核验 Forui 0.27.7、shadcn_ui 0.58.0 的维护者文档及 pub.dev 双平台信息；Forui 要求 Flutter 3.47+，本机 3.47.9 满足此最低条件。直接接入需要新增主题及控件迁移，本轮采用现有 SDK 实现视觉方向，未增加运行时依赖，也不以文档平台列表代替 iOS 实测。
+
+浅色采用 #F6F6F6 画布、#FFFFFF 面板、#181818 正文、#606060 辅助文字、#DDDDDD 边界；深色为对应石墨灰层级。统一字体继承、按钮/表单/弹窗、14/16/20px 控件与面板圆角：首页主操作及最近记录分组，查找和完整列表使用独立结果面板，详情正文与编辑使用纸面区域，设置按实际用途分组。未修改保存、下载、云端发送及日历逻辑。
+
+视觉验证扩展到浅/深色的首页、查找、详情、设置、编辑和日历表单，并检查小屏、两倍字体及实际可命中的设置入口。44 项主机测试和静态检查通过；独立 Standards / Spec 评审均为 0 项确认问题。Android 原生运行与截图见当前交付记录，iOS 和真机继续按原安排后移。
+
+当前截图：[Android 浅色首页](docs/screenshots/android-polish-home-light.png)、[深色首页](docs/screenshots/android-polish-home-dark.png)、[详情](docs/screenshots/android-polish-detail.png)、[设置分组](docs/screenshots/android-polish-settings.png)；[深色编辑页](docs/screenshots/widget-polish-editor-dark.png)为主机 widget 渲染。原生导航验证完成后已返回首页，回放进度轨道与 48dp 手势区域保持可用。
+
 ## 试用反馈：首页更直接
 
 2026-11-09 按试用反馈将时间线首页调整为轻量操作首页：主入口“录音记一下”，并列次级入口“写文字 / 找一下”，下方显示最近三条；“全部记录”进入完整列表及收藏。未转写录音使用创建时间作显示名称，完整原文和音频保持不变。首页显示未就绪的离线转写及准备入口，直接进入模型下载区域；不自动下载或发起云端请求。
@@ -127,7 +137,7 @@ DeepSeek 使用集成时核验的 [V4-Flash](https://api-docs.deepseek.com/updat
 - 模拟器 ExoPlayer 释放时观察到 `Handler ... on a dead thread` 警告，回放完成断言及整个 driver 均通过；尚未在真机确认是否复现。
 - 真实付费 API、双端真机日历提醒、双端系统备份排除的设备实测均未执行；Android 模拟器通知链路的结果见下节。
 
-Android ARM64 Release 试用包已构建并安装启动，约 **50.9 MB**（不含首次下载的模型），仍使用本地 debug 签名；APK 仅包含 ARM64 与单一 ORT 运行时。产物为 `build/app/outputs/flutter-apk/app-release.apk`，SHA-256：`e5db50521254ff74ef82f20b5d909f039adbec3d9a5c5860a840b0a7afc78e0b`。
+Android ARM64 Release 试用包已构建并安装启动，约 **51.0 MB**（不含首次下载的模型），仍使用本地 debug 签名；APK 仅包含 ARM64 与单一 ORT 运行时。产物为 `build/app/outputs/flutter-apk/app-release.apk`，SHA-256：`60fb8fb23799ad0b681093caa75d175c9111a56da247a17f7f2354fb59e7e9f2`。
 
 运行集成测试后再构建 Release 时使用上面的正常 `flutter build apk --release --target-platform android-arm64`，让 Flutter 重新生成排除测试插件的注册文件；不要复用测试阶段生成的注册文件直接加 `--no-pub`。Flutter 平台构建应串行执行。
 

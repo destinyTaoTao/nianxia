@@ -61,7 +61,7 @@ void main() {
   }
 
   for (final mode in [ThemeMode.light, ThemeMode.dark]) {
-    testWidgets('${mode.name} 手机时间线、查找与详情布局', (tester) async {
+    testWidgets('${mode.name} 手机首页、查找、详情与表单布局', (tester) async {
       tester.view.physicalSize = const Size(390, 844);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.resetPhysicalSize);
@@ -91,6 +91,27 @@ void main() {
       await tester.pumpAndSettle(const Duration(milliseconds: 400));
       expect(tester.takeException(), isNull);
       await capture(tester, 'search-${mode.name}');
+      await tester.tap(find.byTooltip('返回'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('设置'));
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      await capture(tester, 'settings-${mode.name}');
+      await tester.tap(find.byTooltip('返回'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('写文字'));
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      await capture(tester, 'editor-${mode.name}');
+      await tester.tap(find.byTooltip('返回'));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(find.textContaining('记录要足够快'));
+      await tester.tap(find.textContaining('记录要足够快'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('加入日历'));
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      await capture(tester, 'calendar-${mode.name}');
     });
   }
   testWidgets('小屏与两倍字体仍可操作，控件有可访问标签', (tester) async {
@@ -108,6 +129,20 @@ void main() {
     await tester.ensureVisible(find.text('全部记录'));
     await tester.tap(find.text('全部记录'));
     await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
+    await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
+    await tester.tap(find.byTooltip('返回'));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.byTooltip('设置').hitTestable(),
+      -200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.byTooltip('设置').hitTestable(), findsOneWidget);
+    await tester.tap(find.byTooltip('设置').hitTestable());
+    await tester.pumpAndSettle();
+    expect(find.text('保存在这里'), findsOneWidget);
     expect(tester.takeException(), isNull);
     await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
     await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));

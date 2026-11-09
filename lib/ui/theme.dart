@@ -2,21 +2,28 @@ import 'package:flutter/material.dart';
 
 ThemeData notebookTheme(Brightness brightness, {String? fontFamily}) {
   final dark = brightness == Brightness.dark;
-  final bg = Color(dark ? 0xff212121 : 0xffffffff),
-      surface = Color(dark ? 0xff303030 : 0xfff7f7f8);
-  final ink = Color(dark ? 0xfff5f5f5 : 0xff171717),
-      muted = Color(dark ? 0xffb4b4b4 : 0xff666666);
-  final line = Color(dark ? 0xff4a4a4a : 0xffe5e5e5),
-      inverse = Color(dark ? 0xff171717 : 0xffffffff);
-  final scheme = ColorScheme.fromSeed(seedColor: ink, brightness: brightness)
-      .copyWith(
+  final canvas = Color(dark ? 0xff1c1c1c : 0xfff6f6f6);
+  final panel = Color(dark ? 0xff272727 : 0xffffffff);
+  final soft = Color(dark ? 0xff333333 : 0xfff1f1f1);
+  final ink = Color(dark ? 0xfff4f4f4 : 0xff181818);
+  final muted = Color(dark ? 0xffb3b3b3 : 0xff606060);
+  final line = Color(dark ? 0xff414141 : 0xffdddddd);
+  final inverse = Color(dark ? 0xff181818 : 0xffffffff);
+  final scheme =
+      ColorScheme.fromSeed(
+        seedColor: ink,
+        brightness: brightness,
+        dynamicSchemeVariant: DynamicSchemeVariant.monochrome,
+      ).copyWith(
         primary: ink,
         onPrimary: inverse,
         secondary: muted,
         onSecondary: inverse,
-        surface: bg,
+        surface: panel,
+        surfaceContainerLow: panel,
+        surfaceContainer: soft,
+        surfaceContainerHighest: soft,
         onSurface: ink,
-        surfaceContainerHighest: surface,
         onSurfaceVariant: muted,
         outline: muted,
         outlineVariant: line,
@@ -28,8 +35,26 @@ ThemeData notebookTheme(Brightness brightness, {String? fontFamily}) {
     colorScheme: scheme,
     fontFamily: fontFamily,
   );
+  final controlShape = RoundedRectangleBorder(
+    borderRadius: BorderRadius.circular(14),
+  );
+  OutlineInputBorder inputBorder(Color color, [double width = 1]) =>
+      OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: BorderSide(color: color, width: width),
+      );
   return base.copyWith(
-    scaffoldBackgroundColor: bg,
+    scaffoldBackgroundColor: canvas,
+    iconTheme: IconThemeData(color: ink, size: 22),
+    sliderTheme: SliderThemeData(
+      trackHeight: 3,
+      activeTrackColor: ink,
+      inactiveTrackColor: muted.withValues(alpha: .72),
+      thumbColor: ink,
+      overlayColor: ink.withValues(alpha: .08),
+      thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+      overlayShape: const RoundSliderOverlayShape(overlayRadius: 24),
+    ),
     progressIndicatorTheme: ProgressIndicatorThemeData(
       color: ink,
       linearTrackColor: line,
@@ -38,31 +63,59 @@ ThemeData notebookTheme(Brightness brightness, {String? fontFamily}) {
     textTheme: base.textTheme
         .copyWith(
           headlineMedium: TextStyle(
-            fontSize: 28,
+            fontFamily: fontFamily,
+            fontSize: 26,
             fontWeight: FontWeight.w600,
-            height: 1.25,
+            height: 1.3,
+            letterSpacing: -.3,
             color: ink,
           ),
           titleLarge: TextStyle(
-            fontSize: 24,
+            fontFamily: fontFamily,
+            fontSize: 22,
             fontWeight: FontWeight.w600,
+            height: 1.35,
             color: ink,
           ),
           titleMedium: TextStyle(
-            fontSize: 17,
+            fontFamily: fontFamily,
+            fontSize: 16,
             fontWeight: FontWeight.w600,
             height: 1.5,
             color: ink,
           ),
-          bodyLarge: TextStyle(fontSize: 17, height: 1.7, color: ink),
-          bodyMedium: TextStyle(fontSize: 16, height: 1.5, color: ink),
-          bodySmall: TextStyle(fontSize: 14, height: 1.5, color: muted),
+          bodyLarge: TextStyle(
+            fontFamily: fontFamily,
+            fontSize: 16,
+            height: 1.65,
+            color: ink,
+          ),
+          bodyMedium: TextStyle(
+            fontFamily: fontFamily,
+            fontSize: 15,
+            height: 1.55,
+            color: ink,
+          ),
+          bodySmall: TextStyle(
+            fontFamily: fontFamily,
+            fontSize: 13,
+            height: 1.5,
+            color: muted,
+          ),
+          labelLarge: TextStyle(
+            fontFamily: fontFamily,
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: ink,
+          ),
         )
         .apply(fontFamily: fontFamily),
     appBarTheme: AppBarTheme(
-      backgroundColor: bg,
+      backgroundColor: canvas,
       surfaceTintColor: Colors.transparent,
       elevation: 0,
+      scrolledUnderElevation: 0,
+      toolbarHeight: 64,
       centerTitle: false,
       titleTextStyle: TextStyle(
         fontFamily: fontFamily,
@@ -72,38 +125,105 @@ ThemeData notebookTheme(Brightness brightness, {String? fontFamily}) {
       ),
     ),
     dividerTheme: DividerThemeData(color: line, thickness: 1, space: 1),
+    cardTheme: CardThemeData(
+      color: panel,
+      elevation: 0,
+      margin: EdgeInsets.zero,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+        side: BorderSide(color: line),
+      ),
+    ),
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(
         minimumSize: const Size(48, 52),
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+        elevation: 0,
+        shape: controlShape,
+        textStyle: TextStyle(
+          fontFamily: fontFamily,
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+        ),
       ),
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: OutlinedButton.styleFrom(
         minimumSize: const Size(48, 52),
+        backgroundColor: panel,
         side: BorderSide(color: line),
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        shape: controlShape,
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+        textStyle: TextStyle(
+          fontFamily: fontFamily,
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+        ),
       ),
     ),
     textButtonTheme: TextButtonThemeData(
-      style: TextButton.styleFrom(minimumSize: const Size(48, 48)),
+      style: TextButton.styleFrom(
+        minimumSize: const Size(48, 48),
+        shape: controlShape,
+        textStyle: TextStyle(
+          fontFamily: fontFamily,
+          fontSize: 14,
+          fontWeight: FontWeight.w500,
+        ),
+      ),
     ),
     iconButtonTheme: IconButtonThemeData(
       style: IconButton.styleFrom(minimumSize: const Size(48, 48)),
     ),
-    inputDecorationTheme: InputDecorationTheme(
-      filled: true,
-      fillColor: surface,
-      contentPadding: const EdgeInsets.all(16),
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(16),
-        borderSide: BorderSide.none,
+    chipTheme: ChipThemeData(
+      backgroundColor: panel,
+      selectedColor: soft,
+      checkmarkColor: ink,
+      side: BorderSide(color: line),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      labelStyle: TextStyle(
+        fontFamily: fontFamily,
+        fontSize: 14,
+        fontWeight: FontWeight.w500,
+        color: ink,
+      ),
+      secondaryLabelStyle: TextStyle(
+        fontFamily: fontFamily,
+        fontSize: 14,
+        fontWeight: FontWeight.w600,
+        color: ink,
       ),
     ),
+    inputDecorationTheme: InputDecorationTheme(
+      filled: true,
+      fillColor: panel,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      hintStyle: TextStyle(fontFamily: fontFamily, color: muted, fontSize: 15),
+      labelStyle: TextStyle(fontFamily: fontFamily, color: muted, fontSize: 14),
+      border: inputBorder(line),
+      enabledBorder: inputBorder(line),
+      focusedBorder: inputBorder(ink, 1.5),
+      errorBorder: inputBorder(scheme.error),
+      focusedErrorBorder: inputBorder(scheme.error, 1.5),
+    ),
+    dialogTheme: DialogThemeData(
+      backgroundColor: panel,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+    ),
+    snackBarTheme: SnackBarThemeData(
+      behavior: SnackBarBehavior.floating,
+      backgroundColor: ink,
+      contentTextStyle: TextStyle(
+        fontFamily: fontFamily,
+        color: inverse,
+        fontSize: 14,
+        height: 1.5,
+      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    ),
     bottomSheetTheme: BottomSheetThemeData(
-      backgroundColor: bg,
+      backgroundColor: panel,
       showDragHandle: false,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),

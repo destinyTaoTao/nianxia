@@ -175,7 +175,8 @@ class _HomePageState extends State<HomePage> {
                     Expanded(
                       child: Text(
                         '念下',
-                        style: Theme.of(context).textTheme.titleLarge,
+                        style: Theme.of(context).textTheme.titleLarge
+                            ?.copyWith(fontSize: 20),
                       ),
                     ),
                     IconButton(
@@ -185,105 +186,167 @@ class _HomePageState extends State<HomePage> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 28),
-                Text(
-                  '记下你的想法',
-                  style: Theme.of(context).textTheme.headlineMedium,
-                ),
                 const SizedBox(height: 20),
-                FilledButton(
-                  onPressed: record,
-                  style: FilledButton.styleFrom(
-                    padding: const EdgeInsets.all(22),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(22),
-                    ),
-                  ),
-                  child: Row(
+                PaperSurface(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      const Icon(Icons.mic_none_rounded, size: 32),
-                      const SizedBox(width: 18),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                      Text(
+                        '记下你的想法',
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
+                      const SizedBox(height: 16),
+                      FilledButton(
+                        onPressed: record,
+                        style: FilledButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 18,
+                            vertical: 20,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                        ),
+                        child: Row(
                           children: [
-                            const Text(
-                              '录音记一下',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w600,
+                            Container(
+                              width: 48,
+                              height: 48,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: Theme.of(context).colorScheme.onPrimary
+                                    .withValues(alpha: .12),
+                              ),
+                              child: const Icon(
+                                Icons.mic_none_rounded,
+                                size: 26,
                               ),
                             ),
-                            const SizedBox(height: 4),
-                            Text(
-                              '最长2分钟，停止后保存',
-                              style: TextStyle(
-                                fontSize: 13,
-                                color: Theme.of(context).colorScheme.onPrimary
-                                    .withValues(alpha: .78),
+                            const SizedBox(width: 18),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    '录音记一下',
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    '最长2分钟，停止后保存',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onPrimary
+                                          .withValues(alpha: .78),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                           ],
                         ),
                       ),
+                      const SizedBox(height: 12),
+                      LayoutBuilder(
+                        builder: (context, constraints) {
+                          final secondaryStyle = OutlinedButton.styleFrom(
+                            backgroundColor: Theme.of(context)
+                                .colorScheme
+                                .surfaceContainerHighest,
+                            side: BorderSide.none,
+                          );
+                          final write = OutlinedButton.icon(
+                            style: secondaryStyle,
+                            onPressed: () => openEditor(context, widget.book),
+                            icon: const Icon(Icons.edit_outlined, size: 20),
+                            label: const Text('写文字'),
+                          );
+                          final search = OutlinedButton.icon(
+                            style: secondaryStyle,
+                            onPressed: find,
+                            icon: const Icon(Icons.search_rounded, size: 20),
+                            label: const Text('找一下'),
+                          );
+                          if (MediaQuery.textScalerOf(context).scale(16) > 22) {
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                write,
+                                const SizedBox(height: 12),
+                                search,
+                              ],
+                            );
+                          }
+                          return Row(
+                            children: [
+                              Expanded(child: write),
+                              const SizedBox(width: 12),
+                              Expanded(child: search),
+                            ],
+                          );
+                        },
+                      ),
                     ],
                   ),
                 ),
-                const SizedBox(height: 12),
-                LayoutBuilder(
-                  builder: (context, constraints) {
-                    final write = OutlinedButton.icon(
-                      onPressed: () => openEditor(context, widget.book),
-                      icon: const Icon(Icons.edit_outlined, size: 20),
-                      label: const Text('写文字'),
-                    );
-                    final search = OutlinedButton.icon(
-                      onPressed: find,
-                      icon: const Icon(Icons.search_rounded, size: 20),
-                      label: const Text('找一下'),
-                    );
-                    if (MediaQuery.textScalerOf(context).scale(16) > 22) {
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [write, const SizedBox(height: 12), search],
-                      );
-                    }
-                    return Row(
-                      children: [
-                        Expanded(child: write),
-                        const SizedBox(width: 12),
-                        Expanded(child: search),
-                      ],
-                    );
-                  },
-                ),
                 if (speechReady == false) ...[
-                  const SizedBox(height: 20),
-                  Container(
-                    padding: const EdgeInsets.fromLTRB(16, 14, 16, 4),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context)
-                          .colorScheme
-                          .surfaceContainerHighest,
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          '离线转写尚未就绪',
-                          style: Theme.of(context).textTheme.titleMedium,
+                  const SizedBox(height: 14),
+                  PaperSurface(
+                    padding: EdgeInsets.zero,
+                    child: InkWell(
+                      onTap: () => settings(modelsFirst: true),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 14,
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          '先录音保存，下载后转文字。',
-                          style: Theme.of(context).textTheme.bodySmall,
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.download_outlined,
+                              size: 22,
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurfaceVariant,
+                            ),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    '离线转写尚未就绪',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleMedium
+                                        ?.copyWith(fontSize: 14),
+                                  ),
+                                  Text(
+                                    '录音照常保存',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodySmall,
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    '准备语音转写',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .labelLarge,
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            const Icon(Icons.chevron_right_rounded, size: 20),
+                          ],
                         ),
-                        TextButton(
-                          onPressed: () => settings(modelsFirst: true),
-                          child: const Text('准备语音转写'),
-                        ),
-                      ],
+                      ),
                     ),
                   ),
                 ],
@@ -299,38 +362,47 @@ class _HomePageState extends State<HomePage> {
                     TextButton(onPressed: library, child: const Text('全部记录')),
                   ],
                 ),
-                if (recent.isEmpty)
-                  Container(
-                    padding: const EdgeInsets.all(24),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context)
-                          .colorScheme
-                          .surfaceContainerHighest,
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          '还没有记录',
-                          style: Theme.of(context).textTheme.titleMedium,
+                PaperSurface(
+                  padding: recent.isEmpty
+                      ? const EdgeInsets.all(22)
+                      : EdgeInsets.zero,
+                  child: recent.isEmpty
+                      ? Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '还没有记录',
+                              style: Theme.of(context).textTheme.titleMedium,
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              '点上方录音或写文字，记下第一条想法。',
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                          ],
+                        )
+                      : Column(
+                          children: [
+                            for (var i = 0; i < recent.length; i++) ...[
+                              if (i > 0)
+                                const Divider(indent: 66, endIndent: 16),
+                              RecordRow(
+                                record: recent[i],
+                                grouped: true,
+                                appendCount: widget.book
+                                    .children(recent[i].id)
+                                    .length,
+                                onTap: () => openDetail(
+                                  context,
+                                  widget.book,
+                                  recent[i].id,
+                                  models: widget.models,
+                                ),
+                              ),
+                            ],
+                          ],
                         ),
-                        const SizedBox(height: 8),
-                        const Text('点上方录音或写文字，记下第一条想法。'),
-                      ],
-                    ),
-                  ),
-                for (final r in recent)
-                  RecordRow(
-                    record: r,
-                    appendCount: widget.book.children(r.id).length,
-                    onTap: () => openDetail(
-                      context,
-                      widget.book,
-                      r.id,
-                      models: widget.models,
-                    ),
-                  ),
+                ),
               ],
             );
           },
@@ -423,11 +495,13 @@ class RecordRow extends StatelessWidget {
     required this.onTap,
     this.snippet,
     this.appendCount = 0,
+    this.grouped = false,
   });
   final Record record;
   final VoidCallback onTap;
   final String? snippet;
   final int appendCount;
+  final bool grouped;
   @override
   Widget build(BuildContext context) {
     final d = record.recordedLocal;
@@ -435,13 +509,13 @@ class RecordRow extends StatelessWidget {
         '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
     final year = d.year == DateTime.now().year ? '' : '${d.year}年';
     final date = '$year${d.month}月${d.day}日 $time';
-    return InkWell(
+    final row = InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
       child: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.symmetric(vertical: 16),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -527,8 +601,20 @@ class RecordRow extends StatelessWidget {
               ],
             ),
           ),
-          const Divider(),
         ],
+      ),
+    );
+    if (grouped) return row;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Material(
+        color: Theme.of(context).colorScheme.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: row,
       ),
     );
   }
