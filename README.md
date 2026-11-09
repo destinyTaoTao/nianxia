@@ -19,7 +19,7 @@
 
 浅色采用 #F6F6F6 画布、#FFFFFF 面板、#181818 正文、#606060 辅助文字、#DDDDDD 边界；深色为对应石墨灰层级。统一字体继承、按钮/表单/弹窗、14/16/20px 控件与面板圆角：首页主操作及最近记录分组，查找和完整列表使用独立结果面板，详情正文与编辑使用纸面区域，设置按实际用途分组。未修改保存、下载、云端发送及日历逻辑。
 
-视觉验证扩展到浅/深色的首页、查找、详情、设置、编辑和日历表单，并检查小屏、两倍字体及实际可命中的设置入口。48 项主机测试和静态检查通过；独立 Standards / Spec 评审及后续缩放回归已完成。Android 原生运行与截图见当前交付记录，iOS 和真机继续按原安排后移。
+视觉验证扩展到浅/深色的首页、查找、详情、设置、编辑和日历表单，并检查小屏、两倍字体及实际可命中的设置入口。52 项主机测试和静态检查通过；独立 Standards / Spec 评审及后续缩放回归已完成。Android 原生运行与截图见当前交付记录，iOS 和真机继续按原安排后移。
 
 后续流程打磨：查找支持一键清空、结果数量、无结果时放宽日期和失败重试；搜索框与结果共同滚动，修复小屏大字加键盘的溢出。录音面板以真实时长、音量和中文状态为中心；日历按事项、时间提醒分组，并修复大字体提醒选项横向溢出。检索算法、录音控制器及系统日历桥未变。
 
@@ -40,6 +40,8 @@
 ## 快捷呼出录音
 
 Android 下拉快捷设置，编辑并添加“记一下”磁贴；也可长按桌面图标选择“记一下”。无需先进入记录列表，直接显示顶部录音胶囊。停止落盘成功才显示已保存，系统返回键也会停止保存；确认丢弃会删除未保存音频。完成后点击“返回原应用”。离开前保留尚未保存的文字编辑，后续查找也不清空编辑栈。
+
+应用内录音失败且没有音频草稿时，可直接“写文字”；从详情追加语音发起时可“追加文字”，保存后仍属于原记录。有音频草稿的失败保留重试保存/丢弃，查询失败不进入笔记编辑器。新增四项公开操作回归验证权限拒绝、追加关系、查询边界及有效片段重试。 Android 实际拒绝权限后已核对[新建文字入口](docs/screenshots/android-recorder-text-fallback.png)和[追加文字入口](docs/screenshots/android-recorder-append-fallback.png)，检查进入对应编辑器并空白返回；权限与浅色首页已恢复。
 
 支持只含操作的 `nianxia://capture` / `nianxia://search` 链接；Android 还提供 `app.nianxia.CAPTURE` Intent。手机 AI 键若允许绑定应用快捷动作或 URL，可指向录音入口；不宣称所有厂商按键都可绑定。应用设置中提供说明及复制录音链接。没有新增悬浮窗、无障碍服务、后台麦克风或常驻监听权限；切换应用/锁屏停止保存，启动阶段退到后台也不继续开始采集。
 
@@ -133,17 +135,17 @@ DeepSeek 使用集成时核验的 [V4-Flash](https://api-docs.deepseek.com/updat
 ## 本轮实际验证
 
 - `flutter analyze`：通过。
-- `flutter test`：48 项主机测试通过，覆盖应用行为、真实 SQLite/文件、故障注入与界面；包含浅深主题、两倍字体、无障碍触控/标签及减少动态效果。新增胶囊重复呼出、返回保存、编辑保留、拒绝权限转文字、确认丢弃及启动期间退后台回归。
+- `flutter test`：52 项主机测试通过，覆盖应用行为、真实 SQLite/文件、故障注入与界面；包含浅深主题、两倍字体、无障碍触控/标签及减少动态效果。新增胶囊重复呼出、返回保存、编辑保留、拒绝权限转文字、确认丢弃及启动期间退后台回归。
 - Android API 36 ARM64 模拟器、飞行模式：通过 `flutter drive` 执行真实 SenseVoice + BGE 同包、语义有/无结果、原生 PCM 录音和 WAV 回放。仅使用公开模型样本和合成文本。
 - 1,000 条合成短记录、主机 20 次关键词查询 P95：约 9.4 ms，非手机指标。
 - [浅色时间线](docs/screenshots/home-light.png)、[深色时间线](docs/screenshots/home-dark.png)、[查找](docs/screenshots/search-light.png)、[详情](docs/screenshots/detail-light.png)为实际 widget 运行截图，非真机截图。
 - Android API 36 ARM64 Release、飞行模式：实际运行通过 URL 冷启动、重复呼出不截断、系统返回保存并返回原系统设置页面、实际点击快捷设置磁贴的热启动、深色主题、原生权限拒绝与首次授权；截图见[录音胶囊](docs/screenshots/android-capsule-recording.png)、[深色胶囊](docs/screenshots/android-capsule-dark.png)、[保存完成](docs/screenshots/android-capsule-saved.png)、[权限失败](docs/screenshots/android-capsule-permission.png)。均为模拟器，未冒充真机。
 - 原生重复呼出验证捕获并修复了短暂 `inactive` 被当作退后台而截断录音的问题；隐藏/暂停/分离及 Android 系统息屏事件触发自动保存，音频中断仍通过原生录音状态处理，符合 [Flutter 生命周期语义](https://api.flutter.dev/flutter/dart-ui/AppLifecycleState.html)。冷启动一次 `am start -W` 活动展示约 0.7 秒，只是系统展示耗时，不是采集延迟或 P95。
-- Swift 前端语法解析通过；`flutter build ios --no-codesign` 未能构建，提示 `Application not configured for iOS`。本机只有 Command Line Tools，缺少完整 Xcode 与 CocoaPods；此结果不表示 iOS 已构建或安装通过。
+- Swift 前端语法解析通过；`flutter build ios --no-codesign` 未能构建，提示 `Application not configured for iOS`。此前构建未通过；当前已安装 CocoaPods 1.17.0，开发目录仍为 Command Line Tools，完整 Xcode 尚未就绪。此结果不表示 iOS 已构建或安装通过，iOS 工作继续按用户安排后移。
 - 模拟器 ExoPlayer 释放时观察到 `Handler ... on a dead thread` 警告，回放完成断言及整个 driver 均通过；尚未在真机确认是否复现。
 - 真实付费 API、双端真机日历提醒、双端系统备份排除的设备实测均未执行；Android 模拟器通知链路的结果见下节。
 
-Android ARM64 Release 试用包已构建并安装启动，约 **51.0 MB**（不含首次下载的模型），仍使用本地 debug 签名；APK 仅包含 ARM64 与单一 ORT 运行时。产物为 `build/app/outputs/flutter-apk/app-release.apk`，SHA-256：`8c41e052aeec943069657348c7261a0b0baf128d96b438dc680028cb22856057`。
+Android ARM64 Release 试用包已构建并安装启动，约 **51.0 MB**（不含首次下载的模型），仍使用本地 debug 签名；APK 仅包含 ARM64 与单一 ORT 运行时。产物为 `build/app/outputs/flutter-apk/app-release.apk`，SHA-256：`c34140782640398755fa64d04c75f585543615419b10b2f20c3763eb47f111d1`。
 
 运行集成测试后再构建 Release 时使用上面的正常 `flutter build apk --release --target-platform android-arm64`，让 Flutter 重新生成排除测试插件的注册文件；不要复用测试阶段生成的注册文件直接加 `--no-pub`。Flutter 平台构建应串行执行。
 

@@ -4,6 +4,9 @@ import '../app/notebook.dart';
 import '../platform/local_models.dart';
 import '../platform/capture_controller.dart';
 import 'common.dart';
+import 'editor.dart';
+
+enum _RecorderAction { write }
 
 Future<Object?> openRecorder(
   BuildContext context,
@@ -11,21 +14,29 @@ Future<Object?> openRecorder(
   LocalModels? models, {
   String? parentId,
   bool query = false,
-}) => book.captureActive
-    ? Future.value(null)
-    : showModalBottomSheet<Object?>(
-        context: context,
-        isDismissible: false,
-        enableDrag: false,
-        isScrollControlled: true,
-        useSafeArea: true,
-        builder: (_) => _Recorder(
-          book: book,
-          models: models,
-          parentId: parentId,
-          query: query,
-        ),
-      );
+  MicrophoneInput? microphone,
+}) async {
+  if (book.captureActive) return null;
+  final result = await showModalBottomSheet<Object?>(
+    context: context,
+    isDismissible: false,
+    enableDrag: false,
+    isScrollControlled: true,
+    useSafeArea: true,
+    builder: (_) => _Recorder(
+      book: book,
+      models: models,
+      parentId: parentId,
+      query: query,
+      microphone: microphone,
+    ),
+  );
+  if (result == _RecorderAction.write) {
+    if (context.mounted) await openEditor(context, book, parentId: parentId);
+    return null;
+  }
+  return result;
+}
 
 class _Recorder extends StatefulWidget {
   const _Recorder({
@@ -33,11 +44,13 @@ class _Recorder extends StatefulWidget {
     this.models,
     this.parentId,
     this.query = false,
+    this.microphone,
   });
   final Notebook book;
   final LocalModels? models;
   final String? parentId;
   final bool query;
+  final MicrophoneInput? microphone;
   @override
   State<_Recorder> createState() => _RecorderState();
 }
@@ -48,6 +61,7 @@ class _RecorderState extends State<_Recorder> {
     models: widget.models,
     parentId: widget.parentId,
     query: widget.query,
+    microphone: widget.microphone,
   );
   bool closed = false;
   @override
@@ -202,6 +216,13 @@ class _RecorderState extends State<_Recorder> {
                   Wrap(
                     spacing: 12,
                     children: [
+                      if (!widget.query && capture.draft == null)
+                        FilledButton.icon(
+                          onPressed: () =>
+                              Navigator.pop(context, _RecorderAction.write),
+                          icon: const Icon(Icons.edit_outlined),
+                          label: Text(widget.parentId == null ? '写文字' : '追加文字'),
+                        ),
                       if (capture.draft != null && !widget.query)
                         FilledButton(
                           onPressed: capture.retry,
