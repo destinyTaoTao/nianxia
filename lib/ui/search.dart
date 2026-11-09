@@ -59,14 +59,29 @@ class _SearchPageState extends State<SearchPage> {
 
   void changed() {
     debounce?.cancel();
+    generation++;
+    setState(() {
+      hits = [];
+      error = null;
+      fallback = null;
+      busy = text.text.trim().isNotEmpty;
+    });
     debounce = Timer(const Duration(milliseconds: 250), search);
   }
 
+  void clearDates() {
+    setState(() => range = null);
+    search();
+  }
+
   Future<void> search() async {
+    debounce?.cancel();
     final version = ++generation;
     setState(() {
       busy = true;
       error = null;
+      hits = [];
+      fallback = null;
     });
     try {
       final found = await widget.book.search(
@@ -128,92 +143,158 @@ class _SearchPageState extends State<SearchPage> {
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: const Text('找一下')),
-    body: ReadingWidth(
-      child: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(24, 12, 24, 0),
-            child: TextField(
-              key: const Key('search-input'),
-              controller: text,
-              autofocus: !widget.voice,
-              maxLength: 500,
-              decoration: InputDecoration(
-                hintText: semantic ? '输入关键词或描述' : '输入记得的关键词',
-                hintMaxLines: 2,
-                counterText: '',
-                prefixIcon: const Icon(Icons.search),
-                suffixIcon: IconButton(
-                  tooltip: '语音查找',
-                  onPressed: voice,
-                  icon: const Icon(Icons.mic_none_rounded),
+    body: SafeArea(
+      top: false,
+      child: ReadingWidth(
+        child: CustomScrollView(
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+          slivers: [
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+              sliver: SliverToBoxAdapter(
+                child: TextField(
+                  key: const Key('search-input'),
+                  controller: text,
+                  autofocus: !widget.voice,
+                  textInputAction: TextInputAction.search,
+                  maxLength: 500,
+                  decoration: InputDecoration(
+                    hintText: semantic ? '输入关键词或描述' : '输入记得的关键词',
+                    hintMaxLines: 2,
+                    counterText: '',
+                    prefixIcon: const Icon(Icons.search_rounded),
+                    suffixIcon: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (text.text.isNotEmpty)
+                          IconButton(
+                            tooltip: '清空查找内容',
+                            onPressed: () {
+                              text.clear();
+                              changed();
+                            },
+                            icon: const Icon(Icons.close_rounded, size: 20),
+                          ),
+                        IconButton(
+                          tooltip: '语音查找',
+                          onPressed: voice,
+                          icon: const Icon(Icons.mic_none_rounded),
+                        ),
+                      ],
+                    ),
+                  ),
+                  onChanged: (_) => changed(),
+                  onSubmitted: (_) => search(),
                 ),
               ),
-              onChanged: (_) => changed(),
-              onSubmitted: (_) => search(),
             ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(24, 8, 16, 8),
-            child: Wrap(
-              spacing: 8,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                TextButton.icon(
-                  onPressed: dates,
-                  icon: const Icon(Icons.date_range_outlined, size: 18),
-                  label: Text(
-                    range == null
-                        ? '按日期筛选'
-                        : '${range!.start.month}月${range!.start.day}日 至 ${range!.end.month}月${range!.end.day}日',
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
+              sliver: SliverToBoxAdapter(
+                child: Wrap(
+                  spacing: 8,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    TextButton.icon(
+                      onPressed: dates,
+                      icon: const Icon(Icons.date_range_outlined, size: 18),
+                      label: Text(
+                        range == null
+                            ? '按日期筛选'
+                            : '${range!.start.year}/${range!.start.month}/${range!.start.day} 至 ${range!.end.year}/${range!.end.month}/${range!.end.day}',
+                      ),
+                    ),
+                    if (range != null)
+                      IconButton(
+                        tooltip: '清除日期条件',
+                        onPressed: clearDates,
+                        icon: const Icon(Icons.close_rounded, size: 18),
+                      ),
+                    if (fallback != null && text.text.trim().isNotEmpty)
+                      Text(
+                        fallback!,
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                  ],
+                ),
+              ),
+            ),
+            if (busy)
+              const SliverToBoxAdapter(
+                child: LinearProgressIndicator(minHeight: 2),
+              ),
+            if (error != null)
+              SliverFillRemaining(
+                hasScrollBody: false,
+                child: EmptyState(
+                  icon: Icons.search_off_rounded,
+                  title: '暂时无法查找',
+                  detail: error!,
+                  action: OutlinedButton(
+                    onPressed: search,
+                    child: const Text('重试查找'),
                   ),
                 ),
-                if (range != null)
-                  IconButton(
-                    tooltip: '清除日期条件',
-                    onPressed: () {
-                      setState(() => range = null);
-                      search();
-                    },
-                    icon: const Icon(Icons.close, size: 18),
-                  ),
-                if (fallback != null && text.text.trim().isNotEmpty)
-                  Text(fallback!, style: Theme.of(context).textTheme.bodySmall),
-              ],
-            ),
-          ),
-          if (busy) const LinearProgressIndicator(minHeight: 2),
-          Expanded(
-            child: error != null
-                ? EmptyState(title: '暂时无法查找', detail: error!)
-                : text.text.trim().isEmpty
-                ? const EmptyState(
-                    icon: Icons.search_rounded,
-                    title: '找回之前的想法',
-                    detail: '输入关键词，或点麦克风说出要找的内容。',
-                  )
-                : hits.isEmpty && !busy
-                ? const EmptyState(
-                    icon: Icons.search_off_rounded,
-                    title: '没有找到相关记录',
-                    detail: '换个关键词，或清除日期条件再试。',
-                  )
-                : ListView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 24),
-                    itemCount: hits.length,
-                    itemBuilder: (context, i) => RecordRow(
-                      record: hits[i].record,
-                      snippet: hits[i].snippet,
-                      onTap: () => openDetail(
-                        context,
-                        widget.book,
-                        hits[i].record.id,
-                        models: widget.models,
+              )
+            else if (text.text.trim().isEmpty)
+              SliverFillRemaining(
+                hasScrollBody: false,
+                child: EmptyState(
+                  icon: Icons.search_rounded,
+                  title: '找回之前的想法',
+                  detail: range == null
+                      ? '输入关键词，或点麦克风说出要找的内容。'
+                      : '输入关键词，在所选日期内查找。',
+                ),
+              )
+            else if (hits.isEmpty && !busy)
+              SliverFillRemaining(
+                hasScrollBody: false,
+                child: EmptyState(
+                  icon: Icons.search_off_rounded,
+                  title: '没有找到相关记录',
+                  detail: range == null ? '换个关键词，再试一次。' : '试试其他关键词，或放宽日期范围。',
+                  action: range == null
+                      ? null
+                      : OutlinedButton(
+                          onPressed: clearDates,
+                          child: const Text('清除日期条件'),
+                        ),
+                ),
+              )
+            else ...[
+              if (!busy)
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
+                  sliver: SliverToBoxAdapter(
+                    child: Semantics(
+                      liveRegion: true,
+                      child: Text(
+                        '找到 ${hits.length} 条记录',
+                        style: Theme.of(context).textTheme.bodySmall,
                       ),
                     ),
                   ),
-          ),
-        ],
+                ),
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                sliver: SliverList.builder(
+                  itemCount: hits.length,
+                  itemBuilder: (context, i) => RecordRow(
+                    record: hits[i].record,
+                    snippet: hits[i].snippet,
+                    onTap: () => openDetail(
+                      context,
+                      widget.book,
+                      hits[i].record.id,
+                      models: widget.models,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
       ),
     ),
   );

@@ -146,7 +146,7 @@ class _CalendarFormState extends State<_CalendarForm> {
     appBar: AppBar(title: const Text('核对日历事项')),
     body: ReadingWidth(
       child: ListView(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
         children: [
           if (widget.stale)
             const Padding(
@@ -161,71 +161,91 @@ class _CalendarFormState extends State<_CalendarForm> {
                 style: Theme.of(context).textTheme.bodySmall,
               ),
             ),
-          TextField(
-            controller: title,
-            maxLength: 200,
-            decoration: const InputDecoration(labelText: '事项标题'),
-          ),
-          const SizedBox(height: 16),
-          TextField(
-            controller: location,
-            maxLength: 200,
-            decoration: const InputDecoration(labelText: '地点（可选）'),
-          ),
-          const SizedBox(height: 16),
-          OutlinedButton.icon(
-            onPressed: busy ? null : chooseDay,
-            icon: const Icon(Icons.calendar_today_outlined),
-            label: Text(
-              day == null
-                  ? '选择具体日期'
-                  : '${day!.year}年${day!.month}月${day!.day}日',
-            ),
-          ),
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            children: [
-              OutlinedButton(
-                onPressed: busy ? null : () => chooseTime(true),
-                child: Text(
-                  start == null ? '开始时间' : '开始 ${start!.format(context)}',
+          PaperSurface(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                TextField(
+                  controller: title,
+                  maxLength: 200,
+                  decoration: const InputDecoration(labelText: '事项标题'),
                 ),
-              ),
-              OutlinedButton(
-                onPressed: busy ? null : () => chooseTime(false),
-                child: Text(
-                  end == null ? '结束时间' : '结束 ${end!.format(context)}',
+                const SizedBox(height: 16),
+                TextField(
+                  controller: location,
+                  maxLength: 200,
+                  decoration: const InputDecoration(labelText: '地点（可选）'),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
           const SizedBox(height: 16),
-          if (start != null && end != null)
-            Text(
-              '时长：${(end!.hour * 60 + end!.minute) - (start!.hour * 60 + start!.minute)} 分钟（同一天）',
-              style: Theme.of(context).textTheme.bodySmall,
+          PaperSurface(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text('时间与提醒', style: Theme.of(context).textTheme.titleMedium),
+                const SizedBox(height: 16),
+                OutlinedButton.icon(
+                  onPressed: busy ? null : chooseDay,
+                  icon: const Icon(Icons.calendar_today_outlined),
+                  label: Text(
+                    day == null
+                        ? '选择具体日期'
+                        : '${day!.year}年${day!.month}月${day!.day}日',
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 12,
+                  children: [
+                    OutlinedButton(
+                      onPressed: busy ? null : () => chooseTime(true),
+                      child: Text(
+                        start == null ? '开始时间' : '开始 ${start!.format(context)}',
+                      ),
+                    ),
+                    OutlinedButton(
+                      onPressed: busy ? null : () => chooseTime(false),
+                      child: Text(
+                        end == null ? '结束时间' : '结束 ${end!.format(context)}',
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                if (start != null && end != null)
+                  Text(
+                    '时长：${(end!.hour * 60 + end!.minute) - (start!.hour * 60 + start!.minute)} 分钟（同一天）',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                const SizedBox(height: 16),
+                DropdownButtonFormField<int>(
+                  isExpanded: true,
+                  isDense: false,
+                  itemHeight: null,
+                  initialValue: reminder,
+                  decoration: InputDecoration(
+                    labelText:
+                        Theme.of(context).platform == TargetPlatform.android
+                        ? '计划提醒时间'
+                        : '提醒时间',
+                  ),
+                  items: const [
+                    DropdownMenuItem(value: -1, child: Text('不提醒')),
+                    DropdownMenuItem(value: 0, child: Text('开始时')),
+                    DropdownMenuItem(value: 5, child: Text('开始前 5 分钟')),
+                    DropdownMenuItem(value: 15, child: Text('开始前 15 分钟')),
+                    DropdownMenuItem(value: 30, child: Text('开始前 30 分钟')),
+                    DropdownMenuItem(value: 60, child: Text('开始前 1 小时')),
+                  ],
+                  onChanged: busy
+                      ? null
+                      : (v) => setState(() => reminder = v == -1 ? null : v),
+                ),
+              ],
             ),
-          const SizedBox(height: 16),
-          DropdownButtonFormField<int>(
-            initialValue: reminder,
-            decoration: InputDecoration(
-              labelText: Theme.of(context).platform == TargetPlatform.android
-                  ? '计划提醒时间'
-                  : '提醒时间',
-            ),
-            items: const [
-              DropdownMenuItem(value: -1, child: Text('不提醒')),
-              DropdownMenuItem(value: 0, child: Text('开始时')),
-              DropdownMenuItem(value: 5, child: Text('开始前 5 分钟')),
-              DropdownMenuItem(value: 15, child: Text('开始前 15 分钟')),
-              DropdownMenuItem(value: 30, child: Text('开始前 30 分钟')),
-              DropdownMenuItem(value: 60, child: Text('开始前 1 小时')),
-            ],
-            onChanged: busy
-                ? null
-                : (v) => setState(() => reminder = v == -1 ? null : v),
           ),
           const SizedBox(height: 24),
           Text(

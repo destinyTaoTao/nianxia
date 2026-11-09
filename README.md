@@ -19,9 +19,15 @@
 
 浅色采用 #F6F6F6 画布、#FFFFFF 面板、#181818 正文、#606060 辅助文字、#DDDDDD 边界；深色为对应石墨灰层级。统一字体继承、按钮/表单/弹窗、14/16/20px 控件与面板圆角：首页主操作及最近记录分组，查找和完整列表使用独立结果面板，详情正文与编辑使用纸面区域，设置按实际用途分组。未修改保存、下载、云端发送及日历逻辑。
 
-视觉验证扩展到浅/深色的首页、查找、详情、设置、编辑和日历表单，并检查小屏、两倍字体及实际可命中的设置入口。44 项主机测试和静态检查通过；独立 Standards / Spec 评审均为 0 项确认问题。Android 原生运行与截图见当前交付记录，iOS 和真机继续按原安排后移。
+视觉验证扩展到浅/深色的首页、查找、详情、设置、编辑和日历表单，并检查小屏、两倍字体及实际可命中的设置入口。48 项主机测试和静态检查通过；独立 Standards / Spec 评审及后续缩放回归已完成。Android 原生运行与截图见当前交付记录，iOS 和真机继续按原安排后移。
+
+后续流程打磨：查找支持一键清空、结果数量、无结果时放宽日期和失败重试；搜索框与结果共同滚动，修复小屏大字加键盘的溢出。录音面板以真实时长、音量和中文状态为中心；日历按事项、时间提醒分组，并修复大字体提醒选项横向溢出。检索算法、录音控制器及系统日历桥未变。
 
 当前截图：[Android 浅色首页](docs/screenshots/android-polish-home-light.png)、[深色首页](docs/screenshots/android-polish-home-dark.png)、[详情](docs/screenshots/android-polish-detail.png)、[设置分组](docs/screenshots/android-polish-settings.png)；[深色编辑页](docs/screenshots/widget-polish-editor-dark.png)为主机 widget 渲染。原生导航验证完成后已返回首页，回放进度轨道与 48dp 手势区域保持可用。
+
+本轮流程截图：[查找无结果](docs/screenshots/android-flow-search-empty.png)、[日历分组](docs/screenshots/android-flow-calendar.png)、[两倍字体日历](docs/screenshots/android-flow-calendar-large-type.png)、[浅色录音](docs/screenshots/android-flow-recorder-light.png)、[深色录音](docs/screenshots/android-flow-recorder-dark.png)。录音截图与确认丢弃流程使用模拟器临时 `-audio none` 后端，不能作为真实采集或回放验收。
+
+本机默认音频后端在启动麦克风时可复现 QEMU 宿主线程卡住；线程采样落在 `AUD_open_in → coreaudio_init_impl → AudioDeviceCreateIOProcID → CoreAudio`。冷启动仍复现，静音后端可运行录音界面。真实 USB 输入设备尚待重连复测，未修改应用录音控制器或系统默认音频设备。
 
 ## 试用反馈：首页更直接
 
@@ -127,7 +133,7 @@ DeepSeek 使用集成时核验的 [V4-Flash](https://api-docs.deepseek.com/updat
 ## 本轮实际验证
 
 - `flutter analyze`：通过。
-- `flutter test`：44 项主机测试通过，覆盖应用行为、真实 SQLite/文件、故障注入与界面；包含浅深主题、两倍字体、无障碍触控/标签及减少动态效果。新增胶囊重复呼出、返回保存、编辑保留、拒绝权限转文字、确认丢弃及启动期间退后台回归。
+- `flutter test`：48 项主机测试通过，覆盖应用行为、真实 SQLite/文件、故障注入与界面；包含浅深主题、两倍字体、无障碍触控/标签及减少动态效果。新增胶囊重复呼出、返回保存、编辑保留、拒绝权限转文字、确认丢弃及启动期间退后台回归。
 - Android API 36 ARM64 模拟器、飞行模式：通过 `flutter drive` 执行真实 SenseVoice + BGE 同包、语义有/无结果、原生 PCM 录音和 WAV 回放。仅使用公开模型样本和合成文本。
 - 1,000 条合成短记录、主机 20 次关键词查询 P95：约 9.4 ms，非手机指标。
 - [浅色时间线](docs/screenshots/home-light.png)、[深色时间线](docs/screenshots/home-dark.png)、[查找](docs/screenshots/search-light.png)、[详情](docs/screenshots/detail-light.png)为实际 widget 运行截图，非真机截图。
@@ -137,7 +143,7 @@ DeepSeek 使用集成时核验的 [V4-Flash](https://api-docs.deepseek.com/updat
 - 模拟器 ExoPlayer 释放时观察到 `Handler ... on a dead thread` 警告，回放完成断言及整个 driver 均通过；尚未在真机确认是否复现。
 - 真实付费 API、双端真机日历提醒、双端系统备份排除的设备实测均未执行；Android 模拟器通知链路的结果见下节。
 
-Android ARM64 Release 试用包已构建并安装启动，约 **51.0 MB**（不含首次下载的模型），仍使用本地 debug 签名；APK 仅包含 ARM64 与单一 ORT 运行时。产物为 `build/app/outputs/flutter-apk/app-release.apk`，SHA-256：`60fb8fb23799ad0b681093caa75d175c9111a56da247a17f7f2354fb59e7e9f2`。
+Android ARM64 Release 试用包已构建并安装启动，约 **51.0 MB**（不含首次下载的模型），仍使用本地 debug 签名；APK 仅包含 ARM64 与单一 ORT 运行时。产物为 `build/app/outputs/flutter-apk/app-release.apk`，SHA-256：`8c41e052aeec943069657348c7261a0b0baf128d96b438dc680028cb22856057`。
 
 运行集成测试后再构建 Release 时使用上面的正常 `flutter build apk --release --target-platform android-arm64`，让 Flutter 重新生成排除测试插件的注册文件；不要复用测试阶段生成的注册文件直接加 `--no-pub`。Flutter 平台构建应串行执行。
 

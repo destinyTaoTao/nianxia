@@ -61,9 +61,11 @@ class EmptyState extends StatelessWidget {
     required this.title,
     required this.detail,
     this.icon = Icons.notes_rounded,
+    this.action,
   });
   final String title, detail;
   final IconData icon;
+  final Widget? action;
   @override
   Widget build(BuildContext context) => Center(
     child: Padding(
@@ -88,6 +90,7 @@ class EmptyState extends StatelessWidget {
             style: Theme.of(context).textTheme.bodySmall,
             textAlign: TextAlign.center,
           ),
+          if (action != null) ...[const SizedBox(height: 16), action!],
         ],
       ),
     ),
