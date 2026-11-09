@@ -132,8 +132,10 @@ Release 包还在模拟器中通过实际界面完成了文字创建、持久显
 - **录音生命周期**：Release 中连续验证 0.5 秒、0.5 秒、1 秒息屏，均停止落盘且唤醒不自动续录；录音中强杀后重启恢复有效片段。短暂 `inactive` 不可靠地代表息屏，最终实现使用受保护的系统 `SCREEN_OFF` 广播；亮屏解锁的重复快捷动作仍不截断。启动时检查交互/锁屏状态，未知、异常和 500ms 超时不开始采集。回归还覆盖权限等待中息屏和迟到响应。
 - **日历接入**：通过念下记录进入 Etar 1.0.57 的系统编辑器，核对标题、日期、08:20–08:50 和时区正确传递；提醒没有通用预填，Android 页现明确为“计划提醒时间”，逐项展示需手动设置的值。本次在接收端手动设为 0 分钟后保存，观察到对应合成事项的日历通知，返回念下仍如实显示保存未确认；另验证系统页取消后也返回未确认，没有虚报保存成功。这条合成事项保存时已略过开始时刻，因此不作为准点或通知延迟验证。
 - **后台定时通知未通过**：另建合成事项 `Scheduled202611090903`，09:01 提前保存 09:03 开始、0 分钟提醒的事件，退出念下并息屏。系统于 09:03:00.026 将 `EVENT_REMINDER` 送达 Etar；Etar 的 `AlertWorker` 随后因 `ForegroundServiceStartNotAllowedException` 失败，观察窗口内未出现该事项通知。该结果保留为接收端兼容性限制，不能用前台保存后的通知代替后台准点验收；从后台启动前台服务的限制见 [Android 官方说明](https://developer.android.com/develop/background-work/services/fgs/restrictions-bg-start)。
+- **日历条件隔离验证通过**：仅为 Etar 临时设置电池优化豁免，经系统编辑器直接创建 `BatteryCheck202611090912`（09:12 开始、0 分钟提醒），09:09 提前保存后退到后台并息屏；09:12:04 轮询时对应通知已出现，随后实际打开通知栏核对。此试验用于隔离接收端限制，不替代念下到日历的字段传递测试，也不将 5 秒轮询结果当作通知延迟指标。原电池设置已恢复，念下没有增加后台权限或电池豁免要求。
+- **模拟来电通过**：录音期间注入来电，以 Android 电话状态确认 `RINGING(1) → OFFHOOK(2) → IDLE(0)`，通过系统接听键接通；胶囊停止保存，结束通话后未自动续录。最终取消测试电话并恢复飞行模式。模拟器控制台通话列表曾为空，而 Android 无线日志已收到来电，验收以 Android 实际状态为准；此结果仍不是运营商真机通话验证。
 - **测试环境**：Etar 仅安装在专用 AVD 中，不进入念下安装包。使用无同步账号的离线日历和合成内容，联系人访问拒绝；Google 日历在此 AVD 中停用以避免离线首启账号页，非产品要求。Etar 来自其项目链接的 [F-Droid 分发页](https://f-droid.org/packages/ws.xsoh.etar/)，APK SHA-256 `dae01d93c8920aa63845868db2190bcc4aa6ff8410b1289de1ce27b1bb89c599`，安装前通过 APK 签名验证。
-- **验证边界**：虚拟 GSM 注入尚未可靠形成可观察的来电中断，未标记通过。iOS Simulator 同样需要完整 Xcode；本机 macOS 26.5.1 当前只有 Command Line Tools。App Store 查询到的最新版 Xcode 27.2 最低要求 macOS 26.6，需使用兼容旧版；官方下载需要 Apple 登录，命令行安装要求管理员认证，电脑控制工具另报告 Mac 锁屏。iOS 构建/运行仍未执行，参见 [Apple 模拟器安装说明](https://developer.apple.com/documentation/safari-developer-tools/installing-xcode-and-simulators)。
+- **验证边界**：虚拟 GSM 来电现已通过 Android 状态和保存界面验证，运营商通话留待真机。iOS Simulator 同样需要完整 Xcode；本机 macOS 26.5.1 当前只有 Command Line Tools。App Store 查询到的最新版 Xcode 27.2 最低要求 macOS 26.6，需使用兼容旧版；官方下载需要 Apple 登录，命令行安装要求管理员认证，电脑控制工具另报告 Mac 锁屏。iOS 构建/运行仍未执行，参见 [Apple 模拟器安装说明](https://developer.apple.com/documentation/safari-developer-tools/installing-xcode-and-simulators)。
 
 ### Standards
 
@@ -143,4 +145,4 @@ Release 包还在模拟器中通过实际界面完成了文字创建、持久显
 
 本阶段独立审阅未发现新增的确定性规格偏差。提醒核对、息屏保存、重复入口保护保持既定范围；iOS 和真机延期项不计为已完成。本阶段新增确定性问题：Standards 0，Spec 0。
 
-本阶段运行截图：[提醒计划](docs/screenshots/android-calendar-plan.png)、[接收端字段](docs/screenshots/android-calendar-editor.png)、[通知](docs/screenshots/android-calendar-notification.png)、[取消回执](docs/screenshots/android-calendar-cancel.png)、[强杀恢复](docs/screenshots/android-recovery.png)、[息屏保存](docs/screenshots/android-screen-off-saved.png)。
+本阶段运行截图：[提醒计划](docs/screenshots/android-calendar-plan.png)、[接收端字段](docs/screenshots/android-calendar-editor.png)、[通知](docs/screenshots/android-calendar-notification.png)、[取消回执](docs/screenshots/android-calendar-cancel.png)、[强杀恢复](docs/screenshots/android-recovery.png)、[息屏保存](docs/screenshots/android-screen-off-saved.png)、[条件性定时通知](docs/screenshots/android-calendar-scheduled.png)、[来电保存](docs/screenshots/android-call-saved.png)。
