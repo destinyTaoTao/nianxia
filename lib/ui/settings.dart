@@ -18,7 +18,9 @@ class SettingsPage extends StatefulWidget {
     this.models,
     required this.themeMode,
     required this.onTheme,
+    this.modelsFirst = false,
   });
+  final bool modelsFirst;
   final Notebook book;
   final LocalModels? models;
   final ThemeMode themeMode;
@@ -241,6 +243,62 @@ class _SettingsPageState extends State<SettingsPage> {
     super.dispose();
   }
 
+  List<Widget> modelSection(BuildContext context) => [
+    Text('离线模型', style: Theme.of(context).textTheme.titleMedium),
+    const SizedBox(height: 8),
+    const Text(
+      '首次下载需要联网，完成后可离线使用。不会发送你的录音或文字。',
+      style: TextStyle(fontSize: 14, height: 1.6),
+    ),
+    if (widget.models == null)
+      const Padding(
+        padding: EdgeInsets.symmetric(vertical: 16),
+        child: Text('当前环境未接入模型，请使用文字记录和关键词查找。'),
+      ),
+    for (final m in widget.models?.store.models ?? [])
+      Padding(
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(switch (m.id) {
+              'sensevoice' => '语音转文字',
+              'bge' => '按意思查找',
+              _ => m.label,
+            }, style: Theme.of(context).textTheme.titleMedium),
+            Text(
+              '下载约 ${(m.bytes / 1000000).toStringAsFixed(1)} MB',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            const SizedBox(height: 8),
+            if (widget.models!.store.progress.containsKey(m.id)) ...[
+              LinearProgressIndicator(
+                value: widget.models!.store.progress[m.id],
+              ),
+              TextButton(
+                onPressed: () => widget.models!.store.cancel(m.id),
+                child: const Text('取消下载'),
+              ),
+            ] else if (ready[m.id] == true)
+              const Text('已就绪，可离线使用')
+            else
+              OutlinedButton.icon(
+                onPressed: downloading.contains(m.id)
+                    ? null
+                    : () => download(m.id),
+                icon: const Icon(Icons.download_outlined),
+                label: Text(downloading.contains(m.id) ? '正在校验' : '下载模型'),
+              ),
+            if (widget.models!.store.errors[m.id] != null)
+              Text(
+                widget.models!.store.errors[m.id]!,
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+          ],
+        ),
+      ),
+  ];
+
   @override
   Widget build(BuildContext context) => PopScope(
     canPop: !busy,
@@ -250,11 +308,15 @@ class _SettingsPageState extends State<SettingsPage> {
       }
     },
     child: Scaffold(
-      appBar: AppBar(title: const Text('设置')),
+      appBar: AppBar(title: Text(widget.modelsFirst ? '离线功能' : '设置')),
       body: ReadingWidth(
         child: ListView(
           padding: const EdgeInsets.all(24),
           children: [
+            if (widget.modelsFirst) ...[
+              ...modelSection(context),
+              const SizedBox(height: 28),
+            ],
             Text('保存在这里', style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 12),
             const Text(
@@ -299,60 +361,7 @@ class _SettingsPageState extends State<SettingsPage> {
               label: const Text('复制录音快捷链接'),
             ),
             const SizedBox(height: 32),
-            Text('离线模型', style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 8),
-            const Text(
-              '仅首次下载需要联网。下载到私有目录并校验后启用；不会发送录音或正文。',
-              style: TextStyle(fontSize: 14, height: 1.6),
-            ),
-            if (widget.models == null)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 16),
-                child: Text('当前环境未接入模型，请使用文字记录和关键词查找。'),
-              ),
-            for (final m in widget.models?.store.models ?? [])
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      m.label,
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                    Text(
-                      '${(m.bytes / 1000000).toStringAsFixed(2)} MB 下载及文件体积，无需解压。内存占用以实测为准。',
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                    const SizedBox(height: 8),
-                    if (widget.models!.store.progress.containsKey(m.id)) ...[
-                      LinearProgressIndicator(
-                        value: widget.models!.store.progress[m.id],
-                      ),
-                      TextButton(
-                        onPressed: () => widget.models!.store.cancel(m.id),
-                        child: const Text('取消下载'),
-                      ),
-                    ] else if (ready[m.id] == true)
-                      const Text('已就绪，可离线使用')
-                    else
-                      OutlinedButton.icon(
-                        onPressed: downloading.contains(m.id)
-                            ? null
-                            : () => download(m.id),
-                        icon: const Icon(Icons.download_outlined),
-                        label: Text(
-                          downloading.contains(m.id) ? '正在校验' : '下载模型',
-                        ),
-                      ),
-                    if (widget.models!.store.errors[m.id] != null)
-                      Text(
-                        widget.models!.store.errors[m.id]!,
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
-                  ],
-                ),
-              ),
+            if (!widget.modelsFirst) ...modelSection(context),
             const SizedBox(height: 20),
             const Divider(),
             const SizedBox(height: 24),

@@ -3,6 +3,8 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nianxia/app/notebook.dart';
+import 'package:nianxia/data/model_store.dart';
+import 'package:nianxia/platform/local_models.dart';
 import 'package:nianxia/ui/app.dart';
 
 void main() {
@@ -15,6 +17,34 @@ void main() {
   tearDown(() async {
     book.dispose();
     await home.delete(recursive: true);
+  });
+  testWidgets('首页直接开始记录，最近三条之外的内容可从全部记录找回', (tester) async {
+    await tester.runAsync(() async {
+      book.dispose();
+      var minute = 0;
+      book = await Notebook.open(
+        home,
+        clock: () => DateTime.utc(2026, 11, 9, 9, minute++),
+      );
+      for (var i = 1; i <= 4; i++) {
+        await book.saveText('想法 $i');
+      }
+    });
+    await tester.pumpWidget(NianxiaApp(book: book));
+    await tester.pumpAndSettle();
+    expect(find.text('录音记一下'), findsOneWidget);
+    expect(find.text('写文字'), findsOneWidget);
+    expect(find.text('找一下'), findsOneWidget);
+    expect(find.text('最近记录'), findsOneWidget);
+    expect(find.text('想法 4'), findsOneWidget);
+    expect(find.text('想法 1'), findsNothing);
+    await tester.ensureVisible(find.text('全部记录'));
+    await tester.tap(find.text('全部记录'));
+    await tester.pumpAndSettle();
+    expect(find.text('想法 1'), findsOneWidget);
+    await tester.tap(find.text('想法 1'));
+    await tester.pumpAndSettle();
+    expect(find.byTooltip('编辑正文'), findsOneWidget);
   });
   testWidgets('Android 日历入口明确说明提醒仍需在系统页手动设置', (tester) async {
     await tester.runAsync(() => book.saveText('待安排的模拟器验收事项'));
@@ -33,9 +63,37 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.textContaining('请在系统日历中手动设置提醒：开始时'), findsOneWidget);
   });
+  testWidgets('首页说明离线转写未准备，并直接进入可操作的模型下载区域', (tester) async {
+    final store = ModelStore(Directory('${home.path}/models'), [
+      const ModelSpec(
+        id: 'sensevoice',
+        version: 'test',
+        label: '离线语音',
+        files: [],
+      ),
+    ]);
+    addTearDown(store.dispose);
+    await tester.pumpWidget(NianxiaApp(book: book, models: LocalModels(store)));
+    await tester.runAsync(() => Future<void>.delayed(Duration.zero));
+    await tester.pumpAndSettle();
+    expect(find.text('离线转写尚未就绪'), findsOneWidget);
+    await tester.tap(find.text('准备语音转写'));
+    await tester.pumpAndSettle();
+    expect(find.text('离线模型').hitTestable(), findsOneWidget);
+    expect(
+      find.widgetWithText(OutlinedButton, '下载模型').hitTestable(),
+      findsOneWidget,
+    );
+    await tester.runAsync(() => store.download('sensevoice'));
+    await tester.tap(find.byTooltip('返回'));
+    await tester.runAsync(() => Future<void>.delayed(Duration.zero));
+    await tester.pumpAndSettle();
+    expect(find.text('离线转写尚未就绪'), findsNothing);
+    expect(find.text('录音记一下'), findsOneWidget);
+  });
   testWidgets('用户可从文字入口保存、查看、编辑并查找记录', (tester) async {
     await tester.pumpWidget(NianxiaApp(book: book));
-    expect(find.text('记一下'), findsOneWidget);
+    expect(find.text('录音记一下'), findsOneWidget);
     expect(find.text('找一下'), findsOneWidget);
     await tester.tap(find.text('写文字'));
     await tester.pumpAndSettle();
@@ -67,6 +125,8 @@ void main() {
     final child = await book.saveText('值得收藏的追加', parentId: parent.id);
     await book.favorite(child.id, true);
     await tester.pumpWidget(NianxiaApp(book: book));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('全部记录'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('收藏'));
     await tester.pumpAndSettle();

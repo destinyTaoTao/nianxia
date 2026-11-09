@@ -139,7 +139,8 @@ class _SearchPageState extends State<SearchPage> {
               autofocus: !widget.voice,
               maxLength: 500,
               decoration: InputDecoration(
-                hintText: '想找什么？关键词或你的说法',
+                hintText: semantic ? '输入关键词或描述' : '输入记得的关键词',
+                hintMaxLines: 2,
                 counterText: '',
                 prefixIcon: const Icon(Icons.search),
                 suffixIcon: IconButton(
@@ -163,7 +164,7 @@ class _SearchPageState extends State<SearchPage> {
                   icon: const Icon(Icons.date_range_outlined, size: 18),
                   label: Text(
                     range == null
-                        ? '选择日期'
+                        ? '按日期筛选'
                         : '${range!.start.month}月${range!.start.day}日 至 ${range!.end.month}月${range!.end.day}日',
                   ),
                 ),
@@ -176,10 +177,8 @@ class _SearchPageState extends State<SearchPage> {
                     },
                     icon: const Icon(Icons.close, size: 18),
                   ),
-                Text(
-                  fallback ?? (semantic ? '关键词与语义查找' : '关键词查找，语义模型未就绪'),
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
+                if (fallback != null && text.text.trim().isNotEmpty)
+                  Text(fallback!, style: Theme.of(context).textTheme.bodySmall),
               ],
             ),
           ),
@@ -190,8 +189,8 @@ class _SearchPageState extends State<SearchPage> {
                 : text.text.trim().isEmpty
                 ? const EmptyState(
                     icon: Icons.search_rounded,
-                    title: '从一句话，找回一个想法',
-                    detail: '输入关键词或说出要找的内容。\n返回原文，不生成答案。',
+                    title: '找回之前的想法',
+                    detail: '输入关键词，或点麦克风说出要找的内容。',
                   )
                 : hits.isEmpty && !busy
                 ? const EmptyState(

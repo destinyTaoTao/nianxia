@@ -105,6 +105,12 @@ void main() {
     await tester.pumpAndSettle();
     await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
     await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
+    await tester.ensureVisible(find.text('全部记录'));
+    await tester.tap(find.text('全部记录'));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
+    await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
     handle.dispose();
   });
 }

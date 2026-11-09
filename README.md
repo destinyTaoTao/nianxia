@@ -13,6 +13,14 @@
 - 用户自带 DeepSeek Key，每次确认单条正文后整理；结果与正文分开，编辑后标过期。不自动重放付费请求。
 - 未加密 ZIP 备份（包含可读文本与 WAV），重复跳过、冲突副本和追加关系重映射。索引可重建。
 
+## 试用反馈：首页更直接
+
+2026-11-09 按试用反馈将时间线首页调整为轻量操作首页：主入口“录音记一下”，并列次级入口“写文字 / 找一下”，下方显示最近三条；“全部记录”进入完整列表及收藏。未转写录音使用创建时间作显示名称，完整原文和音频保持不变。首页显示未就绪的离线转写及准备入口，直接进入模型下载区域；不自动下载或发起云端请求。
+
+沿用现有中性色、系统字体、原创标记及减少动态效果；记录行缩短间距，查找页减少技术术语。两倍字体时次级动作纵向排列。新增应用操作回归覆盖最近三条与完整列表、模型未准备到就绪的提示变化，并扩大记录列表的大字及触控验证。44 项主机测试、分析器和 ARM64 Release 构建通过；本轮 Standards / Spec 独立静态评审均未发现新增确定性问题，不代表 iOS 或真机已验收。
+
+运行截图：[新版首页](docs/screenshots/android-dashboard-light.png)、[深色首页](docs/screenshots/android-dashboard-dark.png)、[离线功能准备](docs/screenshots/android-model-preparation.png)。Android 模拟器实际检查了模型准备入口、完整列表及收藏、文字编辑返回、已有记录查找和深浅主题切换；当前模拟器保留在新版首页。
+
 ## 快捷呼出录音
 
 Android 下拉快捷设置，编辑并添加“记一下”磁贴；也可长按桌面图标选择“记一下”。无需先进入记录列表，直接显示顶部录音胶囊。停止落盘成功才显示已保存，系统返回键也会停止保存；确认丢弃会删除未保存音频。完成后点击“返回原应用”。离开前保留尚未保存的文字编辑，后续查找也不清空编辑栈。
@@ -109,7 +117,7 @@ DeepSeek 使用集成时核验的 [V4-Flash](https://api-docs.deepseek.com/updat
 ## 本轮实际验证
 
 - `flutter analyze`：通过。
-- `flutter test`：42 项主机测试通过，覆盖应用行为、真实 SQLite/文件、故障注入与界面；包含浅深主题、两倍字体、无障碍触控/标签及减少动态效果。新增胶囊重复呼出、返回保存、编辑保留、拒绝权限转文字、确认丢弃及启动期间退后台回归。
+- `flutter test`：44 项主机测试通过，覆盖应用行为、真实 SQLite/文件、故障注入与界面；包含浅深主题、两倍字体、无障碍触控/标签及减少动态效果。新增胶囊重复呼出、返回保存、编辑保留、拒绝权限转文字、确认丢弃及启动期间退后台回归。
 - Android API 36 ARM64 模拟器、飞行模式：通过 `flutter drive` 执行真实 SenseVoice + BGE 同包、语义有/无结果、原生 PCM 录音和 WAV 回放。仅使用公开模型样本和合成文本。
 - 1,000 条合成短记录、主机 20 次关键词查询 P95：约 9.4 ms，非手机指标。
 - [浅色时间线](docs/screenshots/home-light.png)、[深色时间线](docs/screenshots/home-dark.png)、[查找](docs/screenshots/search-light.png)、[详情](docs/screenshots/detail-light.png)为实际 widget 运行截图，非真机截图。
@@ -119,7 +127,7 @@ DeepSeek 使用集成时核验的 [V4-Flash](https://api-docs.deepseek.com/updat
 - 模拟器 ExoPlayer 释放时观察到 `Handler ... on a dead thread` 警告，回放完成断言及整个 driver 均通过；尚未在真机确认是否复现。
 - 真实付费 API、双端真机日历提醒、双端系统备份排除的设备实测均未执行；Android 模拟器通知链路的结果见下节。
 
-Android ARM64 Release 试用包已构建并安装启动，约 **50.9 MB**（不含首次下载的模型），仍使用本地 debug 签名；APK 仅包含 ARM64 与单一 ORT 运行时。产物为 `build/app/outputs/flutter-apk/app-release.apk`，SHA-256：`788f58310869a82e12e6bdf314d7ea897c6c72a64bca0995c2bb649db384584a`。
+Android ARM64 Release 试用包已构建并安装启动，约 **50.9 MB**（不含首次下载的模型），仍使用本地 debug 签名；APK 仅包含 ARM64 与单一 ORT 运行时。产物为 `build/app/outputs/flutter-apk/app-release.apk`，SHA-256：`e5db50521254ff74ef82f20b5d909f039adbec3d9a5c5860a840b0a7afc78e0b`。
 
 运行集成测试后再构建 Release 时使用上面的正常 `flutter build apk --release --target-platform android-arm64`，让 Flutter 重新生成排除测试插件的注册文件；不要复用测试阶段生成的注册文件直接加 `--no-pub`。Flutter 平台构建应串行执行。
 
