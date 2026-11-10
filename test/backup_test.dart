@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:archive/archive.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -119,5 +121,58 @@ void main() {
       throwsA(isA<NotebookException>()),
     );
     expect(book.records.length, 10001);
+  });
+  test('恢复最后音频核验期间取消，不提交新增记录且清理暂存副本', () async {
+    final draft = await book.beginCapture();
+    await writeWave(draft.path);
+    final audio = await book.finishCapture(draft);
+    await BackupService(restored).restore(await BackupService(book).export());
+    final added = await book.saveText('取消后不应导入');
+    final file = await BackupService(book).export();
+    final service = BackupService(restored);
+    await expectLater(
+      service.restore(
+        file,
+        progress: (value) {
+          if (value == 1) scheduleMicrotask(() => service.cancelled = true);
+        },
+      ),
+      throwsA(isA<NotebookException>()),
+    );
+    expect(restored.get(added.id), isNull);
+    expect(restored.records.single.id, audio.id);
+    expect(
+      await File(restored.audioPath(restored.records.single)).exists(),
+      isTrue,
+    );
+    expect(await Directory('${other.path}/audio').list().length, 1);
+    expect(await Directory('${other.path}/imports').list().length, 0);
+  });
+  test('导出容量计算包含可读正文与清单，不留下超出恢复上限的成功包', () async {
+    // 135 valid two-minute WAVs fit the old audio budget. The two copies of
+    // 3.3 million Chinese characters push the complete archive over 512 MiB.
+    for (var i = 0; i < 135; i++) {
+      final draft = await book.beginCapture();
+      await writeWave(draft.path);
+      final file = await File(draft.path).open(mode: FileMode.append);
+      final size = ByteData(4)..setUint32(0, 3840036, Endian.little);
+      await file.setPosition(4);
+      await file.writeFrom(size.buffer.asUint8List());
+      size.setUint32(0, 3840000, Endian.little);
+      await file.setPosition(40);
+      await file.writeFrom(size.buffer.asUint8List());
+      await file.truncate(3840044);
+      await file.close();
+      await book.finishCapture(draft);
+    }
+    for (var i = 0; i < 33; i++) {
+      await book.saveText('记' * 100000);
+    }
+    await expectLater(
+      BackupService(book).export(),
+      throwsA(isA<NotebookException>()),
+    );
+    expect(book.records.length, 168);
+    expect(await Directory('${home.path}/exports').list().length, 0);
   });
 }

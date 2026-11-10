@@ -111,6 +111,7 @@ class _SettingsPageState extends State<SettingsPage> {
       } else {
         await vault.save(key.text);
       }
+      if (!mounted) return;
       key.clear();
       await loadKey();
       if (mounted) {
@@ -134,6 +135,7 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   Future<void> export() async {
+    if (busy) return;
     if (!await confirm(
       context,
       '导出未加密备份？',
@@ -142,6 +144,7 @@ class _SettingsPageState extends State<SettingsPage> {
     )) {
       return;
     }
+    if (!mounted || busy) return;
     setState(() {
       busy = true;
       progress = 0;
@@ -191,6 +194,7 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   Future<void> restore() async {
+    if (busy) return;
     if (!await confirm(
       context,
       '从备份恢复？',
@@ -199,19 +203,29 @@ class _SettingsPageState extends State<SettingsPage> {
     )) {
       return;
     }
-    final selected = await FilePicker.pickFile(
-      type: FileType.custom,
-      allowedExtensions: ['zip'],
-    );
-    if (selected == null || selected.path == null || !mounted) {
-      return;
-    }
+    if (!mounted || busy) return;
     setState(() {
       busy = true;
-      progress = 0;
-      status = '正在校验备份';
+      progress = null;
+      status = '请选择备份文件';
     });
     try {
+      final selected = await FilePicker.pickFile(
+        type: FileType.custom,
+        allowedExtensions: ['zip'],
+      );
+      if (!mounted) return;
+      if (selected == null) {
+        setState(() => status = '已取消选择备份');
+        return;
+      }
+      if (selected.path == null) {
+        throw const NotebookException('无法读取所选文件，请先将备份保存到设备后重试。');
+      }
+      setState(() {
+        progress = 0;
+        status = '正在校验备份';
+      });
       final result = await backup.restore(
         File(selected.path!),
         progress: updateProgress,

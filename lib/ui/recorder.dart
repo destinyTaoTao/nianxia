@@ -94,7 +94,7 @@ class _RecorderState extends State<_Recorder> {
     if (capture.state == 'saving') {
       return;
     }
-    if (capture.state == 'recording' &&
+    if ((capture.state == 'recording' || capture.draft != null) &&
         !await confirm(
           context,
           widget.query ? '取消本次查询？' : '丢弃这段录音？',
@@ -230,7 +230,7 @@ class _RecorderState extends State<_Recorder> {
                         ),
                       OutlinedButton(
                         onPressed: cancel,
-                        child: const Text('关闭或丢弃'),
+                        child: Text(capture.draft == null ? '关闭' : '丢弃片段'),
                       ),
                     ],
                   ),

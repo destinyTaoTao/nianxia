@@ -124,11 +124,43 @@ void main() {
     );
     await untilVisible(tester, '没有麦克风权限');
     expect(find.text('写文字'), findsNothing);
-    await tester.tap(find.text('关闭或丢弃'));
+    await tester.tap(find.text('关闭'));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('body-editor')), findsNothing);
     expect(book.records, isEmpty);
     expect(book.captureActive, isFalse);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+  testWidgets('保存失败的音频经确认才丢弃，取消确认保留恢复片段', (tester) async {
+    final mic = TestMicrophone()..failStop = true;
+    await launch(tester, mic);
+    await untilVisible(tester, '停止并保存');
+    mic.chunks.add(Uint8List(32000));
+    await tester.tap(find.text('停止并保存'));
+    await untilVisible(tester, '重试保存');
+    final draft = book.recoveryDrafts.single;
+    await tester.tap(find.byTooltip('丢弃并关闭'));
+    await tester.pumpAndSettle();
+    expect(find.text('确认丢弃'), findsOneWidget);
+    expect(recorderClosed, isFalse);
+    await tester.tap(find.text('取消'));
+    await tester.pumpAndSettle();
+    expect(book.recoveryDrafts.single.id, draft.id);
+    expect(await tester.runAsync(() => File(draft.path).exists()), isTrue);
+    expect(find.text('重试保存'), findsOneWidget);
+    await tester.tap(find.text('丢弃片段'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('确认丢弃'));
+    for (var i = 0; i < 50 && !recorderClosed; i++) {
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 10)),
+      );
+      await tester.pump();
+    }
+    expect(recorderClosed, isTrue);
+    expect(await tester.runAsync(() => File(draft.path).exists()), isFalse);
+    expect(book.recoveryDrafts, isEmpty);
+    expect(book.records, isEmpty);
     await tester.pumpWidget(const SizedBox.shrink());
   });
   testWidgets('有有效片段的保存失败继续提供重试，不从文字入口丢失音频', (tester) async {

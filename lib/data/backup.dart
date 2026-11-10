@@ -95,6 +95,11 @@ class BackupService {
                 '${r.createdAt.toIso8601String()} (${r.timezone})\n${r.body}\n${r.parentId == null ? '' : '追加到 ${r.parentId}\n'}',
           )
           .join('\n');
+      if (utf8.encode(text).length > 16 * 1024 * 1024 ||
+          total + utf8.encode(manifest).length + utf8.encode(text).length >
+              maxBytes) {
+        throw const NotebookException('备份内容超过 512 MB 或文本大小限制，未生成备份。');
+      }
       encoder.addArchiveFile(
         ArchiveFile.string('records.txt', text)
           ..compression = CompressionType.none,
@@ -114,6 +119,12 @@ class BackupService {
       _check();
       await encoder.close();
       opened = false;
+      _check();
+      // Include ZIP headers and the readable text in the restore size boundary.
+      if (await partial.length() > maxBytes) {
+        throw const NotebookException('完整备份超过 512 MB，未生成备份。');
+      }
+      _check();
       await partial.rename(output.path);
       return output;
     } finally {
@@ -221,6 +232,9 @@ class BackupService {
         return true;
       }
 
+      // Hashing existing audio yields to the UI; honor cancellation up to the
+      // synchronous transaction boundary, before any records become visible.
+      _check();
       final report = book.repository.transaction(() {
         final map = <String, String>{};
         final inserts = <String>{};
