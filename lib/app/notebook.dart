@@ -5,6 +5,7 @@ import 'dart:async';
 import 'package:crypto/crypto.dart';
 
 import '../domain/capture_session.dart';
+import '../domain/search_page.dart';
 
 import '../domain/ports.dart';
 import '../data/capture_store.dart';
@@ -565,6 +566,19 @@ class Notebook extends ChangeNotifier {
       });
 
   static String normalize(String text) => RecordSearch.normalize(text);
+  Future<SearchPage> searchPage(
+    SearchQuery query, {
+    SearchCursor? after,
+    Embedder? embedder,
+    SearchCancellation? cancellation,
+    int limit = 40,
+  }) => _search.searchPage(
+    query,
+    after: after,
+    embedder: embedder,
+    cancellation: cancellation,
+    limit: limit,
+  );
   Future<SearchResults> search(
     String query, {
     DateTime? from,

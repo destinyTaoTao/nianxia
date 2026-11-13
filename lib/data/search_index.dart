@@ -752,8 +752,11 @@ class SearchIndex {
     List<double>? vector,
     String model,
     String? fallback,
-    bool semanticRequested,
-  ) async {
+    bool semanticRequested, {
+    void Function(SearchHit)? onKeywordHit,
+    bool summariesOnly = false,
+    bool Function()? cancelled,
+  }) async {
     if (_closed) throw const NotebookException('存储已关闭。');
     if (_activeQueries++ == 0) _idle = Completer<void>();
     keywordCandidates = sourceRecordsRead = reconciledRecords =
@@ -788,6 +791,8 @@ class SearchIndex {
           semanticLimit: from == null && to == null ? 128 : 1024,
           indexingPending: true,
           sourceGeneration: _sourceVersion,
+          onKeywordHit: onKeywordHit,
+          cancelled: cancelled,
         );
       }
       if (vector != null && model == source.indexModelVersion) {
@@ -801,6 +806,9 @@ class SearchIndex {
         model,
         fallback,
         semanticRequested,
+        onKeywordHit: onKeywordHit,
+        summariesOnly: summariesOnly,
+        cancelled: cancelled,
       );
     } on SqliteException catch (error) {
       _ready = false;
@@ -816,6 +824,8 @@ class SearchIndex {
         semanticRequested,
         semanticLimit: from == null && to == null ? 128 : 1024,
         sourceGeneration: _sourceVersion,
+        onKeywordHit: onKeywordHit,
+        cancelled: cancelled,
       );
     } on FormatException {
       _ready = false;
@@ -831,6 +841,8 @@ class SearchIndex {
         semanticRequested,
         semanticLimit: from == null && to == null ? 128 : 1024,
         sourceGeneration: _sourceVersion,
+        onKeywordHit: onKeywordHit,
+        cancelled: cancelled,
       );
     } on FileSystemException {
       _ready = false;
@@ -845,6 +857,8 @@ class SearchIndex {
         semanticRequested,
         semanticLimit: from == null && to == null ? 128 : 1024,
         sourceGeneration: _sourceVersion,
+        onKeywordHit: onKeywordHit,
+        cancelled: cancelled,
       );
     } finally {
       if (--_activeQueries == 0) {
@@ -862,8 +876,11 @@ class SearchIndex {
     List<double>? vector,
     String model,
     String? fallback,
-    bool requested,
-  ) async {
+    bool requested, {
+    void Function(SearchHit)? onKeywordHit,
+    bool summariesOnly = false,
+    bool Function()? cancelled,
+  }) async {
     final generation = _generation;
     if (vector != null && model != source.indexModelVersion) {
       vector = null;
@@ -934,7 +951,11 @@ class SearchIndex {
         score,
       );
       if (exact) {
-        hits[r.id] = hit;
+        if (onKeywordHit != null) {
+          onKeywordHit(hit);
+        } else {
+          hits[r.id] = hit;
+        }
       } else if (semanticHits.length < semanticLimit ||
           compareHits(hit, semanticHits.last) < 0) {
         if (semanticHits.length == semanticLimit) semanticHits.removeLast();
@@ -945,7 +966,9 @@ class SearchIndex {
 
     void consider(String id, {required bool keyword}) {
       sourceRecordsRead++;
-      final record = source.get(id);
+      final record = summariesOnly
+          ? source.searchRecords([id]).firstOrNull
+          : source.get(id);
       if (record != null) considerRecord(record, keyword: keyword);
     }
 
@@ -965,6 +988,7 @@ class SearchIndex {
       Object? after;
       String? afterDay;
       while (true) {
+        if (cancelled?.call() == true) throw const NotebookException('查找已取消。');
         // The tuple already implies the original lower date bound. Keeping
         // both makes SQLite repeatedly start at `from` on some versions.
         final pageDateWhere = after == null
@@ -994,8 +1018,19 @@ class SearchIndex {
         );
         if (rows.isEmpty) break;
         keywordCandidates += rows.length;
-        for (final row in rows) {
-          if ((row['body'] as String).contains(q)) {
+        final matching = rows.where(
+          (row) => (row['body'] as String).contains(q),
+        );
+        if (summariesOnly) {
+          final records = source.searchRecords(
+            matching.map((row) => row['id'] as String).toList(),
+          );
+          sourceRecordsRead += records.length;
+          for (final record in records) {
+            considerRecord(record, keyword: true);
+          }
+        } else {
+          for (final row in matching) {
             consider(row['id'] as String, keyword: true);
           }
         }
@@ -1009,6 +1044,7 @@ class SearchIndex {
     if (vector != null) {
       String? afterPending;
       while (true) {
+        if (cancelled?.call() == true) throw const NotebookException('查找已取消。');
         final rows = _db!.select(
           'SELECT id FROM pending_vectors ${afterPending == null ? '' : 'WHERE id>?'} ORDER BY id LIMIT 64',
           [?afterPending],
@@ -1059,6 +1095,9 @@ class SearchIndex {
           // SQLite read transactions, statement setup and model metadata reads.
           // Hydrate in SQL batches, but score in the original ANN order.
           for (var at = 0; at < candidates.matches.length; at += 16) {
+            if (cancelled?.call() == true) {
+              throw const NotebookException('查找已取消。');
+            }
             final batch = candidates.matches.sublist(
               at,
               math.min(at + 16, candidates.matches.length),
@@ -1076,7 +1115,10 @@ class SearchIndex {
               ids[key] = row['id'] as String;
             }
             final records = {
-              for (final record in source.getBatch(ids.values.toList()))
+              for (final record
+                  in (summariesOnly
+                      ? source.searchRecords(ids.values.toList())
+                      : source.getBatch(ids.values.toList())))
                 record.id: record,
             };
             for (final match in batch) {
@@ -1110,6 +1152,8 @@ class SearchIndex {
         semanticLimit: semanticLimit,
         indexingPending: true,
         sourceGeneration: _sourceVersion,
+        onKeywordHit: onKeywordHit,
+        cancelled: cancelled,
       );
     }
     final sorted = [...hits.values, ...semanticHits]..sort(compareHits);

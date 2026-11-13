@@ -1,0 +1,19 @@
+{
+  "applicationId": "app.nianxia.nianxia.test",
+  "case": "search-paging",
+  "passed": true,
+  "metrics": {
+    "records": 10001,
+    "pages": 251,
+    "indexPreparationMs": 1610,
+    "firstPageMs": 118,
+    "allPagesMs": 306,
+    "maxPagePayloadBytes": 23208,
+    "sampledProcessPeakRss": 191197184,
+    "mainTimerMaxGapMs": 44
+  },
+  "executionDate": "2026-11-14",
+  "platform": "Android emulator API36 ARM64",
+  "mode": "release AOT non-debuggable isolated target",
+  "scope": "real 10001-row summary paging and generation reset; numeric native report, no VM service"
+}

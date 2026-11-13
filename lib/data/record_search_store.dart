@@ -25,6 +25,8 @@ class RecordSearchStore {
     int? semanticLimit,
     bool indexingPending = false,
     Object Function()? sourceGeneration,
+    void Function(SearchHit)? onKeywordHit,
+    bool Function()? cancelled,
   }) async {
     final hits = <SearchHit>[];
     final semanticHits = <SearchHit>[];
@@ -42,6 +44,7 @@ class RecordSearchStore {
         : DateTime(from.year, from.month, from.day);
     final end = to == null ? null : DateTime(to.year, to.month, to.day);
     while (true) {
+      if (cancelled?.call() == true) throw const NotebookException('查找已取消。');
       if (generation != version()) {
         hits.clear();
         semanticHits.clear();
@@ -64,6 +67,8 @@ class RecordSearchStore {
           semanticLimit: semanticLimit,
           indexingPending: indexingPending,
           sourceGeneration: sourceGeneration,
+          onKeywordHit: onKeywordHit,
+          cancelled: cancelled,
         );
       }
       final page = repository.searchPage(
@@ -106,7 +111,9 @@ class RecordSearchStore {
           r.body.substring(math.min(at, r.body.length), snippetEnd),
           score,
         );
-        if (exact || semanticLimit == null) {
+        if (exact && onKeywordHit != null) {
+          onKeywordHit(hit);
+        } else if (exact || semanticLimit == null) {
           hits.add(hit);
         } else if (semanticHits.length < semanticLimit ||
             compare(hit, semanticHits.last) < 0) {

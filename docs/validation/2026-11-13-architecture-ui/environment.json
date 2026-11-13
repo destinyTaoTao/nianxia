@@ -33,7 +33,7 @@
     "iosBuild": "not-executed-missing-Xcode",
     "formalDataFingerprint": "unavailable-run-as-denied",
     "formalInstallation": "unchanged",
-    "hostFlutterTests": 247,
+    "hostFlutterTests": 258,
     "hostPythonTests": 31,
     "analyzer": "passed",
     "nativeCaptureJvmTests": 12,
@@ -45,7 +45,9 @@
     "normalReleaseArtifactBoundary": "passed-build-only",
     "isolatedRustToolchain": "1.91.1",
     "androidCaptureProcessFaults": "four cases passed debug",
-    "androidNativeDeadline": "passed actual 120 seconds"
+    "androidNativeDeadline": "passed actual 120 seconds",
+    "androidSummaryPagingProfile": "passed 10001 rows / 251 pages",
+    "androidSummaryPagingRelease": "passed isolated non-debuggable AOT"
   },
   "committed": false,
   "pushed": false

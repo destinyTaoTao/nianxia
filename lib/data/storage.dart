@@ -5,9 +5,11 @@ import 'dart:isolate';
 import '../domain/record.dart';
 import '../domain/record_page.dart';
 import '../domain/restore_report.dart';
+import '../domain/search_page.dart';
 import 'record_repository.dart';
 import 'search_index.dart';
 import 'restore_store.dart';
+import 'search_paging_store.dart';
 
 /// Owns one persistent database isolate. Neither handles, SQL closures nor
 /// native pointers cross its seam. A close fences new requests and drains all
@@ -198,6 +200,26 @@ class Storage {
 
   /// Explicit maintenance barrier for preparation tools and native validation.
   Future<void> waitForSearchIndex() => _call(_Command.waitForSearchIndex, []);
+  Future<SearchPage> searchPage(
+    SearchQuery query, {
+    required String requestId,
+    SearchCursor? after,
+    List<double>? vector,
+    String? model,
+    String? fallback,
+    bool semanticRequested = false,
+    int limit = 40,
+  }) => _call(_Command.searchSummaryPage, [
+    query,
+    requestId,
+    after,
+    vector,
+    model,
+    fallback,
+    semanticRequested,
+    limit,
+  ]);
+  Future<void> cancelSearch(String id) => _call(_Command.cancelSearch, [id]);
 
   Future<void> close() => _closeFuture ??= _finishClose();
   Future<void> _finishClose() async {
@@ -249,6 +271,8 @@ enum _Command {
   snapshot,
   close,
   search,
+  searchSummaryPage,
+  cancelSearch,
   waitForSearchIndex,
   prepareRestore,
   mergeRestore,
@@ -266,9 +290,15 @@ void _storageMain(List<Object> arguments) {
   final commands = ReceivePort();
   late final RecordRepository repository;
   late final SearchIndex searchIndex;
+  late final SearchPagingStore searchPages;
   try {
     repository = RecordRepository(Directory(arguments[0] as String));
     searchIndex = SearchIndex(repository, Directory(arguments[0] as String));
+    searchPages = SearchPagingStore(
+      repository,
+      searchIndex,
+      Directory(arguments[0] as String),
+    );
     replies.send([0, true, commands.sendPort]);
   } catch (error) {
     replies.send([0, false, _failure(error)]);
@@ -282,6 +312,7 @@ void _storageMain(List<Object> arguments) {
       final result = _execute(
         repository,
         searchIndex,
+        searchPages,
         command,
         args,
         Directory(arguments[0] as String),
@@ -299,6 +330,7 @@ void _storageMain(List<Object> arguments) {
 Object? _execute(
   RecordRepository r,
   SearchIndex searchIndex,
+  SearchPagingStore searchPages,
   _Command command,
   List a,
   Directory home,
@@ -388,7 +420,27 @@ Object? _execute(
       r.snapshotTo(a[0] as String);
       return null;
     case _Command.close:
-      return searchIndex.close().then((_) => r.close());
+      return searchIndex.close().then((_) {
+        try {
+          searchPages.close();
+        } finally {
+          r.close();
+        }
+      });
+    case _Command.cancelSearch:
+      searchPages.cancel(a[0] as String);
+      return null;
+    case _Command.searchSummaryPage:
+      return searchPages.page(
+        a[0] as SearchQuery,
+        requestId: a[1] as String,
+        after: a[2] as SearchCursor?,
+        vector: a[3] as List<double>?,
+        model: a[4] as String?,
+        fallback: a[5] as String?,
+        semanticRequested: a[6] as bool,
+        limit: a[7] as int,
+      );
     case _Command.search:
       return searchIndex.search(
         a[0] as String,

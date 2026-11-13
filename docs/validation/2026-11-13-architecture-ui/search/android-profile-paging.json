@@ -1,0 +1,19 @@
+{
+  "applicationId": "app.nianxia.nianxia.test",
+  "case": "search-paging",
+  "passed": true,
+  "metrics": {
+    "records": 10001,
+    "pages": 251,
+    "indexPreparationMs": 1551,
+    "firstPageMs": 105,
+    "allPagesMs": 259,
+    "maxPagePayloadBytes": 23208,
+    "sampledProcessPeakRss": 242212864,
+    "mainTimerMaxGapMs": 21
+  },
+  "executionDate": "2026-11-14",
+  "platform": "Android emulator API36 ARM64",
+  "mode": "profile AOT",
+  "scope": "real storage worker, synthetic 10001 records; Dart HTTP blocked, no microphone/models or physical-phone acceptance"
+}
