@@ -306,6 +306,8 @@ class NativeCaptureSession(
 
     private fun discardFiles(snapshot: CaptureSnapshot) {
         if (snapshot.claimed) throw CaptureFailure("capture_claimed")
+        // Cleanup can fail. Keep a durable tombstone until both deletions finish.
+        journal.save(snapshot.copy(phase = CapturePhase.cancelled))
         val path = wave(snapshot.request)
         if (!path.delete() && path.exists()) throw CaptureFailure("capture_cleanup")
         journal.delete(snapshot.request.sessionId)
@@ -323,7 +325,11 @@ class NativeCaptureSession(
         for (id in journal.ids()) {
             val old = try { journal.read(id) } catch (_: Exception) { warnJournal(); continue } // Preserve unknown versions.
             if (old.request.mode == CaptureMode.query || old.phase == CapturePhase.cancelled) {
-                runCatching { wave(old.request).delete(); journal.delete(id) }
+                runCatching {
+                    val path = wave(old.request)
+                    if (!path.delete() && path.exists()) throw CaptureFailure("capture_cleanup")
+                    journal.delete(id)
+                }.onFailure { warnJournal() }
             } else if (old.active) {
                 val next = try {
                     val bytes = PcmWaveSink.repair(wave(old.request))

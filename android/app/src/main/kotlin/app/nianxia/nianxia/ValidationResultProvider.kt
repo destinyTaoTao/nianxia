@@ -39,7 +39,7 @@ class ValidationResultProvider : ContentProvider() {
             .put("case", data.getString("case")).put("passed", data.getBoolean("passed")).put("metrics", metrics)
             .toString().toByteArray(Charsets.UTF_8)
         val pipe = ParcelFileDescriptor.createPipe()
-        Thread { ParcelFileDescriptor.AutoCloseOutputStream(pipe[1]).use { it.write(sanitized) } }.start()
+        Thread { runCatching { ParcelFileDescriptor.AutoCloseOutputStream(pipe[1]).use { it.write(sanitized) } } }.start()
         return pipe[0]
     }
     companion object { private const val TEST_ID = "app.nianxia.nianxia.test" }

@@ -166,6 +166,22 @@ class NativeCaptureSessionTest {
         } finally {release.countDown()}
     }
 
+    @Test fun failedQueryCleanupPreservesDurableIntentForRetry() {
+        owner.start(request().copy(mode=CaptureMode.query));audio.push(byteArrayOf(1,2));owner.stop(id)
+        val query=File(directory,"queries/$id.wav");assertTrue(query.delete());assertTrue(query.mkdir());File(query,"blocked").writeText("fixture")
+        owner.close();owner=NativeCaptureSession(directory,{audio},{clock.get()})
+        assertTrue("Cleanup failure lost its journal",File(directory,"$id.session").exists())
+        assertTrue(query.exists())
+    }
+
+    @Test fun failedDiscardCleanupPreservesTombstoneForRetry() {
+        owner.start(request());audio.push(byteArrayOf(1,2));owner.stop(id)
+        val recording=File(directory,"$id.wav");assertTrue(recording.delete());assertTrue(recording.mkdir());File(recording,"blocked").writeText("fixture")
+        try {owner.cancel(id)}catch (_:CaptureFailure){}
+        assertTrue("Discard failure lost durable cleanup intent",File(directory,"$id.session").exists())
+        assertEquals(CapturePhase.cancelled,CaptureJournal(directory).read(id).phase)
+    }
+
     private class ManualAudio : CaptureAudioSource {
         private lateinit var accept: (ByteArray, Int) -> Unit
         private lateinit var failure: (String) -> Unit

@@ -57,5 +57,30 @@ class CaptureScreenOffTest(unittest.TestCase):
         self.assertTrue(any('224' in c for c in calls))
 
 
+class CaptureProcessKillTest(unittest.TestCase):
+    def test_only_checkpointed_test_package_is_stopped_then_relaunched(self):
+        calls=[];launches=0
+        def command(args,**kwargs):
+            calls.append(args)
+            out=''
+            if 'cat' in args:
+                out=json.dumps({'applicationId':runner.TEST_ID,'runId':'nonce','phase':'active','case':'process-kill-active'})
+            elif 'pidof' in args:out='1234' if not any('force-stop' in c for c in calls) else ''
+            return subprocess.CompletedProcess(args,0,out,'')
+        def drive():
+            nonlocal launches
+            launches+=1
+            if launches==1:
+                import time
+                while not any('force-stop' in c for c in calls):time.sleep(.01)
+                raise runner.ValidationError('expected killed driver')
+        with patch.object(runner,'run',side_effect=command):
+            runner.drive_with_process_kill(drive,['adb','-s','test'],'nonce','process-kill-active')
+        self.assertEqual(launches,2)
+        stops=[c for c in calls if 'force-stop' in c]
+        self.assertEqual(len(stops),1);self.assertEqual(stops[0][-1],runner.TEST_ID)
+        self.assertFalse(any('clear' in c or 'uninstall' in c for c in calls))
+
+
 if __name__ == '__main__':
     unittest.main()

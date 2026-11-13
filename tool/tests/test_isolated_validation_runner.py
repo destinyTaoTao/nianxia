@@ -49,6 +49,8 @@ print("package: name='"+os.environ['APP_ID']+"' versionCode='1'")
         self.stub(self.root / 'android/platform-tools/adb', '''
 if 'path' in sys.argv: print('package:/data/app/formal/base.apk')
 elif 'install' in sys.argv: sys.exit(int(os.environ.get('INSTALL_EXIT','0')))
+elif 'read' in sys.argv and os.environ.get('FAKE_RELEASE_CASE'):
+ print(json.dumps({'passed':True,'runId':sys.argv[-1].split('/')[-1],'case':os.environ['FAKE_RELEASE_CASE'],'applicationId':os.environ['APP_ID']}))
 ''')
 
     def stub(self, path, body):
@@ -108,6 +110,12 @@ elif 'install' in sys.argv: sys.exit(int(os.environ.get('INSTALL_EXIT','0')))
         result = self.invoke()
         self.assertNotEqual(result.returncode, 0)
         self.assertEqual(sum('path' in c for c in self.calls()), 2)
+
+    def test_fault_cases_without_release_orchestrator_are_rejected_before_build(self):
+        self.env['FAKE_RELEASE_CASE']='process-kill-active'
+        result=self.invoke('--mode','release','--case','process-kill-active')
+        self.assertNotEqual(result.returncode,0)
+        self.assertFalse(any('build' in c or 'install' in c for c in self.calls()))
 
     def test_ios_uses_actual_bundle_identifier_and_isolated_flavor(self):
         result = self.invoke('--platform', 'ios', '--device', 'ios-test-id')

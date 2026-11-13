@@ -34,16 +34,18 @@
     "formalDataFingerprint": "unavailable-run-as-denied",
     "formalInstallation": "unchanged",
     "hostFlutterTests": 247,
-    "hostPythonTests": 29,
+    "hostPythonTests": 31,
     "analyzer": "passed",
-    "nativeCaptureJvmTests": 10,
+    "nativeCaptureJvmTests": 12,
     "cryptoRustTests": 5,
     "cryptoHostFfiTests": 3,
     "androidScreenOffSmoke": "passed",
     "androidProfileCryptoResources": "passed",
     "androidReleaseBackupChain": "passed",
     "normalReleaseArtifactBoundary": "passed-build-only",
-    "isolatedRustToolchain": "1.91.1"
+    "isolatedRustToolchain": "1.91.1",
+    "androidCaptureProcessFaults": "four cases passed debug",
+    "androidNativeDeadline": "passed actual 120 seconds"
   },
   "committed": false,
   "pushed": false

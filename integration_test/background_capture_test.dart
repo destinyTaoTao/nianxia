@@ -12,12 +12,31 @@ import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
 
 import 'support/isolated_validation.dart';
+import 'support/capture_kill_scenario.dart';
 
 void main() {
   final binding = IntegrationTestWidgetsFlutterBinding.ensureInitialized();
   testWidgets('原生记录会话在应用隐藏后继续采集并完成有效WAV', (tester) async {
     await requireIsolatedValidation();
     const testCase = String.fromEnvironment('VALIDATION_CASE');
+    if (const {
+      'process-kill-active',
+      'process-kill-query',
+      'kill-after-finalize',
+      'kill-after-source-commit',
+    }.contains(testCase)) {
+      try {
+        final metrics = await runCaptureKillScenario(testCase);
+        binding.reportData = await writeValidationResult(
+          passed: true,
+          metrics: metrics,
+        );
+      } catch (_) {
+        binding.reportData = await writeValidationResult(passed: false);
+        rethrow;
+      }
+      return;
+    }
     if (testCase != 'background-smoke' && testCase != 'capture-matrix') {
       throw StateError('此录音故障用例尚未实现，不能用普通冒烟代替。');
     }

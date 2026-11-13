@@ -18,8 +18,8 @@ import uuid
 TEST_ID = 'app.nianxia.nianxia.test'
 FORMAL_ID = 'app.nianxia.nianxia'
 CASES = {
-    'capture': ('isolation-smoke', 'background-smoke', 'capture-matrix',
-                'process-kill-active', 'kill-after-finalize', 'kill-after-source-commit'),
+    'capture': ('isolation-smoke', 'background-smoke', 'capture-matrix', 'deadline-auto-finalize',
+                'process-kill-active', 'process-kill-query', 'kill-after-finalize', 'kill-after-source-commit'),
     'backup': ('isolation-smoke', 'cipher-smoke', 'cipher-resources', 'backup-matrix'),
     'acceptance': ('isolation-smoke', 'offline-end-to-end', 'performance'),
 }
@@ -103,6 +103,45 @@ def drive_with_screen_off(drive, adb, run_id):
                 run([*adb, 'shell', 'input', 'keyevent', '224'])
 
 
+KILL_PHASES = {'process-kill-active': 'active', 'process-kill-query': 'query-active',
+               'kill-after-finalize': 'finalized', 'kill-after-source-commit': 'source-committed'}
+
+
+def drive_with_process_kill(drive, adb, run_id, case):
+    with ThreadPoolExecutor(max_workers=1) as workers:
+        pending = workers.submit(drive)
+        killed = False
+        deadline = time.monotonic() + 90
+        while time.monotonic() < deadline:
+            response = run([*adb, 'exec-out', 'run-as', TEST_ID, 'cat',
+                            f'cache/validation-progress/{run_id}.json'], timeout=10, allow_failure=True)
+            try:
+                data = json.loads(response.stdout)
+            except ValueError:
+                data = None
+            if (isinstance(data, dict) and data.get('runId') == run_id
+                    and data.get('applicationId') == TEST_ID and data.get('case') == case
+                    and data.get('phase') == KILL_PHASES[case]):
+                if not run([*adb, 'shell', 'pidof', TEST_ID], allow_failure=True).stdout.strip():
+                    raise ValidationError('Test process exited before the requested kill checkpoint')
+                run([*adb, 'shell', 'am', 'force-stop', TEST_ID])
+                killed = True
+                break
+            if pending.done():
+                pending.result()
+                raise ValidationError('Kill checkpoint missing; no process was stopped')
+            time.sleep(.1)
+        if not killed:
+            raise ValidationError('Kill checkpoint timed out; no process was stopped')
+        try:
+            pending.result()
+        except ValidationError:
+            pass  # The first driver is expected to lose the stopped process.
+        if run([*adb, 'shell', 'pidof', TEST_ID], allow_failure=True).stdout.strip():
+            raise ValidationError('Test process did not terminate')
+        drive()  # Same binary/nonce; persistent checkpoint chooses recovery stage.
+
+
 def main():
     args = parse_args()
     root = Path(__file__).resolve().parents[1]
@@ -119,8 +158,10 @@ def main():
         raise ValidationError('Requested device is unavailable or has a different platform')
     if args.platform == 'ios' and args.mode == 'release':
         raise ValidationError('iOS release installation requires a verified native-device runner; refused')
+    if args.mode == 'release' and (args.case in KILL_PHASES or args.case == 'capture-matrix'):
+        raise ValidationError('Automatic capture faults require the debug/profile orchestrator; release refused')
     target = 'integration_test/' + ('isolation_smoke_test.dart' if args.case == 'isolation-smoke'
-                                    else TARGETS[args.target])
+                                    else 'deadline_capture_test.dart' if args.case == 'deadline-auto-finalize' else TARGETS[args.target])
     if not (root / target).is_file():
         raise ValidationError('Requested test entry point is not implemented')
     run_id = str(uuid.uuid4())
@@ -201,6 +242,10 @@ def main():
                     if not adb:
                         raise ValidationError('Automatic screen-off currently requires Android emulator')
                     drive_with_screen_off(lambda: run(drive, env=env), adb, run_id)
+                elif args.case in KILL_PHASES:
+                    if not adb:
+                        raise ValidationError('Process kill validation currently requires Android')
+                    drive_with_process_kill(lambda: run(drive, env=env, timeout=120), adb, run_id, args.case)
                 else:
                     run(drive, env=env)
                 try:

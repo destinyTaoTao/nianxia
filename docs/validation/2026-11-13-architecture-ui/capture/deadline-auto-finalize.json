@@ -1,0 +1,15 @@
+{
+  "applicationId": "app.nianxia.nianxia.test",
+  "case": "deadline-auto-finalize",
+  "passed": true,
+  "metrics": {
+    "actualElapsedMs": 120536,
+    "nativeElapsedMs": 120000,
+    "recordedMs": 119936,
+    "pcmBytes": 3837952
+  },
+  "executionDate": "2026-11-14",
+  "platform": "Android emulator API36 ARM64",
+  "mode": "debug",
+  "scope": "actual background native deadline/sample cap finalization with no Flutter stop call; own WAV validated and discarded"
+}

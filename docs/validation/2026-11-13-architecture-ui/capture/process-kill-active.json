@@ -1,0 +1,15 @@
+{
+  "applicationId": "app.nianxia.nianxia.test",
+  "case": "process-kill-active",
+  "passed": true,
+  "metrics": {
+    "sourceMatchesBeforeCleanup": 1,
+    "recordedMs": 1536,
+    "waveBytes": 49196,
+    "automaticMicRestarts": 0
+  },
+  "executionDate": "2026-11-14",
+  "platform": "Android emulator API36 ARM64",
+  "mode": "debug",
+  "scope": "actual force-stop of isolated test process at nonce checkpoint and persistent recovery after relaunch; no formal data access"
+}
