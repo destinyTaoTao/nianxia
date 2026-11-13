@@ -1,0 +1,164 @@
+[
+  {
+    "run": 1,
+    "variant": "before",
+    "stages": [
+      {
+        "stage": "open",
+        "rss": 25788416,
+        "peak": 25804800,
+        "pid": 19033
+      },
+      {
+        "stage": "first",
+        "rss": 64225280,
+        "peak": 64225280,
+        "ms": 2486.662,
+        "recall": 1.0,
+        "pending": 100000
+      },
+      {
+        "stage": "source_closed",
+        "rss": 55246848,
+        "peak": 64225280
+      }
+    ],
+    "sourceSha256": "add387b847714862a5244f63fc0610b6beefca8feb7341278aa8db87b0924fb3",
+    "sourceUnchanged": true
+  },
+  {
+    "run": 1,
+    "variant": "after",
+    "stages": [
+      {
+        "stage": "open",
+        "rss": 19038208,
+        "peak": 19054592,
+        "pid": 19035
+      },
+      {
+        "stage": "first",
+        "rss": 29114368,
+        "peak": 29114368,
+        "ms": 995.267,
+        "recall": 1.0,
+        "pending": 100000
+      },
+      {
+        "stage": "source_closed",
+        "rss": 26689536,
+        "peak": 29114368
+      }
+    ],
+    "sourceSha256": "add387b847714862a5244f63fc0610b6beefca8feb7341278aa8db87b0924fb3",
+    "sourceUnchanged": true
+  },
+  {
+    "run": 2,
+    "variant": "before",
+    "stages": [
+      {
+        "stage": "open",
+        "rss": 25706496,
+        "peak": 25722880,
+        "pid": 19045
+      },
+      {
+        "stage": "first",
+        "rss": 64192512,
+        "peak": 64192512,
+        "ms": 2499.902,
+        "recall": 1.0,
+        "pending": 100000
+      },
+      {
+        "stage": "source_closed",
+        "rss": 55230464,
+        "peak": 64208896
+      }
+    ],
+    "sourceSha256": "add387b847714862a5244f63fc0610b6beefca8feb7341278aa8db87b0924fb3",
+    "sourceUnchanged": true
+  },
+  {
+    "run": 2,
+    "variant": "after",
+    "stages": [
+      {
+        "stage": "open",
+        "rss": 19021824,
+        "peak": 19038208,
+        "pid": 19054
+      },
+      {
+        "stage": "first",
+        "rss": 29130752,
+        "peak": 29130752,
+        "ms": 994.443,
+        "recall": 1.0,
+        "pending": 100000
+      },
+      {
+        "stage": "source_closed",
+        "rss": 26705920,
+        "peak": 29130752
+      }
+    ],
+    "sourceSha256": "add387b847714862a5244f63fc0610b6beefca8feb7341278aa8db87b0924fb3",
+    "sourceUnchanged": true
+  },
+  {
+    "run": 3,
+    "variant": "before",
+    "stages": [
+      {
+        "stage": "open",
+        "rss": 25657344,
+        "peak": 25673728,
+        "pid": 19057
+      },
+      {
+        "stage": "first",
+        "rss": 64487424,
+        "peak": 64487424,
+        "ms": 2460.998,
+        "recall": 1.0,
+        "pending": 100000
+      },
+      {
+        "stage": "source_closed",
+        "rss": 55508992,
+        "peak": 64487424
+      }
+    ],
+    "sourceSha256": "add387b847714862a5244f63fc0610b6beefca8feb7341278aa8db87b0924fb3",
+    "sourceUnchanged": true
+  },
+  {
+    "run": 3,
+    "variant": "after",
+    "stages": [
+      {
+        "stage": "open",
+        "rss": 18956288,
+        "peak": 18972672,
+        "pid": 19059
+      },
+      {
+        "stage": "first",
+        "rss": 29048832,
+        "peak": 29048832,
+        "ms": 998.548,
+        "recall": 1.0,
+        "pending": 100000
+      },
+      {
+        "stage": "source_closed",
+        "rss": 26624000,
+        "peak": 29048832
+      }
+    ],
+    "sourceSha256": "add387b847714862a5244f63fc0610b6beefca8feb7341278aa8db87b0924fb3",
+    "sourceUnchanged": true
+  }
+]

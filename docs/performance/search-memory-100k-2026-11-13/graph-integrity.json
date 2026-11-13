@@ -1,0 +1,16 @@
+{
+  "before": {
+    "docs": "736316f3d62df469f46138ba2142115983b2c046d211b02c890e820a6d70c7a9",
+    "nodes": "5f7fce36f2939ec840cfa9c3928acff7fb9fc3d290cbaa916531854456222a61",
+    "vector_blocks": "112dd75b83deb2a6ae431343133325677710d0d4750c2c0f586ec610862d95f0",
+    "entries": "5ceb8abc34cf018ee5843f1ed482c7fb991428e98f0f9aa8290d1e7c667ca997"
+  },
+  "after": {
+    "docs": "736316f3d62df469f46138ba2142115983b2c046d211b02c890e820a6d70c7a9",
+    "nodes": "5f7fce36f2939ec840cfa9c3928acff7fb9fc3d290cbaa916531854456222a61",
+    "vector_blocks": "112dd75b83deb2a6ae431343133325677710d0d4750c2c0f586ec610862d95f0",
+    "entries": "5ceb8abc34cf018ee5843f1ed482c7fb991428e98f0f9aa8290d1e7c667ca997"
+  },
+  "same": true,
+  "scope": "all docs/signatures/node topology/Float32 vector blocks/entry points; deterministically encoded ordered rows"
+}

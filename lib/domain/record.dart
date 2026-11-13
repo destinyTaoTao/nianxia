@@ -28,6 +28,25 @@ class Record {
   final Map<String, dynamic>? organization;
   final int? organizationRevision, vectorRevision;
   final List<double>? vector;
+
+  /// Search results retain user data and index status, not ranking workspace.
+  Record get withoutVector => Record(
+    id: id,
+    body: body,
+    createdAt: createdAt,
+    timezone: timezone,
+    offsetMinutes: offsetMinutes,
+    parentId: parentId,
+    revision: revision,
+    favorite: favorite,
+    audio: audio,
+    durationMs: durationMs,
+    transcript: transcript,
+    transcription: transcription,
+    organization: organization,
+    organizationRevision: organizationRevision,
+    vectorRevision: vectorRevision,
+  );
   DateTime get recordedLocal =>
       createdAt.toUtc().add(Duration(minutes: offsetMinutes));
   bool get organizationStale =>
@@ -77,7 +96,15 @@ class SearchHit {
 }
 
 class SearchResults extends UnmodifiableListView<SearchHit> {
-  SearchResults(super.source, {this.semanticUsed = false, this.fallbackReason});
+  SearchResults(
+    super.source, {
+    this.semanticUsed = false,
+    this.semanticApproximate = false,
+    this.pendingSemanticRecords = 0,
+    this.fallbackReason,
+  });
   final bool semanticUsed;
+  final bool semanticApproximate;
+  final int pendingSemanticRecords;
   final String? fallbackReason;
 }

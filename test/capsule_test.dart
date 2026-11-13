@@ -8,6 +8,7 @@ import 'package:nianxia/app/notebook.dart';
 import 'package:nianxia/ui/app.dart';
 
 import 'capture_controller_test.dart' show TestMicrophone;
+import 'support/async_storage_tester.dart';
 
 class DeniedMicrophone extends TestMicrophone {
   @override
@@ -40,8 +41,10 @@ void main() {
           const MethodChannel('app.nianxia/system'),
           null,
         );
-    book.dispose();
-    await home.delete(recursive: true);
+    await TestWidgetsFlutterBinding.instance.runAsync(() async {
+      await book.close();
+      await home.delete(recursive: true);
+    });
   });
   Future<void> untilVisible(WidgetTester tester, String text) async {
     for (var i = 0; i < 50 && find.text(text).evaluate().isEmpty; i++) {
@@ -78,9 +81,12 @@ void main() {
     await tester.binding.handlePopRoute();
     await untilVisible(tester, '音频已保存');
     expect(find.text('音频已保存'), findsOneWidget);
-    expect(book.records.single.durationMs, 1000);
+    expect(
+      (await storageRead(tester, () => book.records)).single.durationMs,
+      1000,
+    );
     await tester.tap(find.text('返回原应用'));
-    await tester.pumpAndSettle();
+    await pumpStorageAndSettle(tester);
     expect(returned, isTrue);
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.runAsync(() async {
@@ -99,8 +105,9 @@ void main() {
         onCapsuleReturn: () async {},
       ),
     );
+    await pumpStorageAndSettle(tester);
     await tester.tap(find.text('写文字'));
-    await tester.pumpAndSettle();
+    await pumpStorageAndSettle(tester);
     await tester.enterText(find.byKey(const Key('body-editor')), '未保存的想法');
     action.value = 'capsule';
     await untilVisible(tester, '停止并保存');
@@ -108,10 +115,10 @@ void main() {
     await tester.tap(find.text('停止并保存'));
     await untilVisible(tester, '音频已保存');
     action.value = 'search';
-    await tester.pumpAndSettle();
+    await pumpStorageAndSettle(tester);
     expect(find.byKey(const Key('search-input')), findsOneWidget);
     await tester.tap(find.byTooltip('返回'));
-    await tester.pumpAndSettle();
+    await pumpStorageAndSettle(tester);
     expect(find.text('未保存的想法'), findsOneWidget);
     expect(find.byKey(const Key('body-editor')), findsOneWidget);
     await tester.pumpWidget(const SizedBox.shrink());
@@ -135,10 +142,10 @@ void main() {
     );
     await untilVisible(tester, '录音未保存');
     expect(find.textContaining('没有麦克风权限'), findsOneWidget);
-    expect(book.records, isEmpty);
+    expect((await storageRead(tester, () => book.records)), isEmpty);
     expect(find.text('音频已保存'), findsNothing);
     await tester.tap(find.text('写文字'));
-    await tester.pumpAndSettle();
+    await pumpStorageAndSettle(tester);
     expect(find.byKey(const Key('body-editor')), findsOneWidget);
     expect(returned, isFalse);
     await tester.pumpWidget(const SizedBox.shrink());
@@ -168,11 +175,11 @@ void main() {
     expect(tester.takeException(), isNull);
     mic.chunks.add(Uint8List(32000));
     await tester.tap(find.text('丢弃'));
-    await tester.pumpAndSettle();
+    await pumpStorageAndSettle(tester);
     expect(find.text('确认丢弃'), findsOneWidget);
     await tester.tap(find.text('确认丢弃'));
-    await untilVisible(tester, '全部记录');
-    expect(book.records, isEmpty);
+    await untilVisible(tester, '记一下');
+    expect((await storageRead(tester, () => book.records)), isEmpty);
     await tester.runAsync(() async {
       expect(await Directory('${home.path}/audio').list().isEmpty, isTrue);
     });

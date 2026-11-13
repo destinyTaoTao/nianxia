@@ -1,0 +1,25 @@
+{
+  "fixtureSha256": "0070f0038dd6a30ad50633f5cb4914c92bd08eac80fcb7ef05714e8d507427a6",
+  "actualInputBytes": 4294967537,
+  "cases": [
+    {
+      "case": "password-0-go-to-rust",
+      "passed": true,
+      "encryptMs": 5387,
+      "decryptMs": 16801,
+      "inputBytes": 4294967537
+    },
+    {
+      "case": "password-0-rust-to-go",
+      "passed": true,
+      "encryptMs": 17270,
+      "decryptMs": 8512,
+      "inputBytes": 4294967537
+    }
+  ],
+  "executionDate": "2026-11-14",
+  "phase": "large-container",
+  "platform": "macOS arm64 host",
+  "passed": true,
+  "scope": "standard container interop only; not app restore or mobile acceptance"
+}

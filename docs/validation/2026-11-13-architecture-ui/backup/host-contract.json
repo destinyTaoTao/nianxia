@@ -1,0 +1,141 @@
+{
+  "fixtureSha256": "fbbab289f7f94b25736c58be46a994c441fd02552cc6022352e3d86d2fab7c83",
+  "actualInputBytes": 1048576,
+  "cases": [
+    {
+      "case": "password-0-go-to-rust",
+      "passed": true,
+      "encryptMs": 751,
+      "decryptMs": 717,
+      "inputBytes": 1048576
+    },
+    {
+      "case": "password-0-rust-to-go",
+      "passed": true,
+      "encryptMs": 343,
+      "decryptMs": 328,
+      "inputBytes": 1048576
+    },
+    {
+      "case": "password-1-go-to-rust",
+      "passed": true,
+      "encryptMs": 329,
+      "decryptMs": 339,
+      "inputBytes": 1048576
+    },
+    {
+      "case": "password-1-rust-to-go",
+      "passed": true,
+      "encryptMs": 336,
+      "decryptMs": 331,
+      "inputBytes": 1048576
+    },
+    {
+      "case": "password-2-go-to-rust",
+      "passed": true,
+      "encryptMs": 329,
+      "decryptMs": 344,
+      "inputBytes": 1048576
+    },
+    {
+      "case": "password-2-rust-to-go",
+      "passed": true,
+      "encryptMs": 336,
+      "decryptMs": 334,
+      "inputBytes": 1048576
+    },
+    {
+      "case": "password-3-go-to-rust",
+      "passed": true,
+      "encryptMs": 333,
+      "decryptMs": 337,
+      "inputBytes": 1048576
+    },
+    {
+      "case": "password-3-rust-to-go",
+      "passed": true,
+      "encryptMs": 336,
+      "decryptMs": 332,
+      "inputBytes": 1048576
+    },
+    {
+      "case": "password-4-go-to-rust",
+      "passed": true,
+      "encryptMs": 345,
+      "decryptMs": 339,
+      "inputBytes": 1048576
+    },
+    {
+      "case": "password-4-rust-to-go",
+      "passed": true,
+      "encryptMs": 338,
+      "decryptMs": 334,
+      "inputBytes": 1048576
+    },
+    {
+      "case": "wrong-password",
+      "passed": true,
+      "durationMs": 83,
+      "errorCode": 1
+    },
+    {
+      "case": "payload-bit",
+      "passed": true,
+      "durationMs": 84,
+      "errorCode": 1
+    },
+    {
+      "case": "header-bit",
+      "passed": true,
+      "durationMs": 84,
+      "errorCode": 1
+    },
+    {
+      "case": "missing-final-byte",
+      "passed": true,
+      "durationMs": 87,
+      "errorCode": 1
+    },
+    {
+      "case": "missing-final-chunk",
+      "passed": true,
+      "durationMs": 84,
+      "errorCode": 1
+    },
+    {
+      "case": "delete-first-chunk",
+      "passed": true,
+      "durationMs": 83,
+      "errorCode": 1
+    },
+    {
+      "case": "reorder-chunks",
+      "passed": true,
+      "durationMs": 86,
+      "errorCode": 1
+    },
+    {
+      "case": "trailing-garbage",
+      "passed": true,
+      "durationMs": 110,
+      "errorCode": 1
+    },
+    {
+      "case": "work-factor-30",
+      "passed": true,
+      "durationMs": 3,
+      "errorCode": 2
+    },
+    {
+      "case": "header-over-budget",
+      "passed": true,
+      "durationMs": 2,
+      "errorCode": 2
+    }
+  ],
+  "executionDate": "2026-11-14",
+  "phase": "host-contract",
+  "platform": "macOS arm64 host",
+  "passed": true,
+  "scope": "standard container interop only; not app restore or mobile acceptance"
+}

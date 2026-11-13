@@ -15,6 +15,7 @@ Future<Object?> openRecorder(
   String? parentId,
   bool query = false,
   MicrophoneInput? microphone,
+  VoidCallback? onSaved,
 }) async {
   if (book.captureActive) return null;
   final result = await showModalBottomSheet<Object?>(
@@ -32,9 +33,12 @@ Future<Object?> openRecorder(
     ),
   );
   if (result == _RecorderAction.write) {
-    if (context.mounted) await openEditor(context, book, parentId: parentId);
+    if (context.mounted) {
+      await openEditor(context, book, parentId: parentId, onSaved: onSaved);
+    }
     return null;
   }
+  if (result is Record) onSaved?.call();
   return result;
 }
 
@@ -117,104 +121,119 @@ class _RecorderState extends State<_Recorder> {
     return PopScope(
       canPop: !capture.active,
       onPopInvokedWithResult: (didPop, _) {
-        if (!didPop) {
-          notice(context, '请先停止保存或选择丢弃。');
-        }
+        if (!didPop) notice(context, '请先停止保存或选择丢弃。');
       },
       child: SafeArea(
         child: SingleChildScrollView(
           child: Padding(
-            padding: const EdgeInsets.all(24),
+            padding: const EdgeInsets.fromLTRB(24, 16, 24, 20),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Row(
                   children: [
                     Expanded(
-                      child: Text(
-                        widget.query ? '说出要找的内容' : '记下此刻的想法',
-                        style: Theme.of(context).textTheme.titleLarge,
+                      child: Semantics(
+                        liveRegion: true,
+                        child: Text(
+                          widget.query ? '说出要找的内容' : status,
+                          style: Theme.of(context).textTheme.titleLarge,
+                        ),
                       ),
                     ),
                     IconButton(
                       onPressed: capture.state == 'saving' ? null : cancel,
                       tooltip: '丢弃并关闭',
-                      icon: const Icon(Icons.close),
+                      icon: Icon(
+                        Icons.close_rounded,
+                        color: Theme.of(context).colorScheme.onSurface,
+                      ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 12),
-                Text(
-                  widget.query ? '仅用于这次查找，结束后删除查询音频' : '最长 2 分钟，到时自动停止保存',
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-                const SizedBox(height: 24),
-                SizedBox(
-                  width: double.infinity,
-                  child: PaperSurface(
-                    child: Column(
-                      children: [
-                        Icon(
-                          capture.state == 'failed'
-                              ? Icons.mic_off_outlined
-                              : Icons.mic_none_rounded,
-                          size: 28,
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
-                        const SizedBox(height: 12),
-                        Semantics(
-                          label: '录音时长 ${durationText(capture.elapsed)}',
-                          excludeSemantics: true,
-                          child: Text(
-                            durationText(capture.elapsed),
-                            style: Theme.of(context).textTheme.headlineMedium!
-                                .copyWith(
-                                  fontSize: 48,
-                                  fontWeight: FontWeight.w400,
-                                  fontFeatures: [FontFeature.tabularFigures()],
-                                ),
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        Semantics(liveRegion: true, child: Text(status)),
-                        if (capture.state == 'recording') ...[
-                          const SizedBox(height: 20),
-                          Semantics(
-                            label: '实时麦克风音量',
-                            child: LinearProgressIndicator(
-                              value: capture.amplitude,
-                              minHeight: 4,
-                              borderRadius: BorderRadius.circular(2),
-                            ),
-                          ),
-                        ],
-                        if (capture.error != null) ...[
-                          const SizedBox(height: 12),
-                          Semantics(
-                            liveRegion: true,
-                            child: Text(
-                              capture.error!,
-                              textAlign: TextAlign.center,
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    widget.query ? '仅用于这次查找，不会成为记录' : '最长 2 分钟，到时自动停止保存',
+                    style: Theme.of(context).textTheme.bodySmall,
                   ),
                 ),
                 const SizedBox(height: 28),
-                if (capture.state == 'recording')
+                Icon(
+                  capture.state == 'failed'
+                      ? Icons.mic_off_outlined
+                      : Icons.mic_none_rounded,
+                  size: 42,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+                const SizedBox(height: 16),
+                Semantics(
+                  label: '录音时长 ${durationText(capture.elapsed)}',
+                  excludeSemantics: true,
+                  child: Text(
+                    durationText(capture.elapsed),
+                    style: Theme.of(context).textTheme.headlineMedium!.copyWith(
+                      fontSize: 48,
+                      fontWeight: FontWeight.w400,
+                      fontFeatures: [FontFeature.tabularFigures()],
+                    ),
+                  ),
+                ),
+                if (capture.state == 'recording') ...[
+                  const SizedBox(height: 20),
+                  SizedBox(
+                    width: 180,
+                    child: Semantics(
+                      label: '实时麦克风音量',
+                      child: LinearProgressIndicator(
+                        value: capture.amplitude,
+                        minHeight: 4,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  Text(
+                    widget.query ? '说出你记得的内容，识别后可以修改' : '说完点停止，保存后再转写',
+                    style: Theme.of(context).textTheme.bodySmall,
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+                if (widget.query) ...[
+                  const SizedBox(height: 12),
+                  Text(
+                    '结束后删除查询音频',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ],
+                if (capture.error != null) ...[
+                  const SizedBox(height: 16),
+                  Semantics(
+                    liveRegion: true,
+                    child: Text(capture.error!, textAlign: TextAlign.center),
+                  ),
+                ],
+                const SizedBox(height: 28),
+                if (capture.state == 'recording') ...[
                   SizedBox(
                     width: double.infinity,
                     child: FilledButton.icon(
                       onPressed: capture.finish,
                       icon: const Icon(Icons.stop_rounded),
-                      label: Text(widget.query ? '停止并查找' : '停止并保存'),
+                      label: Text(widget.query ? '停止并查看文字' : '停止并保存'),
                     ),
                   ),
+                  const SizedBox(height: 8),
+                  TextButton(
+                    onPressed: cancel,
+                    child: Text(widget.query ? '取消查找' : '取消录音'),
+                  ),
+                ],
                 if (capture.state == 'failed')
                   Wrap(
                     spacing: 12,
+                    runSpacing: 12,
+                    alignment: WrapAlignment.center,
                     children: [
                       if (!widget.query && capture.draft == null)
                         FilledButton.icon(
@@ -239,7 +258,6 @@ class _RecorderState extends State<_Recorder> {
                     padding: EdgeInsets.all(12),
                     child: CircularProgressIndicator(),
                   ),
-                const SizedBox(height: 12),
               ],
             ),
           ),

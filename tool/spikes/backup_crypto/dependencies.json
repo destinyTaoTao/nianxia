@@ -1,0 +1,39 @@
+{
+  "scope": "Experimental test-only dependencies; not approved production integration",
+  "ageFormat": "https://c2sp.org/age@v1.1.0",
+  "reference": {
+    "module": "filippo.io/age",
+    "version": "v1.3.2",
+    "commit": "b74dce4cdbe35b5e5f66c06d9612b72f89028758",
+    "source": "https://github.com/FiloSottile/age",
+    "moduleSum": "h1:r6RSZLFSMm6rzKepZ7ZAYkKCu14f3/Me8c7uKYh7C8c=",
+    "moduleZipSha256": "531f9b8b966827d356766c024a1ae86bbcaef21caf58ccbe56f378f0a6ce59f7",
+    "license": "BSD-3-Clause",
+    "lockfile": "reference/go.sum",
+    "lockfileSha256": "0cd5a4ea7bd6848ddb2855e1bd666257bb281cc122c4f90047da02ff995360b3"
+  },
+  "candidate": {
+    "crate": "age",
+    "version": "0.12.1",
+    "source": "https://github.com/str4d/rage",
+    "crateUrl": "https://static.crates.io/crates/age/age-0.12.1.crate",
+    "crateSha256": "fd290633c2482479f70f6d1d96ae0e9f52c6a26cd5859edd47ee1fe33fc89f26",
+    "license": "MIT OR Apache-2.0",
+    "upstreamStatus": "BETA / experimental in crate metadata",
+    "lockfile": "native/Cargo.lock",
+    "commit": "7a854c9c8c02dab2ebea19e02e6693a5730a8b2a",
+    "lockfileSha256": "f512b5b630c24aa4ab58e1a094aba7d7110adcd92f4798fce5880aea8186bf62"
+  },
+  "toolchain": {
+    "rust": "1.91.1",
+    "go": "1.26.1",
+    "ndk": "28.2.13676358",
+    "androidApi": 24
+  },
+  "auditEvidence": "No audit of this binding or app integration. Upstream status and audit scope do not establish local integration security.",
+  "bindingDependencies": {
+    "zeroize": "1.8.2",
+    "libc": "0.2.186",
+    "allTransitiveVersionsAndHashes": "native/Cargo.lock"
+  }
+}

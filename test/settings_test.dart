@@ -8,6 +8,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:nianxia/app/notebook.dart';
 import 'package:nianxia/ui/app.dart';
 
+import 'support/async_storage_tester.dart';
+
 class ControlledPicker extends FilePickerPlatform {
   Future<PlatformFile?> Function() select = () async => null;
   @override
@@ -41,21 +43,24 @@ void main() {
   });
   tearDown(() async {
     FilePickerPlatform.instance = originalPicker;
-    book.dispose();
-    await home.delete(recursive: true);
+    await TestWidgetsFlutterBinding.instance.runAsync(() async {
+      await book.close();
+      await home.delete(recursive: true);
+    });
   });
 
   Future<void> openRestore(WidgetTester tester) async {
     await tester.tap(find.text('恢复备份'));
-    await tester.pumpAndSettle();
+    await pumpStorageAndSettle(tester);
     await tester.tap(find.text('选择备份'));
     await tester.pump();
   }
 
   Future<void> launch(WidgetTester tester) async {
     await tester.pumpWidget(NianxiaApp(book: book));
+    await pumpStorageAndSettle(tester);
     await tester.tap(find.byTooltip('设置'));
-    await tester.pumpAndSettle();
+    await pumpStorageAndSettle(tester);
     await tester.scrollUntilVisible(
       find.text('恢复备份'),
       300,
@@ -67,14 +72,17 @@ void main() {
     picker.select = () async => throw PlatformException(code: 'picker_failed');
     await launch(tester);
     await openRestore(tester);
-    await tester.pumpAndSettle();
+    await pumpStorageAndSettle(tester);
     expect(tester.takeException(), isNull);
     expect(find.textContaining('操作失败，请检查权限'), findsOneWidget);
     picker.select = () async => null;
     await openRestore(tester);
-    await tester.pumpAndSettle();
+    await pumpStorageAndSettle(tester);
     expect(find.text('已取消选择备份'), findsOneWidget);
-    expect(book.records.single.body, '必须保留的内容');
+    expect(
+      (await storageRead(tester, () => book.records)).single.body,
+      '必须保留的内容',
+    );
     expect(
       tester
           .widget<OutlinedButton>(find.widgetWithText(OutlinedButton, '恢复备份'))
@@ -98,8 +106,11 @@ void main() {
       );
     }
     selection.complete(null);
-    await tester.pumpAndSettle();
+    await pumpStorageAndSettle(tester);
     expect(find.text('已取消选择备份'), findsOneWidget);
-    expect(book.records.single.body, '必须保留的内容');
+    expect(
+      (await storageRead(tester, () => book.records)).single.body,
+      '必须保留的内容',
+    );
   });
 }

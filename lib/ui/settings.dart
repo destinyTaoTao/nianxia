@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
@@ -8,7 +9,7 @@ import 'package:share_plus/share_plus.dart';
 import '../app/notebook.dart';
 import '../platform/local_models.dart';
 import '../platform/organizer.dart';
-import '../data/backup.dart';
+import '../app/backup.dart';
 import 'common.dart';
 
 class SettingsPage extends StatefulWidget {
@@ -24,7 +25,7 @@ class SettingsPage extends StatefulWidget {
   final Notebook book;
   final LocalModels? models;
   final ThemeMode themeMode;
-  final ValueChanged<ThemeMode> onTheme;
+  final FutureOr<bool> Function(ThemeMode) onTheme;
   @override
   State<SettingsPage> createState() => _SettingsPageState();
 }
@@ -36,6 +37,8 @@ class _SettingsPageState extends State<SettingsPage> {
   bool keyBusy = false;
   String? keyError;
   late ThemeMode mode = widget.themeMode;
+  Key themeFieldKey = UniqueKey();
+  bool themeBusy = false;
   final Map<String, bool> ready = {};
   late final backup = BackupService(widget.book);
   bool busy = false;
@@ -198,7 +201,7 @@ class _SettingsPageState extends State<SettingsPage> {
     if (!await confirm(
       context,
       '从备份恢复？',
-      '相同内容跳过，冲突保留副本，不覆盖已有记录。支持本应用生成的未加密 ZIP，最大 512 MB。',
+      '相同内容跳过，冲突保留副本，不覆盖已有记录。支持本应用的新旧未加密 ZIP 备份。大备份需要更多时间和设备空间。',
       action: '选择备份',
     )) {
       return;
@@ -299,6 +302,8 @@ class _SettingsPageState extends State<SettingsPage> {
                     ),
                   ] else if (ready[m.id] == true)
                     const Text('已就绪，可离线使用')
+                  else if (!ready.containsKey(m.id))
+                    const Text('正在检查本地模型…')
                   else
                     OutlinedButton.icon(
                       onPressed: downloading.contains(m.id)
@@ -349,6 +354,7 @@ class _SettingsPageState extends State<SettingsPage> {
                   ),
                   const SizedBox(height: 28),
                   DropdownButtonFormField<ThemeMode>(
+                    key: themeFieldKey,
                     initialValue: mode,
                     decoration: const InputDecoration(labelText: '外观'),
                     items: const [
@@ -365,12 +371,31 @@ class _SettingsPageState extends State<SettingsPage> {
                         child: Text('深色'),
                       ),
                     ],
-                    onChanged: (v) {
-                      if (v != null) {
-                        setState(() => mode = v);
-                        widget.onTheme(v);
-                      }
-                    },
+                    onChanged: themeBusy
+                        ? null
+                        : (v) async {
+                            if (v == null) return;
+                            setState(() {
+                              themeBusy = true;
+                              // Keep showing the persisted selection until saving succeeds.
+                              themeFieldKey = UniqueKey();
+                            });
+                            var saved = false;
+                            try {
+                              saved = await widget.onTheme(v);
+                            } catch (_) {
+                              // The previous selection stays active after a storage failure.
+                            }
+                            if (!mounted) return;
+                            setState(() {
+                              if (saved) mode = v;
+                              themeBusy = false;
+                              themeFieldKey = UniqueKey();
+                            });
+                            if (!saved && context.mounted) {
+                              notice(context, '主题设置未保存，请重试。');
+                            }
+                          },
                   ),
                 ],
               ),

@@ -7,8 +7,9 @@ import 'dart:typed_data';
 
 import 'package:onnxruntime/onnxruntime.dart' as ort;
 import 'package:sherpa_onnx/sherpa_onnx.dart' as sherpa;
+import 'package:flutter/foundation.dart' show ChangeNotifier;
 
-import '../domain/ports.dart';
+import '../app/inference_runtime.dart';
 import '../domain/record.dart';
 import '../data/model_store.dart';
 
@@ -101,10 +102,14 @@ class _Work {
 }
 
 class InferenceQueue {
+  static const _maxPending = 64;
   final Queue<_Work> _foreground = Queue(), _background = Queue();
   bool _running = false;
   bool _paused = false;
+  bool _closed = false;
+  _Work? _active;
   set paused(bool value) {
+    if (_closed) return;
     _paused = value;
     if (!value) {
       _drain();
@@ -112,6 +117,11 @@ class InferenceQueue {
   }
 
   Future<T> run<T>(Future<T> Function() action, {bool foreground = true}) {
+    if (_closed || _foreground.length + _background.length >= _maxPending) {
+      return Future.error(
+        NotebookException(_closed ? '推理已关闭。' : '推理任务已排满，请稍后重试。'),
+      );
+    }
     final c = Completer<dynamic>();
     (foreground ? _foreground : _background).add(_Work(action, c));
     _drain();
@@ -119,37 +129,72 @@ class InferenceQueue {
   }
 
   Future<void> _drain() async {
-    if (_running || _paused) {
+    if (_closed || _running || _paused) {
       return;
     }
     _running = true;
     try {
-      while (!_paused && (_foreground.isNotEmpty || _background.isNotEmpty)) {
+      while (!_closed &&
+          !_paused &&
+          (_foreground.isNotEmpty || _background.isNotEmpty)) {
         final work = (_foreground.isNotEmpty ? _foreground : _background)
             .removeFirst();
+        _active = work;
         try {
-          work.done.complete(await work.action());
+          final result = await work.action();
+          if (!work.done.isCompleted) work.done.complete(result);
         } catch (e, st) {
-          work.done.completeError(e, st);
+          if (!work.done.isCompleted) work.done.completeError(e, st);
+        } finally {
+          _active = null;
         }
       }
     } finally {
       _running = false;
     }
   }
+
+  /// Native work already executing releases its resources in its own finally;
+  /// queued work is never started, and no result is delivered after closing.
+  void dispose() {
+    if (_closed) return;
+    _closed = true;
+    for (final work in [?_active, ..._foreground, ..._background]) {
+      if (!work.done.isCompleted) {
+        work.done.completeError(const NotebookException('推理已关闭。'));
+      }
+    }
+    _foreground.clear();
+    _background.clear();
+  }
 }
 
-class LocalModels implements Transcriber, Embedder {
-  LocalModels(this.store);
+class LocalModels extends ChangeNotifier implements InferenceRuntime {
+  LocalModels(this.store) {
+    store.addListener(notifyListeners);
+  }
   final ModelStore store;
   final queue = InferenceQueue();
   static const queryInstruction = '为这个句子生成表示以用于检索相关文章：';
   @override
-  Future<String> transcribe(String path) => transcribeFile(path);
+  String? get searchModelVersion {
+    final models = store.models.where((m) => m.id == 'bge');
+    return models.isEmpty
+        ? null
+        : '${models.first.version}:bert-cls-l2-w480-o32-v1';
+  }
+
+  @override
+  Future<bool> ready(InferenceCapability capability) => store.ready(
+    capability == InferenceCapability.speech ? 'sensevoice' : 'bge',
+  );
+  @override
+  Future<String> transcribe(String path, {bool foreground = true}) =>
+      transcribeFile(path, foreground: foreground);
   Future<String> transcribeFile(String path, {bool foreground = true}) =>
       queue.run(() async {
         if (!await store.ready('sensevoice')) {
-          throw const NotebookException('请先在设置下载语音模型。音频已经保留。');
+          throw const NotebookException('请先在设置下载语音模型。');
         }
         final model = store.file('sensevoice', 'model.int8.onnx');
         final tokens = store.file('sensevoice', 'tokens.txt');
@@ -165,6 +210,17 @@ class LocalModels implements Transcriber, Embedder {
         final vocab = store.file('bge', 'vocab.txt');
         return _embedOffThread(text, query, model, vocab);
       }, foreground: query);
+
+  bool _disposed = false;
+  @override
+  void dispose() {
+    if (_disposed) return;
+    _disposed = true;
+    store.removeListener(notifyListeners);
+    queue.dispose();
+    store.dispose();
+    super.dispose();
+  }
 }
 
 String recognizeWave(String path, String model, String tokens) {
@@ -178,7 +234,7 @@ String recognizeWave(String path, String model, String tokens) {
     energy += s * s;
   }
   if (math.sqrt(energy / wave.samples.length) < 0.001) {
-    throw const NotebookException('未检测到有效语音，原音频已保留。');
+    throw const NotebookException('未检测到有效语音，请检查录音内容后重试。');
   }
   final recognizer = sherpa.OfflineRecognizer(
     sherpa.OfflineRecognizerConfig(

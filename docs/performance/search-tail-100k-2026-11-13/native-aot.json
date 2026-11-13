@@ -1,0 +1,8 @@
+{
+  "mode": "profile (ARM64 AOT)",
+  "package": "app.nianxia.nianxia.test",
+  "officialPackageUnchanged": true,
+  "bytes": 56587278,
+  "sha256": "d6cd006577ead0ccc2cc6e6d5fabeb7c650226aa0dc3e03ea97fd1fb0b82bf0b",
+  "testDefinitions": 9
+}

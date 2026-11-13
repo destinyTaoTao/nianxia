@@ -1,0 +1,52 @@
+import 'dart:convert';
+import 'dart:io';
+import 'package:nianxia/data/record_repository.dart';
+import 'package:nianxia/data/record_search_store.dart';
+import 'package:nianxia/data/search_index.dart';
+import 'package:nianxia/data/compact_graph_store.dart';
+import 'package:sqlite3/sqlite3.dart';
+
+void mark(String stage, [Map<String,Object?> data=const {}]) => stdout.writeln(jsonEncode({'stage':stage,'rss':ProcessInfo.currentRss,'peak':ProcessInfo.maxRss,...data}));
+Future<void> main(List<String> args) async {
+ final home=Directory(args[0]);
+ final marker=File('${home.path}/.synthetic-search-benchmark');
+ if(!marker.existsSync()||marker.readAsStringSync()!=home.resolveSymbolicLinksSync()) throw StateError('fixture only');
+ final gold=jsonDecode(File('${home.path}/gold.json').readAsStringSync());
+ final queries=(gold['queries'] as List).map((q)=>(q as List).cast<num>().map((n)=>n.toDouble()).toList()).toList();
+ final source=RecordRepository(home);
+ mark('open',{'pid':pid});
+ if(args[1]=='first') {
+  final index=SearchIndex(source,home);
+  final watch=Stopwatch()..start();
+  final found=await index.search('未出现的其他表达',null,null,queries.first,'benchmark-512-v1',null,true);
+  final expected=(gold['gold'][0] as List).cast<String>();
+  final recall=found.take(10).where((h)=>expected.contains(h.record.id)).length/10;
+  mark('first',{'ms':watch.elapsedMicroseconds/1000,'recall':recall,'pending':found.pendingSemanticRecords});
+  if(recall!=1||found.pendingSemanticRecords!=100000) throw StateError('first mismatch');
+  await index.close();
+ }else if(args[1]=='scan') {
+  for(var i=0;i<3;i++) {
+   final watch=Stopwatch()..start();
+   final hits=await RecordSearchStore(source).scan('未出现的其他表达',null,null,queries[i], 'benchmark-512-v1',null,true,semanticLimit:128,indexingPending:true);
+   final expected=(gold['gold'][i] as List).cast<String>();
+   final recall=hits.take(10).where((h)=>expected.contains(h.record.id)).length/10;
+   mark('scan$i',{'ms':watch.elapsedMicroseconds/1000,'recall':recall,'pending':hits.pendingSemanticRecords});
+  }
+ }else {
+  final index=SearchIndex(source,home);
+  await index.waitForIndexing();mark('ready');
+  for(var i=0;i<60;i++) {
+   final watch=Stopwatch()..start();
+   final q=i%queries.length;
+   final found=await index.search('未出现的其他表达',null,null,queries[q],'benchmark-512-v1',null,true);
+   if(i%12==11) mark('warm$i',{'ms':watch.elapsedMicroseconds/1000,'hits':found.length});
+  }
+  mark('before_close');await index.close();mark('closed');
+  final db=sqlite3.open('${home.path}/search-index.sqlite',mode:OpenMode.readOnly);
+  final store=CompactGraphStore(db,512);
+  final node=store.read('n1')!;
+  mark('vector_buffer',{'viewBytes':node.vector.lengthInBytes,'backingBytes':node.vector.buffer.lengthInBytes});
+  store.close();db.close();
+ }
+ source.close();mark('source_closed');
+}

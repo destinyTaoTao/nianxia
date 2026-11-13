@@ -1,0 +1,21 @@
+{
+  "scope": [
+    "lib/domain/semantic_vector.dart",
+    "lib/data/derived_store.dart",
+    "lib/data/search_index.dart",
+    "lib/data/record_repository.dart",
+    "test/vector_allocation_test.dart"
+  ],
+  "critical": [],
+  "important": [],
+  "minorDeferred": [
+    "Strict numeric equality tests do not compare every Float64 bit pattern (including signed zero); broader signed-zero/Float32-subnormal byte fixtures remain an evidence gap, not a found precision defect."
+  ],
+  "reviewed": "fresh independent read-only reviewer; no second review",
+  "notValidatedByReviewer": [
+    "actual final latency/RSS/recall/data integrity (parent validates serially)",
+    "actual big-endian platform and ARM64 numerical execution (native Android integration separately)",
+    "unrelated pre-existing WIP and ANN architecture"
+  ],
+  "cacheBudget": "Connection-local suggested page-cache target; not a strict total-connection or process RSS guarantee."
+}

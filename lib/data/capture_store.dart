@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'package:path/path.dart' as p;
 
 import '../domain/record.dart';
+import '../domain/capture_session.dart';
 
 class CaptureDraft {
   const CaptureDraft({
@@ -15,18 +16,24 @@ class CaptureDraft {
     required this.offsetMinutes,
     this.parentId,
     this.query = false,
+    this.nativePcmBytes,
   });
   final String id, path, timezone;
   final String? parentId;
   final DateTime createdAt;
   final int offsetMinutes;
   final bool query;
+  final int? nativePcmBytes;
   Map<String, dynamic> toJson() => {
     'id': id,
     'createdAt': createdAt.toUtc().toIso8601String(),
     'timezone': timezone,
     'offsetMinutes': offsetMinutes,
     'parentId': parentId,
+    if (nativePcmBytes != null) ...{
+      'nativeCaptureVersion': 1,
+      'pcmBytes': nativePcmBytes,
+    },
   };
 }
 
@@ -111,6 +118,24 @@ class CaptureStore {
   final Directory home;
   String audio(String name) => p.join(home.path, 'audio', name);
   File marker(String id) => File(p.join(home.path, 'drafts', '$id.json'));
+  CaptureDraft nativeDraft(FinalizedCapture clip) {
+    final request = clip.snapshot.request;
+    if (request.mode != CaptureMode.record) {
+      throw const NotebookException('查询不能保存为记录。');
+    }
+    return CaptureDraft(
+      id: request.sessionId,
+      path: p.join(home.path, 'native-captures', '${request.sessionId}.wav'),
+      createdAt: request.createdAtUtc,
+      timezone: request.timezone,
+      offsetMinutes: request.offsetMinutes,
+      parentId: request.parentId,
+      nativePcmBytes: clip.snapshot.pcmBytes,
+    );
+  }
+
+  Future<void> persistNative(FinalizedCapture clip) =>
+      persist(nativeDraft(clip));
   Future<void> persist(CaptureDraft draft) async {
     if (!draft.query) {
       await marker(draft.id)

@@ -1,0 +1,12 @@
+{
+  "executionDate": "2026-11-14",
+  "applicationId": "app.nianxia.nianxia",
+  "mode": "release",
+  "built": true,
+  "installed": false,
+  "debuggable": false,
+  "experimentalCryptoLibraryIncluded": false,
+  "validationProviderDeclared": false,
+  "apkBytes": 51269649,
+  "sha256": "61807a2c23cd003d92045a9e91bdd335285f78126dd707357da7998ee0cceb07"
+}

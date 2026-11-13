@@ -4,6 +4,13 @@ plugins {
     id 'dev.flutter.flutter-gradle-plugin'
 }
 
+// Every integration entry point owns a disposable package, in every build mode.
+// Ordinary debug builds are isolated too; production Release keeps its ID.
+def entryTarget = (project.findProperty('target') ?: 'lib/main.dart').toString().replace('\\', '/')
+def isolatedTarget = entryTarget.tokenize('/').contains('integration_test') ||
+    entryTarget == 'tool/manual_audio_demo.dart' || entryTarget.endsWith('/tool/manual_audio_demo.dart')
+def cryptoSpikeTarget = entryTarget.endsWith('integration_test/backup_crypto_test.dart')
+
 android {
     namespace 'app.nianxia.nianxia'
     compileSdk flutter.compileSdkVersion
@@ -14,7 +21,8 @@ android {
     }
     kotlinOptions { jvmTarget = '17' }
     defaultConfig {
-        applicationId 'app.nianxia.nianxia'
+        applicationId isolatedTarget ? 'app.nianxia.nianxia.test' : 'app.nianxia.nianxia'
+        manifestPlaceholders += [appLabel: isolatedTarget ? '念下·测试' : '念下']
         minSdk 24
         ndk { abiFilters 'arm64-v8a' }
         targetSdk flutter.targetSdkVersion
@@ -24,7 +32,20 @@ android {
     packagingOptions {
         jniLibs { excludes += ['**/armeabi-v7a/**', '**/x86_64/**', '**/x86/**'] }
     }
+    if (cryptoSpikeTarget) {
+        sourceSets.main.jniLibs.srcDir rootProject.file('../build/backup_crypto/jniLibs')
+        if (!rootProject.file('../build/backup_crypto/jniLibs/arm64-v8a/libnianxia_age_spike.so').isFile()) {
+            throw new GradleException('Build the isolated crypto prototype with tool/spikes/backup_crypto/build_native.py first')
+        }
+    }
+    if (isolatedTarget) {
+        sourceSets.release.manifest.srcFile 'src/isolatedRelease/AndroidManifest.xml'
+    }
     buildTypes {
+        debug {
+            if (!isolatedTarget) applicationIdSuffix '.test'
+            manifestPlaceholders += [appLabel: '念下·测试']
+        }
         release {
             // Trial package only. Store distribution needs a separate signing key.
             signingConfig signingConfigs.debug
@@ -32,3 +53,7 @@ android {
     }
 }
 flutter { source '../..' }
+
+dependencies {
+    testImplementation 'junit:junit:4.13.2'
+}

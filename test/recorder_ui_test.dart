@@ -11,6 +11,7 @@ import 'package:nianxia/ui/theme.dart';
 
 import 'capsule_test.dart' show DeniedMicrophone;
 import 'capture_controller_test.dart' show TestMicrophone, QueryReadyStore;
+import 'support/async_storage_tester.dart';
 
 void main() {
   late Directory home;
@@ -35,8 +36,10 @@ void main() {
           const MethodChannel('app.nianxia/system'),
           null,
         );
-    book.dispose();
-    await home.delete(recursive: true);
+    await TestWidgetsFlutterBinding.instance.runAsync(() async {
+      await book.close();
+      await home.delete(recursive: true);
+    });
   });
 
   Future<void> launch(
@@ -69,6 +72,7 @@ void main() {
         ),
       ),
     );
+    await pumpStorageAndSettle(tester);
     await tester.tap(find.text('开始录音'));
   }
 
@@ -84,31 +88,42 @@ void main() {
       await tester.pump();
     }
     expect(find.textContaining(label), findsOneWidget);
-    await tester.pumpAndSettle();
+    await pumpStorageAndSettle(tester);
   }
 
   for (final append in [false, true]) {
     testWidgets('录音权限拒绝后可直接${append ? '追加文字并保留所属关系' : '写文字并保存'}', (
       tester,
     ) async {
-      final parent = append ? await book.saveText('原始想法') : null;
+      final parent = append
+          ? await storageRead(tester, () => book.saveText('原始想法'))
+          : null;
       await launch(tester, DeniedMicrophone(), parentId: parent?.id);
       await untilVisible(tester, '没有麦克风权限');
-      await tester.pumpAndSettle();
+      await pumpStorageAndSettle(tester);
       expect(find.textContaining('没有麦克风权限'), findsOneWidget);
-      expect(book.records.length, append ? 1 : 0);
+      expect(
+        (await storageRead(tester, () => book.records)).length,
+        append ? 1 : 0,
+      );
       await tester.tap(find.text(append ? '追加文字' : '写文字'));
-      await tester.pumpAndSettle();
+      await pumpStorageAndSettle(tester);
       await tester.enterText(
         find.byKey(const Key('body-editor')),
         '麦克风不可用时也能记住想法',
       );
       await tester.tap(find.text('保存'));
-      await tester.pumpAndSettle();
-      final saved = book.records.singleWhere((r) => r.body == '麦克风不可用时也能记住想法');
+      await pumpStorageAndSettle(tester);
+      final saved = (await storageRead(
+        tester,
+        () => book.records,
+      )).singleWhere((r) => r.body == '麦克风不可用时也能记住想法');
       expect(saved.parentId, parent?.id);
       expect(saved.audio, isNull);
-      expect(book.records.length, append ? 2 : 1);
+      expect(
+        (await storageRead(tester, () => book.records)).length,
+        append ? 2 : 1,
+      );
       expect(book.captureActive, isFalse);
       await tester.pumpWidget(const SizedBox.shrink());
     });
@@ -125,9 +140,9 @@ void main() {
     await untilVisible(tester, '没有麦克风权限');
     expect(find.text('写文字'), findsNothing);
     await tester.tap(find.text('关闭'));
-    await tester.pumpAndSettle();
+    await pumpStorageAndSettle(tester);
     expect(find.byKey(const Key('body-editor')), findsNothing);
-    expect(book.records, isEmpty);
+    expect((await storageRead(tester, () => book.records)), isEmpty);
     expect(book.captureActive, isFalse);
     await tester.pumpWidget(const SizedBox.shrink());
   });
@@ -140,16 +155,16 @@ void main() {
     await untilVisible(tester, '重试保存');
     final draft = book.recoveryDrafts.single;
     await tester.tap(find.byTooltip('丢弃并关闭'));
-    await tester.pumpAndSettle();
+    await pumpStorageAndSettle(tester);
     expect(find.text('确认丢弃'), findsOneWidget);
     expect(recorderClosed, isFalse);
     await tester.tap(find.text('取消'));
-    await tester.pumpAndSettle();
+    await pumpStorageAndSettle(tester);
     expect(book.recoveryDrafts.single.id, draft.id);
     expect(await tester.runAsync(() => File(draft.path).exists()), isTrue);
     expect(find.text('重试保存'), findsOneWidget);
     await tester.tap(find.text('丢弃片段'));
-    await tester.pumpAndSettle();
+    await pumpStorageAndSettle(tester);
     await tester.tap(find.text('确认丢弃'));
     for (var i = 0; i < 50 && !recorderClosed; i++) {
       await tester.runAsync(
@@ -160,7 +175,7 @@ void main() {
     expect(recorderClosed, isTrue);
     expect(await tester.runAsync(() => File(draft.path).exists()), isFalse);
     expect(book.recoveryDrafts, isEmpty);
-    expect(book.records, isEmpty);
+    expect((await storageRead(tester, () => book.records)), isEmpty);
     await tester.pumpWidget(const SizedBox.shrink());
   });
   testWidgets('有有效片段的保存失败继续提供重试，不从文字入口丢失音频', (tester) async {
@@ -171,7 +186,7 @@ void main() {
     await tester.tap(find.text('停止并保存'));
     await untilVisible(tester, '重试保存');
     expect(find.text('写文字'), findsNothing);
-    expect(book.records, isEmpty);
+    expect((await storageRead(tester, () => book.records)), isEmpty);
     expect(book.recoveryDrafts, hasLength(1));
     expect(
       await tester.runAsync(
@@ -187,12 +202,18 @@ void main() {
       await tester.pump();
     }
     expect(recorderClosed, isTrue);
-    expect((recorderResult as Record).id, book.records.single.id);
-    await tester.pumpAndSettle();
-    expect(book.records.single.durationMs, 1000);
+    expect(
+      (recorderResult as Record).id,
+      (await storageRead(tester, () => book.records)).single.id,
+    );
+    await pumpStorageAndSettle(tester);
+    expect(
+      (await storageRead(tester, () => book.records)).single.durationMs,
+      1000,
+    );
     expect(
       await tester.runAsync(
-        () => File(book.audioPath(book.records.single)).exists(),
+        () async => File(book.audioPath((await book.records).single)).exists(),
       ),
       isTrue,
     );

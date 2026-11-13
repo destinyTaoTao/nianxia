@@ -1,0 +1,440 @@
+// Standalone synthetic benchmark. Only marked, freshly created temporary data.
+import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
+import 'dart:math';
+
+import 'package:path/path.dart' as p;
+
+import 'package:nianxia/data/derived_store.dart';
+import 'package:nianxia/data/record_repository.dart';
+import 'package:nianxia/data/search_index.dart';
+import 'package:nianxia/domain/record.dart';
+import 'package:nianxia/domain/semantic_vector.dart';
+
+const _marker = '.synthetic-search-benchmark';
+String _id(int i) =>
+    '00000000-0000-4000-8000-${i.toRadixString(16).padLeft(12, '0')}';
+List<double> _randomVector(Random r, int d) =>
+    unitVector(List.generate(d, (_) => r.nextDouble() * 2 - 1));
+List<List<double>> _centers(int d) =>
+    List.generate(100, (i) => _randomVector(Random(7300 + i), d));
+List<double> _near(List<double> center, int seed) {
+  final r = Random(seed);
+  return unitVector([
+    for (final v in center) v + (r.nextDouble() * 2 - 1) * .015,
+  ]);
+}
+
+void _emit(String phase, Map<String, Object?> values) =>
+    stdout.writeln(jsonEncode({'phase': phase, ...values}));
+Future<void> main(List<String> args) async {
+  String? option(String name) {
+    final at = args.indexOf(name);
+    return at < 0 ? null : args[at + 1];
+  }
+
+  final size = int.parse(option('--records') ?? '100000');
+  final dimensions = int.parse(option('--dimensions') ?? '512');
+  if (size < 1000 || size > 100000 || dimensions < 16 || dimensions > 512) {
+    throw ArgumentError('Supported: 1000..100000 records, 16..512 dimensions');
+  }
+  final phase = option('--phase');
+  if (phase == null) {
+    final home = await Directory.systemTemp.createTemp('nianxia-search-bench-');
+    await File(p.join(home.path, _marker))
+        .writeAsString(home.resolveSymbolicLinksSync());
+    var success = false;
+    try {
+      for (final step in ['seed', 'gold', 'measure']) {
+        final process = await Process.start(Platform.resolvedExecutable, [
+          if (Platform.script.path.endsWith('.dart')) ...[
+            'run',
+            Platform.script.toFilePath(),
+          ],
+          '--phase',
+          step,
+          '--home',
+          home.path,
+          '--records',
+          '$size',
+          '--dimensions',
+          '$dimensions',
+        ]);
+        final out = process.stdout
+            .transform(utf8.decoder)
+            .forEach(stdout.write);
+        final err = process.stderr
+            .transform(utf8.decoder)
+            .forEach(stderr.write);
+        final code = await process.exitCode;
+        await Future.wait([out, err]);
+        if (code != 0) {
+          throw StateError(
+            'Benchmark $step failed ($code); fixture preserved at ${home.path}',
+          );
+        }
+      }
+      final report = File('${home.path}-report.json');
+      await File(p.join(home.path, 'report.json')).copy(report.path);
+      _emit('complete', {
+        'report': report.path,
+        if (args.contains('--keep-fixture')) 'fixture': home.path,
+      });
+      success = true;
+    } finally {
+      if (success && !args.contains('--keep-fixture')) {
+        await home.delete(recursive: true);
+      }
+    }
+    return;
+  }
+  final home = Directory(option('--home') ?? '');
+  final real = home.resolveSymbolicLinksSync();
+  if (!p.isWithin(Directory.systemTemp.resolveSymbolicLinksSync(), real) ||
+      !p.basename(real).startsWith('nianxia-search-bench-') ||
+      FileSystemEntity.typeSync(p.join(real, _marker), followLinks: false) !=
+          FileSystemEntityType.file ||
+      await File(p.join(real, _marker)).readAsString() != real) {
+    throw StateError('Refusing non-fixture directory');
+  }
+  final model = 'benchmark-$dimensions-v1';
+  if (phase == 'seed') {
+    final watch = Stopwatch()..start();
+    final source = RecordRepository(home);
+    try {
+      source.ensureIndexVersion(model);
+      final centers = _centers(dimensions);
+      source.transaction(() {
+        for (var i = 0; i < size; i++) {
+          source.insert(
+            Record(
+              id: _id(i),
+              body: '第$i条想法：数据库性能与本地语音记录。${i == 17 ? '独特尾部灵感。' : '保留原文和中文检索。'}',
+              createdAt: DateTime.utc(2025).add(Duration(days: i % 365)),
+              timezone: 'Asia/Shanghai',
+              offsetMinutes: 480,
+            ),
+          );
+          source.embedding(
+            _id(i),
+            1,
+            _near(centers[i % centers.length], 81000 + i),
+          );
+        }
+      });
+      _emit('seed', {
+        'records': size,
+        'dimensions': dimensions,
+        'ms': watch.elapsedMilliseconds,
+        'sqlite': source.db
+            .select('SELECT sqlite_version()')
+            .single
+            .values
+            .single,
+      });
+    } finally {
+      source.close();
+    }
+    return;
+  }
+  if (phase == 'gold') {
+    final source = RecordRepository(home);
+    final centers = _centers(dimensions);
+    final queries = List.generate(
+      12,
+      (i) => _near(centers[(i * 7) % 100], 91000 + i),
+    );
+    final best = List.generate(queries.length, (_) => <(String, double)>[]);
+    String? after;
+    try {
+      while (true) {
+        final rows = source.db.select(
+          'SELECT record_id,payload,dimension FROM record_embeddings ${after == null ? '' : 'WHERE record_id>?'} ORDER BY record_id LIMIT 64',
+          [?after],
+        );
+        if (rows.isEmpty) break;
+        for (final row in rows) {
+          final vector = unitVector(
+            DerivedCodec.vector(row['payload'], row['dimension'])!,
+          );
+          for (var q = 0; q < queries.length; q++) {
+            var dot = 0.0;
+            for (var d = 0; d < dimensions; d++) {
+              dot += vector[d] * queries[q][d];
+            }
+            final top = best[q];
+            if (top.length == 10 && dot <= top.last.$2) continue;
+            if (top.length == 10) top.removeLast();
+            top.add((row['record_id'] as String, dot));
+            top.sort((a, b) => b.$2.compareTo(a.$2));
+          }
+        }
+        after = rows.last['record_id'] as String;
+      }
+      await File(p.join(home.path, 'gold.json')).writeAsString(
+        jsonEncode({
+          'queries': queries,
+          'gold': best.map((b) => b.map((v) => v.$1).toList()).toList(),
+        }),
+      );
+      _emit('gold', {'queries': queries.length, 'exhaustiveRecords': size});
+    } finally {
+      source.close();
+    }
+    return;
+  }
+  if (phase == 'wide') {
+    if (!File(p.join(home.path, 'search-index.sqlite')).existsSync()) {
+      throw StateError(
+        'Wide-result measurement requires a previously completed fixture index',
+      );
+    }
+    final source = RecordRepository(home);
+    final index = SearchIndex(source, home);
+    try {
+      await index.waitForIndexing();
+      final baseline = ProcessInfo.currentRss;
+      final watch = Stopwatch()..start();
+      final found = await index.search(
+        '记',
+        null,
+        null,
+        null,
+        model,
+        null,
+        false,
+      );
+      final elapsed = watch.elapsedMicroseconds / 1000;
+      if (found.length != size || found.fallbackReason != null) {
+        throw StateError('Wide-result measurement mismatch');
+      }
+      final result = <String, Object?>{
+        'records': size,
+        'dimensions': dimensions,
+        'returned': found.length,
+        'elapsedMs': elapsed,
+        'baselineRssBytes': baseline,
+        'returnedRssBytes': ProcessInfo.currentRss,
+        'osPeakRssBytes': ProcessInfo.maxRss,
+        'keywordCandidates': index.keywordCandidates,
+        'sourceRecordsRead': index.sourceRecordsRead,
+        'mode':
+            '${const bool.fromEnvironment('dart.vm.product') ? 'AOT' : 'JIT'}, separate process, all-match keyword output',
+      };
+      await File(p.join(home.path, 'wide-report.json'))
+          .writeAsString(const JsonEncoder.withIndent('  ').convert(result));
+      _emit('wide', result);
+    } finally {
+      await index.close();
+      source.close();
+    }
+    return;
+  }
+  final cold = phase == 'measure';
+  if (!cold && phase != 'warm') throw ArgumentError.value(phase, 'phase');
+  if (cold && File(p.join(home.path, 'search-index.sqlite')).existsSync()) {
+    throw StateError(
+      'Cold measure requires an absent sidecar; never reuse a partial or warm graph',
+    );
+  }
+  final source = RecordRepository(home);
+  final searchEf = int.parse(option('--ef') ?? '200');
+  var index = SearchIndex(source, home, searchEf: searchEf);
+  final gold = jsonDecode(
+    await File(p.join(home.path, 'gold.json')).readAsString(),
+  ) as Map<String, dynamic>;
+  final queries = (gold['queries'] as List)
+      .map((q) => (q as List).cast<num>().map((v) => v.toDouble()).toList())
+      .toList();
+  final report = <String, Object?>{
+    'records': size,
+    'dimensions': dimensions,
+    'measureKind': cold ? 'cold' : 'warm-retest',
+    'searchEf': searchEf,
+    'upperSearchEf': 8,
+    'mode':
+        'standalone Dart ${const bool.fromEnvironment('dart.vm.product') ? 'AOT' : 'JIT'}, synthetic UUID records',
+    'sqlite': source.db.select('SELECT sqlite_version()').single.values.single,
+    'dart': Platform.version.split('\n').first,
+    'os': Platform.operatingSystem,
+    'processors': Platform.numberOfProcessors,
+    'baselineRssBytes': ProcessInfo.currentRss,
+  };
+  final rss = <String, int>{};
+  var peakIndexBytes = 0;
+  final latencies = <String, List<int>>{};
+  var stage = 'cold';
+  final sampler = Timer.periodic(const Duration(milliseconds: 20), (_) {
+    rss[stage] = max(rss[stage] ?? 0, ProcessInfo.currentRss);
+    var bytes = 0;
+    for (final suffix in ['', '-wal', '-shm']) {
+      final file = File(p.join(home.path, 'search-index.sqlite$suffix'));
+      if (file.existsSync()) bytes += file.lengthSync();
+    }
+    peakIndexBytes = max(peakIndexBytes, bytes);
+  });
+  Future<SearchResults> query(
+    String kind,
+    String text, {
+    List<double>? vector,
+    DateTime? from,
+    DateTime? to,
+  }) async {
+    final watch = Stopwatch()..start();
+    final found = await index.search(
+      text,
+      from,
+      to,
+      vector,
+      model,
+      null,
+      vector != null,
+    );
+    (latencies[kind] ??= []).add(watch.elapsedMicroseconds);
+    return found;
+  }
+
+  try {
+    if (cold) {
+      final total = Stopwatch()..start();
+      final first = await query(
+        'first_semantic',
+        '未出现的其他表达',
+        vector: queries.first,
+      );
+      if (first.pendingSemanticRecords <= 0) {
+        throw StateError('First query waited for whole graph');
+      }
+      report['firstPending'] = first.pendingSemanticRecords;
+      report['firstRecallAt10'] =
+          first
+              .take(10)
+              .where((h) => (gold['gold'][0] as List).contains(h.record.id))
+              .length /
+          10;
+      _emit('first_query', {
+        'ms': latencies['first_semantic']!.single / 1000,
+        'pending': first.pendingSemanticRecords,
+        'rssBytes': ProcessInfo.currentRss,
+      });
+      stage = 'building';
+      for (var n = 0; n < 3; n++) {
+        await Future<void>.delayed(const Duration(milliseconds: 150));
+        await query('building_semantic', '未出现的其他表达', vector: queries[n]);
+        final keyword = await query('building_keyword', '尾部灵感');
+        if (keyword.single.record.id != _id(17)) {
+          throw StateError('Keyword mismatch during build');
+        }
+      }
+      final progress = Timer.periodic(
+        const Duration(seconds: 30),
+        (_) => _emit('building', {
+          'elapsedMs': total.elapsedMilliseconds,
+          'rssBytes': ProcessInfo.currentRss,
+          'peakRssBytes': ProcessInfo.maxRss,
+        }),
+      );
+      try {
+        await index.waitForIndexing();
+      } finally {
+        progress.cancel();
+      }
+      report['fullyBuiltMs'] = total.elapsedMilliseconds;
+    } else {
+      final validation = Stopwatch()..start();
+      await index.waitForIndexing();
+      report['warmValidationMs'] = validation.elapsedMilliseconds;
+    }
+    stage = 'warm';
+    var recalled = 0, distances = 0;
+    final recalls = List<int>.filled(queries.length, 0);
+    for (var n = 0; n < 60; n++) {
+      final q = n % queries.length;
+      final found = await query(
+        'warm_semantic',
+        '未出现的其他表达',
+        vector: queries[q],
+      );
+      if (found.pendingSemanticRecords != 0 || found.fallbackReason != null) {
+        throw StateError('Index did not become warm');
+      }
+      final hits = found
+          .take(10)
+          .where((h) => (gold['gold'][q] as List).contains(h.record.id))
+          .length;
+      recalled += hits;
+      recalls[q] += hits;
+      distances += index.distanceEvaluations;
+      final keyword = await query('warm_keyword', ['尾', '尾部', '独特尾部灵感'][n % 3]);
+      if (keyword.single.record.id != _id(17)) {
+        throw StateError('Keyword mismatch');
+      }
+      final dated = await query(
+        'date_keyword',
+        '记',
+        from: DateTime(2025, 1, 1),
+        to: DateTime(2025, 1, 1),
+      );
+      if (dated.length != (size + 364) ~/ 365) {
+        throw StateError('Date result mismatch');
+      }
+      final empty = await query(
+        'empty_date',
+        '记',
+        from: DateTime(1999),
+        to: DateTime(1999),
+      );
+      if (empty.isNotEmpty) throw StateError('Empty date mismatch');
+    }
+    report['recallAt10'] = recalled / 600;
+    report['recallByQuery'] = recalls.map((n) => n / 50).toList();
+    report['meanDistanceEvaluations'] = distances / 60;
+    await index.close();
+    stage = 'reopen';
+    index = SearchIndex(source, home, searchEf: searchEf);
+    await query('reopen_semantic', '未出现的其他表达', vector: queries.first);
+    await index.close();
+    var disk = 0;
+    final files = <String, int>{};
+    await for (final file in home.list()) {
+      if (file is File &&
+          p.basename(file.path).startsWith('search-index.sqlite')) {
+        final bytes = await file.length();
+        disk += bytes;
+        files[p.basename(file.path)] = bytes;
+      }
+    }
+    report['indexBytes'] = disk;
+    report['peakLiveIndexBytes'] = peakIndexBytes;
+    report['indexFiles'] = files;
+    report['sourceDbBytes'] = await File(p.join(home.path, 'records.sqlite'))
+        .length();
+    report['rssObservedByPhaseBytes'] = rss;
+    report['osPeakRssBytes'] = ProcessInfo.maxRss;
+    report['latencyMs'] = latencies.map((key, values) {
+      values.sort();
+      double at(double quantile) =>
+          values[(values.length * quantile).ceil() - 1] / 1000;
+      return MapEntry(key, {
+        'n': values.length,
+        'p50': at(.5),
+        'p95': at(.95),
+        'max': values.last / 1000,
+      });
+    });
+    await File(
+      p.join(home.path, cold ? 'report.json' : 'warm-$searchEf-report.json'),
+    ).writeAsString(const JsonEncoder.withIndent('  ').convert(report));
+    _emit('measure', report);
+    if (recalled / 600 < .95) {
+      throw StateError(
+        'Recall@10 below 0.95: ${recalled / 600}; measurements retained for diagnosis',
+      );
+    }
+  } finally {
+    sampler.cancel();
+    await index.close();
+    source.close();
+  }
+}

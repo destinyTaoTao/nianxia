@@ -1,0 +1,12 @@
+{
+  "records": 100000,
+  "dimensions": 512,
+  "returned": 100000,
+  "elapsedMs": 3656.204,
+  "baselineRssBytes": 53264384,
+  "returnedRssBytes": 104087552,
+  "osPeakRssBytes": 104087552,
+  "keywordCandidates": 100000,
+  "sourceRecordsRead": 100000,
+  "mode": "AOT, separate process, all-match keyword output"
+}

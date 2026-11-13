@@ -1,0 +1,14 @@
+#include <sys/resource.h>
+#include <stdint.h>
+void nianxia_tail_metrics(int64_t *out) {
+  struct rusage r;
+  getrusage(RUSAGE_SELF, &r);
+  out[0] = (int64_t)r.ru_utime.tv_sec * 1000000 + r.ru_utime.tv_usec;
+  out[1] = (int64_t)r.ru_stime.tv_sec * 1000000 + r.ru_stime.tv_usec;
+  out[2] = r.ru_minflt;
+  out[3] = r.ru_majflt;
+  out[4] = r.ru_inblock;
+  out[5] = r.ru_oublock;
+  out[6] = r.ru_nvcsw;
+  out[7] = r.ru_nivcsw;
+}

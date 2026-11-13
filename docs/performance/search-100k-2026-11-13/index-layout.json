@@ -1,0 +1,145 @@
+{
+  "pageSize": 4096,
+  "objects": [
+    {
+      "name": "nodes",
+      "bytes": 410615808,
+      "payloadBytes": 224113334,
+      "unusedBytes": 184132527,
+      "pages": 100248
+    },
+    {
+      "name": "postings_doc",
+      "bytes": 169598976,
+      "payloadBytes": 120397708,
+      "unusedBytes": 20881947,
+      "pages": 41406
+    },
+    {
+      "name": "postings",
+      "bytes": 165126144,
+      "payloadBytes": 120397708,
+      "unusedBytes": 16422219,
+      "pages": 40314
+    },
+    {
+      "name": "docs",
+      "bytes": 25018368,
+      "payloadBytes": 22111986,
+      "unusedBytes": 2120057,
+      "pages": 6108
+    },
+    {
+      "name": "docs_keyword_date",
+      "bytes": 6414336,
+      "payloadBytes": 5267105,
+      "unusedBytes": 828443,
+      "pages": 1566
+    },
+    {
+      "name": "sqlite_autoindex_docs_1",
+      "bytes": 5152768,
+      "payloadBytes": 4167105,
+      "unusedBytes": 670571,
+      "pages": 1258
+    },
+    {
+      "name": "docs_vector_date",
+      "bytes": 3137536,
+      "payloadBytes": 2556000,
+      "unusedBytes": 272348,
+      "pages": 766
+    },
+    {
+      "name": "docs_dimension",
+      "bytes": 1949696,
+      "payloadBytes": 1456000,
+      "unusedBytes": 187988,
+      "pages": 476
+    },
+    {
+      "name": "sqlite_autoindex_nodes_1",
+      "bytes": 1613824,
+      "payloadBytes": 1156000,
+      "unusedBytes": 153100,
+      "pages": 394
+    },
+    {
+      "name": "docs_vector_key",
+      "bytes": 1613824,
+      "payloadBytes": 1156000,
+      "unusedBytes": 153100,
+      "pages": 394
+    },
+    {
+      "name": "nodes_dimension",
+      "bytes": 1347584,
+      "payloadBytes": 867105,
+      "unusedBytes": 176535,
+      "pages": 329
+    },
+    {
+      "name": "sqlite_autoindex_docs_2",
+      "bytes": 1306624,
+      "payloadBytes": 834210,
+      "unusedBytes": 168590,
+      "pages": 319
+    },
+    {
+      "name": "docs_embedding",
+      "bytes": 1306624,
+      "payloadBytes": 834210,
+      "unusedBytes": 168590,
+      "pages": 319
+    },
+    {
+      "name": "nodes_deleted",
+      "bytes": 995328,
+      "payloadBytes": 567105,
+      "unusedBytes": 125311,
+      "pages": 243
+    },
+    {
+      "name": "terms",
+      "bytes": 24576,
+      "payloadBytes": 15034,
+      "unusedBytes": 5163,
+      "pages": 6
+    },
+    {
+      "name": "sqlite_schema",
+      "bytes": 4096,
+      "payloadBytes": 1866,
+      "unusedBytes": 2043,
+      "pages": 1
+    },
+    {
+      "name": "sqlite_autoindex_metadata_1",
+      "bytes": 4096,
+      "payloadBytes": 28,
+      "unusedBytes": 4054,
+      "pages": 1
+    },
+    {
+      "name": "pending_vectors",
+      "bytes": 4096,
+      "payloadBytes": 0,
+      "unusedBytes": 4088,
+      "pages": 1
+    },
+    {
+      "name": "metadata",
+      "bytes": 4096,
+      "payloadBytes": 47,
+      "unusedBytes": 4031,
+      "pages": 1
+    },
+    {
+      "name": "entries",
+      "bytes": 4096,
+      "payloadBytes": 9,
+      "unusedBytes": 4074,
+      "pages": 1
+    }
+  ]
+}

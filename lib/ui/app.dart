@@ -17,7 +17,7 @@ class NianxiaApp extends StatefulWidget {
     this.models,
     this.shortcut,
     this.fontFamily,
-    this.initialTheme = ThemeMode.system,
+    this.initialTheme = ThemeMode.dark,
     this.captureMicrophone,
     this.onCapsuleReturn,
   });
@@ -33,10 +33,25 @@ class NianxiaApp extends StatefulWidget {
 }
 
 class _NianxiaAppState extends State<NianxiaApp> with WidgetsBindingObserver {
-  late ThemeMode mode = widget.initialTheme;
+  late ThemeMode mode =
+      ThemeMode.values
+          .where((value) => value.name == widget.book.themeMode)
+          .firstOrNull ??
+      widget.initialTheme;
   late bool capsule = widget.shortcut?.value == 'capsule';
   final navigator = GlobalKey<NavigatorState>();
   final capsuleNavigator = GlobalKey<NavigatorState>();
+  Future<bool> changeTheme(ThemeMode value) async {
+    try {
+      await widget.book.saveThemeMode(value.name);
+      if (!mounted) return false;
+      setState(() => mode = value);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -152,7 +167,7 @@ class _NianxiaAppState extends State<NianxiaApp> with WidgetsBindingObserver {
       models: widget.models,
       shortcut: widget.shortcut,
       themeMode: mode,
-      onTheme: (v) => setState(() => mode = v),
+      onTheme: changeTheme,
     ),
   );
 }

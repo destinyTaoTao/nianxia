@@ -5,8 +5,34 @@ import 'package:crypto/crypto.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nianxia/data/model_store.dart';
 import 'package:nianxia/platform/local_models.dart';
+import 'package:nianxia/domain/record.dart';
 
 void main() {
+  test('识别引擎未就绪错误不承诺调用方音频的保留状态', () async {
+    final home = await Directory.systemTemp.createTemp('nianxia-model-error-');
+    final store = ModelStore(home, [
+      const ModelSpec(
+        id: 'sensevoice',
+        version: 'test',
+        label: 'test',
+        files: [],
+      ),
+    ]);
+    try {
+      await expectLater(
+        LocalModels(store).transcribe('caller-owned.wav'),
+        throwsA(
+          isA<NotebookException>()
+              .having((e) => e.message, 'reason', contains('语音模型'))
+              .having((e) => e.message, 'ownership', isNot(contains('保留'))),
+        ),
+      );
+    } finally {
+      store.dispose();
+      await home.delete(recursive: true);
+    }
+  });
+
   test('下载文件大小及 SHA-256 都正确后才原子启用，损坏重试保留旧版本', () async {
     final home = await Directory.systemTemp.createTemp('nianxia-model-');
     final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);

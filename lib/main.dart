@@ -8,9 +8,8 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:quick_actions/quick_actions.dart';
 
-import 'app/background_tasks.dart';
 import 'app/notebook.dart';
-import 'data/model_store.dart';
+import 'app/notebook_session.dart';
 import 'platform/local_models.dart';
 import 'platform/capture_controller.dart';
 import 'ui/app.dart';
@@ -36,9 +35,10 @@ class _Bootstrap extends StatefulWidget {
 }
 
 class _BootstrapState extends State<_Bootstrap> {
-  Notebook? book;
-  LocalModels? models;
-  BackgroundTasks? tasks;
+  NotebookSession? session;
+  Notebook? get book => session?.book;
+  LocalModels? get models => session?.models;
+  bool loading = false;
   String? error;
   final shortcut = ValueNotifier<String?>(null);
   static const bridge = MethodChannel('app.nianxia/system');
@@ -56,6 +56,8 @@ class _BootstrapState extends State<_Bootstrap> {
   }
 
   Future<void> load() async {
+    if (loading) return;
+    loading = true;
     setState(() => error = null);
     try {
       final initialAction = await bridge.invokeMethod<String>(
@@ -73,29 +75,35 @@ class _BootstrapState extends State<_Bootstrap> {
       if (protected != true) {
         throw const NotebookException('无法核验本地备份边界，尚未打开记录。');
       }
-      final opened = await Notebook.open(root);
-      final manifest = ModelSpec.parse(
-        await rootBundle.loadString('assets/models.json'),
+      final opened = await NotebookSession.open(
+        root,
+        loadModelManifest: () => rootBundle.loadString('assets/models.json'),
       );
-      final store = ModelStore(
-        Directory(p.join(root.path, 'models')),
-        manifest,
-      );
-      final runtime = LocalModels(store);
-      final background = BackgroundTasks(opened, runtime);
       if (!mounted) {
-        background.dispose();
-        opened.dispose();
-        store.dispose();
+        await opened.close();
         return;
       }
       setState(() {
-        book = opened;
-        models = runtime;
-        tasks = background;
+        session = opened;
       });
       // Only system shortcuts are registered. No account, telemetry or model
       // download is started as a side effect of opening the app.
+      await registerShortcuts();
+    } catch (e) {
+      if (mounted) {
+        setState(
+          () => error = e is NotebookException
+              ? e.message
+              : '无法读取本地数据或核验存储设置。未重置或删除任何记录，请检查空间、权限后重试。',
+        );
+      }
+    } finally {
+      loading = false;
+    }
+  }
+
+  Future<void> registerShortcuts() async {
+    try {
       const actions = QuickActions();
       await actions.initialize(
         (type) => shortcut.value = type == 'capture' ? 'capsule' : type,
@@ -112,22 +120,16 @@ class _BootstrapState extends State<_Bootstrap> {
           icon: 'shortcut_search',
         ),
       ]);
-    } catch (e) {
-      if (mounted) {
-        setState(
-          () => error = e is NotebookException
-              ? e.message
-              : '无法读取本地数据或核验存储设置。未重置或删除任何记录，请检查空间、权限后重试。',
-        );
-      }
+    } on PlatformException {
+      // Optional system shortcuts must not invalidate an opened notebook.
+    } on MissingPluginException {
+      // Desktop tests and unsupported platforms still retain the library.
     }
   }
 
   @override
   void dispose() {
-    tasks?.dispose();
-    models?.store.dispose();
-    book?.dispose();
+    session?.dispose();
     shortcut.dispose();
     bridge.setMethodCallHandler(null);
     super.dispose();

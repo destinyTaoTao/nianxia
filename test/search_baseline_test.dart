@@ -26,7 +26,7 @@ void main() {
         'Host keyword baseline: 1000 records, n=20, p95=${times[18] / 1000} ms',
       );
     } finally {
-      book.dispose();
+      await book.close();
       await home.delete(recursive: true);
     }
   });

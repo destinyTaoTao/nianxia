@@ -97,7 +97,7 @@ void main() {
           const MethodChannel('app.nianxia/system'),
           null,
         );
-    book.dispose();
+    await book.close();
     await home.delete(recursive: true);
   });
   test('Android 快速息屏仅触发 inactive 也停止保存，唤醒不自动续录', () async {
@@ -117,7 +117,7 @@ void main() {
       screenAvailable = true;
       capture.didChangeAppLifecycleState(AppLifecycleState.resumed);
       expect(capture.state, 'done');
-      expect(book.records.single.durationMs, 1000);
+      expect((await book.records).single.durationMs, 1000);
     } finally {
       capture.dispose();
     }
@@ -131,7 +131,7 @@ void main() {
         await capture.start();
         expect(mic.started, isFalse);
         expect(capture.state, 'failed');
-        expect(book.records, isEmpty);
+        expect((await book.records), isEmpty);
         expect(book.recoveryDrafts, isEmpty);
       } finally {
         capture.dispose();
@@ -149,7 +149,7 @@ void main() {
       await starting;
       expect(mic.started, isFalse);
       expect(capture.state, 'failed');
-      expect(book.records, isEmpty);
+      expect((await book.records), isEmpty);
       expect(book.recoveryDrafts, isEmpty);
     } finally {
       capture.dispose();
@@ -175,7 +175,7 @@ void main() {
         response.complete(true);
         await Future<void>.delayed(Duration.zero);
         expect(mic.started, isFalse);
-        expect(book.records, isEmpty);
+        expect((await book.records), isEmpty);
       } finally {
         if (!response.isCompleted) response.complete(true);
         capture.dispose();
@@ -193,7 +193,7 @@ void main() {
       expect(mic.started, isFalse);
       expect(capture.state, 'failed');
       expect(book.captureActive, isFalse);
-      expect(book.records, isEmpty);
+      expect((await book.records), isEmpty);
     } finally {
       capture.dispose();
     }
@@ -212,7 +212,7 @@ void main() {
       });
       capture.didChangeAppLifecycleState(AppLifecycleState.paused);
       await done.future.timeout(const Duration(seconds: 5));
-      expect(book.records.single.durationMs, 1000);
+      expect((await book.records).single.durationMs, 1000);
     } finally {
       capture.dispose();
     }
@@ -233,8 +233,11 @@ void main() {
       ); // A final device buffer crosses the declared limit.
       await done.future.timeout(const Duration(seconds: 5));
       expect(capture.error, isNull);
-      expect(book.records.single.durationMs, 120000);
-      expect(await File(book.audioPath(book.records.single)).length(), 3840044);
+      expect((await book.records).single.durationMs, 120000);
+      expect(
+        await File(book.audioPath((await book.records).single)).length(),
+        3840044,
+      );
     } finally {
       capture.dispose();
     }
@@ -254,7 +257,7 @@ void main() {
       await Future<void>.delayed(const Duration(milliseconds: 20));
       await capture.finish();
       expect(capture.state, 'failed');
-      expect(book.records, isEmpty);
+      expect((await book.records), isEmpty);
       expect(await File(capture.draft!.path).exists(), isFalse);
     } finally {
       capture.dispose();

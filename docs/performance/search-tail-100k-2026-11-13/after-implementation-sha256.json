@@ -1,0 +1,11 @@
+{
+  "lib/data/record_repository.dart": "ee5ccfc750f66fd1290f4cb92344552ca2554ef7bb83c145f2d1f5070389057d",
+  "lib/data/search_index.dart": "b539e62aebea602a6836d948ec53695f8aa180032058761470559072ebc65991",
+  "lib/domain/semantic_vector.dart": "50c2c2462b46bc398408582b10a780983f09a3c07e7c1697c9adf4b513f0dcdd",
+  "lib/data/derived_store.dart": "1b6af63495b131b68ae6c81bd0fe464edb3ecfa0ea57146028784bb971d97ba9",
+  "lib/data/hnsw.dart": "a9dcbdfd1bbbdde63e2093a0d7b94917f659c7218999eaf7a9d82a736b18e51f",
+  "lib/data/compact_graph_store.dart": "7cf33f81f11849658435fcc112656e23b138fd37f79b331aff086ab52056bb91",
+  "integration_test/indexed_search_test.dart": "c032580623fec044893b75e32aa4deed8b8043af9e9034efdd78eb5ef3cb4175",
+  "test/vector_bit_patterns_test.dart": "dd630f5b3c31c9dbaf3994487a1024277b69d048054b9a165b8f6e63f07d6a42",
+  "test/search_candidate_batch_test.dart": "bc08445481ae92c0a1e7de702641770b6a02d733e8c9d4554b72d1c69a9187c7"
+}

@@ -1,0 +1,15 @@
+{
+  "executionDate": "2026-11-14",
+  "platform": "Android emulator API36",
+  "mode": "debug",
+  "applicationId": "app.nianxia.nianxia.test",
+  "case": "background-smoke",
+  "passed": true,
+  "metrics": {
+    "startMs": 348,
+    "nativeFinalizeMs": 24,
+    "recordedMs": 3072,
+    "pcmBytes": 98304
+  },
+  "scope": "background capture and WAV integrity, not real speech quality or physical-device acceptance"
+}

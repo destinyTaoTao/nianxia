@@ -1,0 +1,80 @@
+{
+  "records": 100000,
+  "dimensions": 512,
+  "mode": "standalone Dart AOT, synthetic UUID records",
+  "sqlite": "3.51.0",
+  "dart": "3.13.7 (stable) (Thu Oct 22 14:28:57 2026 -0700) on \"macos_arm64\"",
+  "os": "macos",
+  "processors": 10,
+  "baselineRssBytes": 26509312,
+  "firstPending": 100000,
+  "firstRecallAt10": 1.0,
+  "fullyBuiltMs": 987890,
+  "recallAt10": 0.9166666666666666,
+  "meanDistanceEvaluations": 995.8333333333334,
+  "indexBytes": 795275264,
+  "peakLiveIndexBytes": 800179344,
+  "indexFiles": {
+    "search-index.sqlite": 795242496,
+    "search-index.sqlite-wal": 0,
+    "search-index.sqlite-shm": 32768
+  },
+  "sourceDbBytes": 463712256,
+  "rssObservedByPhaseBytes": {
+    "cold": 65699840,
+    "building": 106889216,
+    "warm": 82198528,
+    "reopen": 78004224
+  },
+  "osPeakRssBytes": 107347968,
+  "latencyMs": {
+    "first_semantic": {
+      "n": 1,
+      "p50": 2212.752,
+      "p95": 2212.752,
+      "max": 2212.752
+    },
+    "building_semantic": {
+      "n": 3,
+      "p50": 2233.773,
+      "p95": 2236.57,
+      "max": 2236.57
+    },
+    "building_keyword": {
+      "n": 3,
+      "p50": 421.711,
+      "p95": 422.566,
+      "max": 422.566
+    },
+    "warm_semantic": {
+      "n": 60,
+      "p50": 27.483,
+      "p95": 33.606,
+      "max": 37.48
+    },
+    "warm_keyword": {
+      "n": 60,
+      "p50": 0.176,
+      "p95": 0.298,
+      "max": 0.754
+    },
+    "date_keyword": {
+      "n": 60,
+      "p50": 11.25,
+      "p95": 12.102,
+      "max": 21.642
+    },
+    "empty_date": {
+      "n": 60,
+      "p50": 0.046,
+      "p95": 0.052,
+      "max": 0.151
+    },
+    "reopen_semantic": {
+      "n": 1,
+      "p50": 4340.129,
+      "p95": 4340.129,
+      "max": 4340.129
+    }
+  }
+}

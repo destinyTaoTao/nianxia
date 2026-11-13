@@ -4,13 +4,16 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:archive/archive.dart';
+import 'package:crypto/crypto.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nianxia/app/notebook.dart';
-import 'package:nianxia/data/backup.dart';
+import 'package:nianxia/app/backup.dart';
 
 import 'recording_search_test.dart' show writeWave;
+import 'support/storage_probe.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
   late Directory home, other;
   late Notebook book, restored;
   setUp(() async {
@@ -20,8 +23,8 @@ void main() {
     restored = await Notebook.open(other);
   });
   tearDown(() async {
-    book.dispose();
-    restored.dispose();
+    await book.close();
+    await restored.close();
     await home.delete(recursive: true);
     await other.delete(recursive: true);
   });
@@ -38,14 +41,14 @@ void main() {
     final report = await BackupService(restored).restore(backup);
     expect(report.added, 2);
     expect(report.conflicts, 0);
-    expect(restored.get(parent.id)!.favorite, isTrue);
-    expect(restored.get(child.id)!.parentId, parent.id);
+    expect((await restored.get(parent.id))!.favorite, isTrue);
+    expect((await restored.get(child.id))!.parentId, parent.id);
     expect(
-      File(restored.audioPath(restored.get(child.id)!)).existsSync(),
+      File(restored.audioPath((await restored.get(child.id))!)).existsSync(),
       isTrue,
     );
     expect((await BackupService(restored).restore(backup)).skipped, 2);
-    expect(restored.records.length, 2);
+    expect((await restored.records).length, 2);
   });
   test('ID冲突保留副本且重映射父子，重复冲突导入不再造副本', () async {
     final parent = await book.saveText('父项原文');
@@ -55,13 +58,15 @@ void main() {
     await book.edit(parent.id, '本地已修改', expectedRevision: parent.revision);
     final report = await service.restore(old);
     expect(report.conflicts, 1);
-    expect(book.get(parent.id)!.body, '本地已修改');
-    final copy = book.records.singleWhere((r) => r.body == '父项原文');
-    final appended = book.records.where((r) => r.body == '追加原文').toList();
+    expect((await book.get(parent.id))!.body, '本地已修改');
+    final copy = (await book.records).singleWhere((r) => r.body == '父项原文');
+    final appended = (await book.records)
+        .where((r) => r.body == '追加原文')
+        .toList();
     expect(appended.any((r) => r.parentId == copy.id), isTrue);
-    final count = book.records.length;
+    final count = (await book.records).length;
     await service.restore(old);
-    expect(book.records.length, count);
+    expect((await book.records).length, count);
   });
   test('拒绝路径穿越、压缩炸弹格式和损坏备份，保留已有数据', () async {
     await book.saveText('既有内容');
@@ -78,7 +83,7 @@ void main() {
         BackupService(book).restore(file),
         throwsA(isA<NotebookException>()),
       );
-      expect(book.records.single.body, '既有内容');
+      expect((await book.records).single.body, '既有内容');
       expect(File('${home.parent.path}/escape.txt').existsSync(), isFalse);
     }
   });
@@ -89,38 +94,40 @@ void main() {
     await restored.edit(
       r.id,
       '恢复后在本地修改',
-      expectedRevision: restored.get(r.id)!.revision,
+      expectedRevision: (await restored.get(r.id))!.revision,
     );
     final result = await BackupService(restored).restore(backup);
     expect(result.conflicts, 1);
     expect(
-      restored.records.map((r) => r.body),
+      (await restored.records).map((r) => r.body),
       containsAll(['备份中的原文', '恢复后在本地修改']),
     );
-    final count = restored.records.length;
+    final count = (await restored.records).length;
     await BackupService(restored).restore(backup);
-    expect(restored.records.length, count);
+    expect((await restored.records).length, count);
   });
-  test('应用拒绝生成超过自身恢复条数上限的备份', () async {
+  test('超过一万条记录完整往返且重复恢复幂等', () async {
     // Real persistence, batched only to keep fixture creation inexpensive.
-    book.repository.transaction(() {
-      for (var i = 0; i < 10001; i++) {
-        book.repository.insert(
-          Record(
-            id: '${i.toString().padLeft(8, '0')}-0000-4000-8000-000000000000',
-            body: '记录',
-            createdAt: DateTime.utc(2026),
-            timezone: 'UTC',
-            offsetMinutes: 0,
-          ),
-        );
-      }
-    });
-    await expectLater(
-      BackupService(book).export(),
-      throwsA(isA<NotebookException>()),
+    withFixtureRepository(
+      book,
+      (fixture) => fixture.transaction(() {
+        for (var i = 0; i < 10001; i++) {
+          fixture.insert(
+            Record(
+              id: '${i.toString().padLeft(8, '0')}-0000-4000-8000-000000000000',
+              body: '记录',
+              createdAt: DateTime.utc(2026),
+              timezone: 'UTC',
+              offsetMinutes: 0,
+            ),
+          );
+        }
+      }),
     );
-    expect(book.records.length, 10001);
+    final backup = await BackupService(book).export();
+    expect((await BackupService(restored).restore(backup)).added, 10001);
+    expect((await restored.records).length, 10001);
+    expect((await BackupService(restored).restore(backup)).skipped, 10001);
   });
   test('恢复最后音频核验期间取消，不提交新增记录且清理暂存副本', () async {
     final draft = await book.beginCapture();
@@ -139,19 +146,19 @@ void main() {
       ),
       throwsA(isA<NotebookException>()),
     );
-    expect(restored.get(added.id), isNull);
-    expect(restored.records.single.id, audio.id);
+    expect((await restored.get(added.id)), isNull);
+    expect((await restored.records).single.id, audio.id);
     expect(
-      await File(restored.audioPath(restored.records.single)).exists(),
+      await File(restored.audioPath((await restored.records).single)).exists(),
       isTrue,
     );
     expect(await Directory('${other.path}/audio').list().length, 1);
     expect(await Directory('${other.path}/imports').list().length, 0);
   });
-  test('导出容量计算包含可读正文与清单，不留下超出恢复上限的成功包', () async {
-    // 135 valid two-minute WAVs fit the old audio budget. The two copies of
-    // 3.3 million Chinese characters push the complete archive over 512 MiB.
-    for (var i = 0; i < 135; i++) {
+  test('超过512MiB完整备份真实往返且音频字节保持', () async {
+    // Real sparse two-minute WAVs exceed 512 MiB; the text and metadata
+    // each also exceed the former 16 MiB whole-library boundary.
+    for (var i = 0; i < 140; i++) {
       final draft = await book.beginCapture();
       await writeWave(draft.path);
       final file = await File(draft.path).open(mode: FileMode.append);
@@ -165,14 +172,19 @@ void main() {
       await file.close();
       await book.finishCapture(draft);
     }
-    for (var i = 0; i < 33; i++) {
+    for (var i = 0; i < 60; i++) {
       await book.saveText('记' * 100000);
     }
-    await expectLater(
-      BackupService(book).export(),
-      throwsA(isA<NotebookException>()),
-    );
-    expect(book.records.length, 168);
-    expect(await Directory('${home.path}/exports').list().length, 0);
+    final backup = await BackupService(book).export();
+    expect(await backup.length(), greaterThan(512 * 1024 * 1024));
+    expect((await BackupService(restored).restore(backup)).added, 200);
+    expect((await restored.records).length, 200);
+    for (final r in (await book.records).where((r) => r.audio != null)) {
+      final copy = (await restored.get(r.id))!;
+      expect(
+        await sha256.bind(File(book.audioPath(r)).openRead()).first,
+        await sha256.bind(File(restored.audioPath(copy)).openRead()).first,
+      );
+    }
   });
 }

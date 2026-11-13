@@ -8,17 +8,24 @@ Future<void> openEditor(
   Notebook book, {
   Record? record,
   String? parentId,
+  VoidCallback? onSaved,
 }) => Navigator.of(context).push<void>(
   MaterialPageRoute(
-    builder: (_) => _Editor(book: book, record: record, parentId: parentId),
+    builder: (_) => _Editor(
+      book: book,
+      record: record,
+      parentId: parentId,
+      onSaved: onSaved,
+    ),
   ),
 );
 
 class _Editor extends StatefulWidget {
-  const _Editor({required this.book, this.record, this.parentId});
+  const _Editor({required this.book, this.record, this.parentId, this.onSaved});
   final Notebook book;
   final Record? record;
   final String? parentId;
+  final VoidCallback? onSaved;
   @override
   State<_Editor> createState() => _EditorState();
 }
@@ -49,6 +56,7 @@ class _EditorState extends State<_Editor> {
         );
       }
       if (mounted) {
+        widget.onSaved?.call();
         Navigator.pop(context);
         notice(context, '已保存');
       }

@@ -1,0 +1,701 @@
+{
+  "baseline": [
+    {
+      "phase": "measure",
+      "records": 100000,
+      "dimensions": 512,
+      "measureKind": "warm-retest",
+      "searchEf": 200,
+      "upperSearchEf": 8,
+      "mode": "standalone Dart AOT, synthetic UUID records",
+      "sqlite": "3.51.0",
+      "dart": "3.13.7 (stable) (Thu Oct 22 14:28:57 2026 -0700) on \"macos_arm64\"",
+      "os": "macos",
+      "processors": 10,
+      "baselineRssBytes": 26509312,
+      "warmValidationMs": 9148,
+      "recallAt10": 1.0,
+      "recallByQuery": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "meanDistanceEvaluations": 1045.0833333333333,
+      "indexBytes": 494825472,
+      "peakLiveIndexBytes": 494829624,
+      "indexFiles": {
+        "search-index.sqlite": 494792704,
+        "search-index.sqlite-wal": 0,
+        "search-index.sqlite-shm": 32768
+      },
+      "sourceDbBytes": 463712256,
+      "rssObservedByPhaseBytes": {
+        "cold": 43024384,
+        "warm": 102629376,
+        "reopen": 82558976
+      },
+      "osPeakRssBytes": 106201088,
+      "latencyMs": {
+        "warm_semantic": {
+          "n": 60,
+          "p50": 20.25,
+          "p95": 23.42,
+          "max": 26.507
+        },
+        "warm_keyword": {
+          "n": 60,
+          "p50": 0.188,
+          "p95": 0.278,
+          "max": 0.343
+        },
+        "date_keyword": {
+          "n": 60,
+          "p50": 11.858,
+          "p95": 12.834,
+          "max": 15.61
+        },
+        "empty_date": {
+          "n": 60,
+          "p50": 0.054,
+          "p95": 0.067,
+          "max": 0.074
+        },
+        "reopen_semantic": {
+          "n": 1,
+          "p50": 3055.326,
+          "p95": 3055.326,
+          "max": 3055.326
+        }
+      }
+    },
+    {
+      "phase": "measure",
+      "records": 100000,
+      "dimensions": 512,
+      "measureKind": "warm-retest",
+      "searchEf": 200,
+      "upperSearchEf": 8,
+      "mode": "standalone Dart AOT, synthetic UUID records",
+      "sqlite": "3.51.0",
+      "dart": "3.13.7 (stable) (Thu Oct 22 14:28:57 2026 -0700) on \"macos_arm64\"",
+      "os": "macos",
+      "processors": 10,
+      "baselineRssBytes": 26509312,
+      "warmValidationMs": 6727,
+      "recallAt10": 1.0,
+      "recallByQuery": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "meanDistanceEvaluations": 1045.0833333333333,
+      "indexBytes": 494825472,
+      "peakLiveIndexBytes": 494829624,
+      "indexFiles": {
+        "search-index.sqlite": 494792704,
+        "search-index.sqlite-wal": 0,
+        "search-index.sqlite-shm": 32768
+      },
+      "sourceDbBytes": 463712256,
+      "rssObservedByPhaseBytes": {
+        "cold": 44974080,
+        "warm": 104366080,
+        "reopen": 84148224
+      },
+      "osPeakRssBytes": 107708416,
+      "latencyMs": {
+        "warm_semantic": {
+          "n": 60,
+          "p50": 20.254,
+          "p95": 22.217,
+          "max": 25.683
+        },
+        "warm_keyword": {
+          "n": 60,
+          "p50": 0.191,
+          "p95": 0.279,
+          "max": 0.284
+        },
+        "date_keyword": {
+          "n": 60,
+          "p50": 11.94,
+          "p95": 12.772,
+          "max": 13.049
+        },
+        "empty_date": {
+          "n": 60,
+          "p50": 0.054,
+          "p95": 0.065,
+          "max": 0.212
+        },
+        "reopen_semantic": {
+          "n": 1,
+          "p50": 2936.377,
+          "p95": 2936.377,
+          "max": 2936.377
+        }
+      }
+    },
+    {
+      "phase": "measure",
+      "records": 100000,
+      "dimensions": 512,
+      "measureKind": "warm-retest",
+      "searchEf": 200,
+      "upperSearchEf": 8,
+      "mode": "standalone Dart AOT, synthetic UUID records",
+      "sqlite": "3.51.0",
+      "dart": "3.13.7 (stable) (Thu Oct 22 14:28:57 2026 -0700) on \"macos_arm64\"",
+      "os": "macos",
+      "processors": 10,
+      "baselineRssBytes": 26476544,
+      "warmValidationMs": 6949,
+      "recallAt10": 1.0,
+      "recallByQuery": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "meanDistanceEvaluations": 1045.0833333333333,
+      "indexBytes": 494825472,
+      "peakLiveIndexBytes": 494829624,
+      "indexFiles": {
+        "search-index.sqlite": 494792704,
+        "search-index.sqlite-wal": 0,
+        "search-index.sqlite-shm": 32768
+      },
+      "sourceDbBytes": 463712256,
+      "rssObservedByPhaseBytes": {
+        "cold": 44924928,
+        "warm": 101056512,
+        "reopen": 83460096
+      },
+      "osPeakRssBytes": 107626496,
+      "latencyMs": {
+        "warm_semantic": {
+          "n": 60,
+          "p50": 21.107,
+          "p95": 23.438,
+          "max": 28.805
+        },
+        "warm_keyword": {
+          "n": 60,
+          "p50": 0.206,
+          "p95": 0.298,
+          "max": 0.627
+        },
+        "date_keyword": {
+          "n": 60,
+          "p50": 12.427,
+          "p95": 15.202,
+          "max": 18.457
+        },
+        "empty_date": {
+          "n": 60,
+          "p50": 0.062,
+          "p95": 0.074,
+          "max": 0.082
+        },
+        "reopen_semantic": {
+          "n": 1,
+          "p50": 3121.678,
+          "p95": 3121.678,
+          "max": 3121.678
+        }
+      }
+    }
+  ],
+  "numeric-buffers-and-fingerprint": [
+    {
+      "phase": "measure",
+      "records": 100000,
+      "dimensions": 512,
+      "measureKind": "warm-retest",
+      "searchEf": 200,
+      "upperSearchEf": 8,
+      "mode": "standalone Dart AOT, synthetic UUID records",
+      "sqlite": "3.51.0",
+      "dart": "3.13.7 (stable) (Thu Oct 22 14:28:57 2026 -0700) on \"macos_arm64\"",
+      "os": "macos",
+      "processors": 10,
+      "baselineRssBytes": 26492928,
+      "warmValidationMs": 5882,
+      "recallAt10": 1.0,
+      "recallByQuery": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "meanDistanceEvaluations": 1045.0833333333333,
+      "indexBytes": 494825472,
+      "peakLiveIndexBytes": 494829624,
+      "indexFiles": {
+        "search-index.sqlite": 494792704,
+        "search-index.sqlite-wal": 0,
+        "search-index.sqlite-shm": 32768
+      },
+      "sourceDbBytes": 463712256,
+      "rssObservedByPhaseBytes": {
+        "cold": 44957696,
+        "warm": 107593728,
+        "reopen": 80707584
+      },
+      "osPeakRssBytes": 110411776,
+      "latencyMs": {
+        "warm_semantic": {
+          "n": 60,
+          "p50": 19.179,
+          "p95": 21.35,
+          "max": 36.417
+        },
+        "warm_keyword": {
+          "n": 60,
+          "p50": 0.181,
+          "p95": 0.262,
+          "max": 0.564
+        },
+        "date_keyword": {
+          "n": 60,
+          "p50": 10.862,
+          "p95": 12.349,
+          "max": 15.67
+        },
+        "empty_date": {
+          "n": 60,
+          "p50": 0.054,
+          "p95": 0.073,
+          "max": 0.305
+        },
+        "reopen_semantic": {
+          "n": 1,
+          "p50": 1945.817,
+          "p95": 1945.817,
+          "max": 1945.817
+        }
+      }
+    },
+    {
+      "phase": "measure",
+      "records": 100000,
+      "dimensions": 512,
+      "measureKind": "warm-retest",
+      "searchEf": 200,
+      "upperSearchEf": 8,
+      "mode": "standalone Dart AOT, synthetic UUID records",
+      "sqlite": "3.51.0",
+      "dart": "3.13.7 (stable) (Thu Oct 22 14:28:57 2026 -0700) on \"macos_arm64\"",
+      "os": "macos",
+      "processors": 10,
+      "baselineRssBytes": 26394624,
+      "warmValidationMs": 5258,
+      "recallAt10": 1.0,
+      "recallByQuery": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "meanDistanceEvaluations": 1045.0833333333333,
+      "indexBytes": 494825472,
+      "peakLiveIndexBytes": 494829624,
+      "indexFiles": {
+        "search-index.sqlite": 494792704,
+        "search-index.sqlite-wal": 0,
+        "search-index.sqlite-shm": 32768
+      },
+      "sourceDbBytes": 463712256,
+      "rssObservedByPhaseBytes": {
+        "cold": 44711936,
+        "warm": 107429888,
+        "reopen": 80527360
+      },
+      "osPeakRssBytes": 109674496,
+      "latencyMs": {
+        "warm_semantic": {
+          "n": 60,
+          "p50": 19.054,
+          "p95": 21.35,
+          "max": 21.955
+        },
+        "warm_keyword": {
+          "n": 60,
+          "p50": 0.188,
+          "p95": 0.276,
+          "max": 0.31
+        },
+        "date_keyword": {
+          "n": 60,
+          "p50": 11.018,
+          "p95": 12.109,
+          "max": 12.554
+        },
+        "empty_date": {
+          "n": 60,
+          "p50": 0.054,
+          "p95": 0.064,
+          "max": 0.179
+        },
+        "reopen_semantic": {
+          "n": 1,
+          "p50": 1812.832,
+          "p95": 1812.832,
+          "max": 1812.832
+        }
+      }
+    },
+    {
+      "phase": "measure",
+      "records": 100000,
+      "dimensions": 512,
+      "measureKind": "warm-retest",
+      "searchEf": 200,
+      "upperSearchEf": 8,
+      "mode": "standalone Dart AOT, synthetic UUID records",
+      "sqlite": "3.51.0",
+      "dart": "3.13.7 (stable) (Thu Oct 22 14:28:57 2026 -0700) on \"macos_arm64\"",
+      "os": "macos",
+      "processors": 10,
+      "baselineRssBytes": 26525696,
+      "warmValidationMs": 5233,
+      "recallAt10": 1.0,
+      "recallByQuery": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "meanDistanceEvaluations": 1045.0833333333333,
+      "indexBytes": 494825472,
+      "peakLiveIndexBytes": 494829624,
+      "indexFiles": {
+        "search-index.sqlite": 494792704,
+        "search-index.sqlite-wal": 0,
+        "search-index.sqlite-shm": 32768
+      },
+      "sourceDbBytes": 463712256,
+      "rssObservedByPhaseBytes": {
+        "cold": 44924928,
+        "warm": 107642880,
+        "reopen": 80707584
+      },
+      "osPeakRssBytes": 110460928,
+      "latencyMs": {
+        "warm_semantic": {
+          "n": 60,
+          "p50": 19.101,
+          "p95": 21.394,
+          "max": 21.837
+        },
+        "warm_keyword": {
+          "n": 60,
+          "p50": 0.19,
+          "p95": 0.279,
+          "max": 0.365
+        },
+        "date_keyword": {
+          "n": 60,
+          "p50": 11.106,
+          "p95": 12.526,
+          "max": 13.274
+        },
+        "empty_date": {
+          "n": 60,
+          "p50": 0.055,
+          "p95": 0.064,
+          "max": 0.378
+        },
+        "reopen_semantic": {
+          "n": 1,
+          "p50": 1817.912,
+          "p95": 1817.912,
+          "max": 1817.912
+        }
+      }
+    }
+  ],
+  "numeric-buffers-fingerprint-cache": [
+    {
+      "phase": "measure",
+      "records": 100000,
+      "dimensions": 512,
+      "measureKind": "warm-retest",
+      "searchEf": 200,
+      "upperSearchEf": 8,
+      "mode": "standalone Dart AOT, synthetic UUID records",
+      "sqlite": "3.51.0",
+      "dart": "3.13.7 (stable) (Thu Oct 22 14:28:57 2026 -0700) on \"macos_arm64\"",
+      "os": "macos",
+      "processors": 10,
+      "baselineRssBytes": 19857408,
+      "warmValidationMs": 7414,
+      "recallAt10": 1.0,
+      "recallByQuery": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "meanDistanceEvaluations": 1045.0833333333333,
+      "indexBytes": 494825472,
+      "peakLiveIndexBytes": 494829624,
+      "indexFiles": {
+        "search-index.sqlite": 494792704,
+        "search-index.sqlite-wal": 0,
+        "search-index.sqlite-shm": 32768
+      },
+      "sourceDbBytes": 463712256,
+      "rssObservedByPhaseBytes": {
+        "cold": 31604736,
+        "warm": 94306304,
+        "reopen": 66813952
+      },
+      "osPeakRssBytes": 96600064,
+      "latencyMs": {
+        "warm_semantic": {
+          "n": 60,
+          "p50": 19.295,
+          "p95": 21.439,
+          "max": 28.41
+        },
+        "warm_keyword": {
+          "n": 60,
+          "p50": 0.19,
+          "p95": 0.263,
+          "max": 0.301
+        },
+        "date_keyword": {
+          "n": 60,
+          "p50": 11.179,
+          "p95": 12.509,
+          "max": 13.608
+        },
+        "empty_date": {
+          "n": 60,
+          "p50": 0.06,
+          "p95": 0.07,
+          "max": 0.073
+        },
+        "reopen_semantic": {
+          "n": 1,
+          "p50": 1901.044,
+          "p95": 1901.044,
+          "max": 1901.044
+        }
+      }
+    },
+    {
+      "phase": "measure",
+      "records": 100000,
+      "dimensions": 512,
+      "measureKind": "warm-retest",
+      "searchEf": 200,
+      "upperSearchEf": 8,
+      "mode": "standalone Dart AOT, synthetic UUID records",
+      "sqlite": "3.51.0",
+      "dart": "3.13.7 (stable) (Thu Oct 22 14:28:57 2026 -0700) on \"macos_arm64\"",
+      "os": "macos",
+      "processors": 10,
+      "baselineRssBytes": 19857408,
+      "warmValidationMs": 5225,
+      "recallAt10": 1.0,
+      "recallByQuery": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "meanDistanceEvaluations": 1045.0833333333333,
+      "indexBytes": 494825472,
+      "peakLiveIndexBytes": 494829624,
+      "indexFiles": {
+        "search-index.sqlite": 494792704,
+        "search-index.sqlite-wal": 0,
+        "search-index.sqlite-shm": 32768
+      },
+      "sourceDbBytes": 463712256,
+      "rssObservedByPhaseBytes": {
+        "cold": 31604736,
+        "warm": 94322688,
+        "reopen": 67354624
+      },
+      "osPeakRssBytes": 96632832,
+      "latencyMs": {
+        "warm_semantic": {
+          "n": 60,
+          "p50": 18.937,
+          "p95": 21.473,
+          "max": 24.332
+        },
+        "warm_keyword": {
+          "n": 60,
+          "p50": 0.188,
+          "p95": 0.273,
+          "max": 0.356
+        },
+        "date_keyword": {
+          "n": 60,
+          "p50": 11.238,
+          "p95": 12.804,
+          "max": 17.949
+        },
+        "empty_date": {
+          "n": 60,
+          "p50": 0.061,
+          "p95": 0.077,
+          "max": 0.084
+        },
+        "reopen_semantic": {
+          "n": 1,
+          "p50": 1813.696,
+          "p95": 1813.696,
+          "max": 1813.696
+        }
+      }
+    },
+    {
+      "phase": "measure",
+      "records": 100000,
+      "dimensions": 512,
+      "measureKind": "warm-retest",
+      "searchEf": 200,
+      "upperSearchEf": 8,
+      "mode": "standalone Dart AOT, synthetic UUID records",
+      "sqlite": "3.51.0",
+      "dart": "3.13.7 (stable) (Thu Oct 22 14:28:57 2026 -0700) on \"macos_arm64\"",
+      "os": "macos",
+      "processors": 10,
+      "baselineRssBytes": 19824640,
+      "warmValidationMs": 5060,
+      "recallAt10": 1.0,
+      "recallByQuery": [
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "meanDistanceEvaluations": 1045.0833333333333,
+      "indexBytes": 494825472,
+      "peakLiveIndexBytes": 494829624,
+      "indexFiles": {
+        "search-index.sqlite": 494792704,
+        "search-index.sqlite-wal": 0,
+        "search-index.sqlite-shm": 32768
+      },
+      "sourceDbBytes": 463712256,
+      "rssObservedByPhaseBytes": {
+        "cold": 31571968,
+        "warm": 94289920,
+        "reopen": 67338240
+      },
+      "osPeakRssBytes": 96616448,
+      "latencyMs": {
+        "warm_semantic": {
+          "n": 60,
+          "p50": 19.156,
+          "p95": 21.023,
+          "max": 22.28
+        },
+        "warm_keyword": {
+          "n": 60,
+          "p50": 0.181,
+          "p95": 0.267,
+          "max": 0.318
+        },
+        "date_keyword": {
+          "n": 60,
+          "p50": 11.131,
+          "p95": 12.513,
+          "max": 12.782
+        },
+        "empty_date": {
+          "n": 60,
+          "p50": 0.058,
+          "p95": 0.068,
+          "max": 0.072
+        },
+        "reopen_semantic": {
+          "n": 1,
+          "p50": 1821.318,
+          "p95": 1821.318,
+          "max": 1821.318
+        }
+      }
+    }
+  ]
+}

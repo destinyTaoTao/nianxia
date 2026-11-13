@@ -1,0 +1,7 @@
+{
+  "sha256": "add387b847714862a5244f63fc0610b6beefca8feb7341278aa8db87b0924fb3",
+  "bytes": 463712256,
+  "afterSha256": "add387b847714862a5244f63fc0610b6beefca8feb7341278aa8db87b0924fb3",
+  "same": true,
+  "verifiedAfter": "cold, warm-retest and all-match keyword processes"
+}

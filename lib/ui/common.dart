@@ -46,12 +46,48 @@ class PaperSurface extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Material(
     color: Theme.of(context).colorScheme.surface,
-    shape: RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(20),
-      side: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
-    ),
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
     clipBehavior: Clip.antiAlias,
     child: Padding(padding: padding, child: child),
+  );
+}
+
+/// Keeps the main actions reachable while the page content scrolls.
+class BottomActions extends StatelessWidget {
+  const BottomActions({super.key, required this.primary, this.secondary});
+  final Widget primary;
+  final Widget? secondary;
+
+  @override
+  Widget build(BuildContext context) => ColoredBox(
+    color: Theme.of(context).scaffoldBackgroundColor,
+    child: SafeArea(
+      top: false,
+      minimum: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+      child: ReadingWidth(
+        child: MediaQuery.textScalerOf(context).scale(16) > 22
+            ? Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  primary,
+                  if (secondary != null) ...[
+                    const SizedBox(height: 10),
+                    secondary!,
+                  ],
+                ],
+              )
+            : Row(
+                children: [
+                  Expanded(flex: 5, child: primary),
+                  if (secondary != null) ...[
+                    const SizedBox(width: 12),
+                    Expanded(flex: 4, child: secondary!),
+                  ],
+                ],
+              ),
+      ),
+    ),
   );
 }
 

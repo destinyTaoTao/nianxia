@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "flutter": {
+    "path": "isolated Flutter toolchain",
+    "version": "3.47.9",
+    "dartVersion": "3.13.7",
+    "available": true
+  },
+  "android": {
+    "sdkAvailable": true,
+    "sdkPath": "isolated Android SDK"
+  },
+  "ios": {
+    "developerDirectory": "/Library/Developer/CommandLineTools",
+    "sdkAvailable": false,
+    "readyForBuild": false
+  },
+  "cryptoPrototype": {
+    "goAvailable": true,
+    "cargoAvailable": false
+  },
+  "deviceVerification": "not-performed",
+  "executionDate": "2026-11-14",
+  "baseline": {
+    "flutterTests": 220,
+    "pythonTests": 15,
+    "analyzer": "passed"
+  },
+  "current": {
+    "runnerSafetyTests": 11,
+    "sandboxTests": 2,
+    "androidIsolationSmoke": "passed",
+    "iosBuild": "not-executed-missing-Xcode",
+    "formalDataFingerprint": "unavailable-run-as-denied",
+    "formalInstallation": "unchanged",
+    "hostFlutterTests": 247,
+    "hostPythonTests": 29,
+    "analyzer": "passed",
+    "nativeCaptureJvmTests": 10,
+    "cryptoRustTests": 5,
+    "cryptoHostFfiTests": 3,
+    "androidScreenOffSmoke": "passed",
+    "androidProfileCryptoResources": "passed",
+    "androidReleaseBackupChain": "passed",
+    "normalReleaseArtifactBoundary": "passed-build-only",
+    "isolatedRustToolchain": "1.91.1"
+  },
+  "committed": false,
+  "pushed": false
+}

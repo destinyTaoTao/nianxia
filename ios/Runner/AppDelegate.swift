@@ -24,6 +24,14 @@ import EventKitUI
     channel.setMethodCallHandler { [weak self] call, result in
       guard let self = self else { return }
       switch call.method {
+      case "validationIdentity":
+        let temporary = FileManager.default.temporaryDirectory.resolvingSymlinksInPath().path
+        guard let cacheURL = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first else {
+          result(FlutterError(code: "validation_cache", message: "Private cache unavailable", details: nil)); return
+        }
+        let cache = cacheURL.resolvingSymlinksInPath().path
+        result(["applicationId": Bundle.main.bundleIdentifier ?? "", "cacheRoot": cache,
+                "temporaryRoots": [temporary, cache]])
       case "getLaunchAction":
         LaunchActions.channel = channel
         LaunchActions.ready = true
@@ -48,6 +56,16 @@ import EventKitUI
           result(true)
         } catch {
           result(FlutterError(code: "backup_exclusion", message: "Could not exclude private files from backup", details: nil))
+        }
+      case "availableStorageBytes":
+        do {
+          let attributes = try FileManager.default.attributesOfFileSystem(forPath: NSHomeDirectory())
+          guard let bytes = attributes[.systemFreeSize] as? NSNumber else {
+            throw NSError(domain: "NianxiaStorage", code: 1)
+          }
+          result(bytes.int64Value)
+        } catch {
+          result(FlutterError(code: "storage_space", message: "Unable to inspect private storage", details: nil))
         }
       case "calendar": self.openCalendar(call.arguments, result: result)
       default: result(FlutterMethodNotImplemented)

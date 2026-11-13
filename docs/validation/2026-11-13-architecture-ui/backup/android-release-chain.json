@@ -1,0 +1,14 @@
+{
+  "applicationId": "app.nianxia.nianxia.test",
+  "case": "backup-matrix",
+  "passed": true,
+  "metrics": {
+    "backupChainMs": 1793,
+    "restoredRecords": 3,
+    "audioBytes": 32044
+  },
+  "executionDate": "2026-11-14",
+  "platform": "Android emulator API36 ARM64",
+  "mode": "release AOT non-debuggable isolated target",
+  "scope": "real application backup/restore with test-only native candidate; no VM service, formal data not accessed"
+}

@@ -1,6 +1,10 @@
 import 'dart:io';
 import 'dart:convert';
-import 'dart:math' as math;
+import 'dart:async';
+
+import 'package:crypto/crypto.dart';
+
+import '../domain/capture_session.dart';
 
 import '../domain/ports.dart';
 import '../data/capture_store.dart';
@@ -10,8 +14,13 @@ import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 import 'package:uuid/uuid.dart';
 
-import '../data/record_repository.dart';
+import '../data/storage.dart';
+import '../domain/record_page.dart';
+export '../domain/record_page.dart';
 import '../domain/record.dart';
+import '../domain/semantic_vector.dart';
+import '../domain/organization.dart';
+import 'record_search.dart';
 export '../domain/record.dart';
 
 class Notebook extends ChangeNotifier {
@@ -25,114 +34,216 @@ class Notebook extends ChangeNotifier {
     await Directory(p.join(home.path, 'drafts')).create();
     final book = Notebook._(
       home,
-      RecordRepository(home),
+      await Storage.open(home),
       clock ?? DateTime.now,
     );
-    await book._recover();
-    return book;
+    try {
+      book._themeMode = await book.repository.themeMode;
+      await book._recover();
+      return book;
+    } catch (_) {
+      await book.close();
+      rethrow;
+    }
   }
 
   final Directory home;
-  final RecordRepository repository;
+  final Storage repository;
   final DateTime Function() clock;
-  List<Record> get records => repository.all();
-  Record? get(String id) => repository.get(id);
-  List<Record> children(String id) =>
-      records.where((r) => r.parentId == id).toList().reversed.toList();
-  Future<Record> saveText(String text, {String? parentId}) async {
-    if (text.trim().isEmpty || text.length > 100000) {
-      throw const NotebookException('请输入 1–100,000 字的正文。');
-    }
-    if (parentId != null && get(parentId)?.parentId != null) {
-      throw const NotebookException('请追加到原记录。');
-    }
-    final now = clock();
-    final r = Record(
-      id: const Uuid().v4(),
-      body: text.trim(),
-      parentId: parentId,
-      createdAt: now.toUtc(),
-      timezone: now.timeZoneName,
-      offsetMinutes: now.timeZoneOffset.inMinutes,
-    );
-    repository.insert(r);
-    notifyListeners();
-    return r;
-  }
-
-  Future<void> edit(
-    String id,
-    String text, {
-    required int expectedRevision,
-  }) async {
-    if (text.trim().isEmpty || text.length > 100000) {
-      throw const NotebookException('请输入 1–100,000 字的正文。');
-    }
-    repository.edit(id, text.trim(), expectedRevision);
-    notifyListeners();
-  }
-
-  Future<void> favorite(String id, bool value) async {
-    repository.favorite(id, value);
-    notifyListeners();
-  }
-
-  Future<void> delete(String id) async {
-    final group = records.where((r) => r.id == id || r.parentId == id).toList();
-    repository.delete(id);
-    notifyListeners();
-    for (final r in group) {
-      if (r.audio != null) {
-        final file = File(p.join(home.path, 'audio', r.audio!));
-        if (await file.exists()) {
-          await file.delete();
+  String? _themeMode;
+  String? get themeMode => _themeMode;
+  Future<void> saveThemeMode(String mode) => _operation(() async {
+    await repository.saveThemeMode(mode);
+    _themeMode = mode;
+  });
+  Future<List<Record>> get records => repository.all();
+  Future<Record?> get(String id) => repository.get(id);
+  Future<RecordPage> page({
+    RecordCursor? after,
+    int? generation,
+    bool favorites = false,
+  }) => repository.page(
+    after: after,
+    generation: generation,
+    favorites: favorites,
+  );
+  Future<RecordDetail?> detail(
+    String id, {
+    RecordCursor? after,
+    int? generation,
+  }) => repository.detail(id, after: after, generation: generation);
+  Future<int> childCount(String id) => repository.childCount(id);
+  Future<List<Record>> children(String id) => repository.children(id);
+  Future<Record> saveText(String text, {String? parentId}) =>
+      _operation(() async {
+        if (text.trim().isEmpty || text.length > 100000) {
+          throw const NotebookException('请输入 1–100,000 字的正文。');
         }
+        if (parentId != null && (await get(parentId))?.parentId != null) {
+          throw const NotebookException('请追加到原记录。');
+        }
+        final now = clock();
+        final r = Record(
+          id: const Uuid().v4(),
+          body: text.trim(),
+          parentId: parentId,
+          createdAt: now.toUtc(),
+          timezone: now.timeZoneName,
+          offsetMinutes: now.timeZoneOffset.inMinutes,
+        );
+        await repository.insert(r);
+        changed();
+        return r;
+      });
+
+  Future<void> edit(String id, String text, {required int expectedRevision}) =>
+      _operation(() async {
+        if (text.trim().isEmpty || text.length > 100000) {
+          throw const NotebookException('请输入 1–100,000 字的正文。');
+        }
+        await repository.edit(id, text.trim(), expectedRevision);
+        changed();
+      });
+
+  Future<void> favorite(String id, bool value) => _operation(() async {
+    await repository.favorite(id, value);
+    changed();
+  });
+
+  Future<void> delete(String id) {
+    final deletion = _operation(() async {
+      if (_mediaLeases > 0) {
+        throw const NotebookException('正在备份或恢复，请完成后再删除记录。');
       }
-    }
+      await repository.delete(id);
+      changed();
+      await _drainMediaDeletions();
+    });
+    // Register the whole operation before its first async reply. An archive
+    // lease cannot start preparing media in the SQL-to-cleanup gap.
+    final previous = _mediaMutation;
+    final barrier = Future.wait<void>([
+      ?previous,
+      deletion.then<void>((_) {}, onError: (Object _, StackTrace _) {}),
+    ]).then<void>((_) {});
+    _mediaMutation = barrier;
+    unawaited(
+      barrier.then((_) {
+        if (identical(_mediaMutation, barrier)) _mediaMutation = null;
+      }),
+    );
+    return deletion;
   }
 
-  void changed() {
+  final contentChanges = ValueNotifier<int>(0);
+  void changed({bool content = true}) {
     if (!_closed) {
+      if (content) contentChanges.value++;
       notifyListeners();
     }
   }
 
-  void setSearchModelVersion(String version) {
-    repository.ensureIndexVersion(version);
-    changed();
-  }
+  Future<void> setSearchModelVersion(String version) => _operation(() async {
+    await repository.ensureIndexVersion(version);
+    changed(content: false);
+  });
 
   bool captureActive = false;
   int recoveredCount = 0;
   final List<CaptureDraft> recoveryDrafts = [];
   final Set<String> _transcribing = {};
   bool _closed = false;
-  CaptureStore get captures => CaptureStore(home);
-  String audioPath(Record r) => captures.audio(r.audio!);
-  Future<CaptureDraft> beginCapture({
-    String? parentId,
-    bool query = false,
-  }) async {
-    if (parentId != null && get(parentId) == null) {
-      throw const NotebookException('原记录已删除。');
+  bool get isClosed => _closed;
+  int _mediaLeases = 0;
+  Future<void>? _mediaMutation;
+  final Map<String, Future<void>> _captureOperations = {};
+  late final _search = RecordSearch(repository, isClosed: () => _closed);
+
+  // Save and discard share a single seam. Checking SQLite before asynchronous
+  // file I/O alone cannot protect a recording from a concurrent discard.
+  Future<T> _withCapture<T>(String id, Future<T> Function() action) =>
+      _operation(() async {
+        final previous = _captureOperations[id];
+        final released = Completer<void>();
+        _captureOperations[id] = released.future;
+        try {
+          await previous;
+          if (_closed) throw const NotebookException('本地资料库已关闭。');
+          return await action();
+        } finally {
+          released.complete();
+          if (identical(_captureOperations[id], released.future)) {
+            _captureOperations.remove(id);
+          }
+        }
+      });
+
+  /// Keeps immutable media referenced by an archive snapshot alive. Edits and
+  /// new captures remain available; each archive owns its snapshot of metadata.
+  Future<T> withMediaLease<T>(Future<T> Function() action) async {
+    if (_closed) {
+      throw const NotebookException('本地资料库已关闭。');
     }
-    final now = clock();
-    final id = const Uuid().v4();
-    final draft = CaptureDraft(
-      id: id,
-      path: p.join(home.path, query ? 'queries' : 'drafts', '$id.wav'),
-      createdAt: now.toUtc(),
-      timezone: now.timeZoneName,
-      offsetMinutes: now.timeZoneOffset.inMinutes,
-      parentId: parentId,
-      query: query,
-    );
-    await File(draft.path).parent.create(recursive: true);
-    await captures.persist(draft);
-    return draft;
+    _mediaLeases++;
+    try {
+      await _mediaMutation;
+      await _mediaCleanup;
+      return await action();
+    } finally {
+      _mediaLeases--;
+      if (_mediaLeases == 0 && _mediaIdle != null && !_mediaIdle!.isCompleted) {
+        _mediaIdle!.complete();
+      }
+    }
   }
 
+  CaptureStore get captures => CaptureStore(home);
+  String audioPath(Record r) => captures.audio(r.audio!);
+  Future<CaptureDraft> beginCapture({String? parentId, bool query = false}) =>
+      _operation(() async {
+        if (parentId != null && await get(parentId) == null) {
+          throw const NotebookException('原记录已删除。');
+        }
+        final now = clock();
+        final id = const Uuid().v4();
+        final draft = CaptureDraft(
+          id: id,
+          path: p.join(home.path, query ? 'queries' : 'drafts', '$id.wav'),
+          createdAt: now.toUtc(),
+          timezone: now.timeZoneName,
+          offsetMinutes: now.timeZoneOffset.inMinutes,
+          parentId: parentId,
+          query: query,
+        );
+        await File(draft.path).parent.create(recursive: true);
+        await captures.persist(draft);
+        return draft;
+      });
+
   Future<Record> finishCapture(
+    CaptureDraft draft, {
+    bool recovering = false,
+    bool standalone = false,
+  }) => _withCapture(
+    draft.id,
+    () => _finishCapture(draft, recovering: recovering, standalone: standalone),
+  );
+
+  Future<Record> acceptNativeCapture(
+    FinalizedCapture clip, {
+    bool standalone = false,
+  }) {
+    final draft = captures.nativeDraft(clip);
+    return _withCapture(
+      draft.id,
+      () => withMediaLease(() async {
+        if (await get(draft.id) == null) await captures.persistNative(clip);
+        return _finishCapture(draft, standalone: standalone);
+      }),
+    );
+  }
+
+  Future<Record> _finishCapture(
     CaptureDraft draft, {
     bool recovering = false,
     bool standalone = false,
@@ -140,13 +251,49 @@ class Notebook extends ChangeNotifier {
     if (draft.query) {
       throw const NotebookException('查询不能保存为记录。');
     }
-    final existing = get(draft.id);
+    final existing = await get(draft.id);
     if (existing != null) {
+      if (draft.nativePcmBytes != null) {
+        if (existing.audio != '${draft.id}.wav' ||
+            existing.createdAt != draft.createdAt ||
+            existing.timezone != draft.timezone ||
+            existing.offsetMinutes != draft.offsetMinutes ||
+            existing.parentId != draft.parentId &&
+                !(existing.parentId == null && draft.parentId != null) ||
+            existing.durationMs != draft.nativePcmBytes! * 1000 ~/ 32000) {
+          throw const NotebookException('录音来源与已有记录不一致，原文件保留。');
+        }
+        final destination = File(audioPath(existing));
+        await _validateNativeWave(destination, draft.nativePcmBytes!);
+        final source = File(draft.path);
+        if (await source.exists()) {
+          await _validateNativeWave(source, draft.nativePcmBytes!);
+          if ((await sha256.bind(source.openRead()).first) !=
+              (await sha256.bind(destination.openRead()).first)) {
+            throw const NotebookException('录音与已有音频不一致，原文件保留。');
+          }
+        }
+      }
       return existing;
     }
     final dest = captures.audio('${draft.id}.wav');
     final src = await File(draft.path).exists() ? File(draft.path) : File(dest);
-    final duration = await validateWave(src, repair: recovering);
+    if (draft.nativePcmBytes != null) {
+      final destination = File(dest);
+      if (src.path != dest && await destination.exists()) {
+        throw const NotebookException('目标音频已存在，原文件保留，请核对恢复资料。');
+      }
+      if (!standalone &&
+          draft.parentId != null &&
+          await get(draft.parentId!) == null) {
+        throw const NotebookException('原记录已删除，请确认是否保存为独立记录。');
+      }
+      await _validateNativeWave(src, draft.nativePcmBytes!);
+    }
+    final duration = await validateWave(
+      src,
+      repair: recovering && draft.nativePcmBytes == null,
+    );
     if (src.path != dest) {
       await src.rename(dest);
     }
@@ -161,7 +308,7 @@ class Notebook extends ChangeNotifier {
       durationMs: duration,
       transcription: 'pending',
     );
-    repository.insert(r);
+    await repository.insert(r);
     final journal = captures.marker(draft.id);
     // The SQLite commit is the save boundary. A cleanup failure must not turn
     // a committed recording into an apparent draft that can be discarded.
@@ -174,32 +321,59 @@ class Notebook extends ChangeNotifier {
     }
     recoveryDrafts.removeWhere((d) => d.id == draft.id);
     if (!_closed) {
-      notifyListeners();
+      changed();
     }
     return r;
   }
 
-  Future<void> cancelCapture(CaptureDraft draft) async {
-    if (!draft.query && get(draft.id) != null) {
-      throw const NotebookException('录音已经保存。若要删除，请从记录详情操作。');
+  Future<void> _validateNativeWave(File file, int bytes) async {
+    if (bytes <= 0 ||
+        bytes > 3840000 ||
+        bytes.isOdd ||
+        await FileSystemEntity.type(file.path, followLinks: false) !=
+            FileSystemEntityType.file ||
+        !p.isWithin(home.path, file.path) ||
+        await file.resolveSymbolicLinks() !=
+            p.join(
+              await home.resolveSymbolicLinks(),
+              p.relative(file.path, from: home.path),
+            ) ||
+        await file.length() != bytes + 44) {
+      throw const NotebookException('原生录音文件不完整或路径无效，原文件保留。');
     }
-    await captures.discard(draft);
-    recoveryDrafts.removeWhere((d) => d.id == draft.id);
-    if (!_closed) {
-      notifyListeners();
-    }
+    await validateWave(file);
   }
+
+  Future<void> cancelCapture(CaptureDraft draft) =>
+      _withCapture(draft.id, () async {
+        if (!draft.query && await get(draft.id) != null) {
+          throw const NotebookException('录音已经保存。若要删除，请从记录详情操作。');
+        }
+        await captures.discard(draft);
+        recoveryDrafts.removeWhere((d) => d.id == draft.id);
+        if (!_closed) {
+          changed();
+        }
+      });
 
   Future<void> _recover() async {
     for (final name in ['imports', 'exports']) {
       final temporary = Directory(p.join(home.path, name));
       if (await temporary.exists()) {
-        await temporary.delete(recursive: true);
+        try {
+          await temporary.delete(recursive: true);
+        } on FileSystemException {
+          recoveryWarnings++;
+        }
       }
     }
     final queries = Directory(p.join(home.path, 'queries'));
     if (await queries.exists()) {
-      await queries.delete(recursive: true);
+      try {
+        await queries.delete(recursive: true);
+      } on FileSystemException {
+        recoveryWarnings++;
+      }
     }
     await for (final file in Directory(p.join(home.path, 'drafts')).list()) {
       if (file is! File || !file.path.endsWith('.json')) {
@@ -207,9 +381,14 @@ class Notebook extends ChangeNotifier {
       }
       try {
         final j = jsonDecode(await file.readAsString()) as Map<String, dynamic>;
+        if (j.containsKey('nativeCaptureVersion') &&
+            j['nativeCaptureVersion'] != 1) {
+          recoveryWarnings++;
+          continue;
+        }
         if (j['discarded'] == true) {
           final id = p.basenameWithoutExtension(file.path);
-          if (get(id) != null) {
+          if (await get(id) != null) {
             await file.delete();
             continue;
           }
@@ -225,18 +404,25 @@ class Notebook extends ChangeNotifier {
           continue;
         }
         final id = j['id'] as String;
+        final native = j['nativeCaptureVersion'] == 1;
+        if (native) validateCaptureId(id);
         if (!RegExp(r'^[a-f0-9-]{36}$').hasMatch(id)) {
           continue;
         }
         final draft = CaptureDraft(
           id: id,
-          path: p.join(home.path, 'drafts', '$id.wav'),
+          path: p.join(
+            home.path,
+            native ? 'native-captures' : 'drafts',
+            '$id.wav',
+          ),
           createdAt: DateTime.parse(j['createdAt'] as String),
           timezone: j['timezone'] as String,
           offsetMinutes: j['offsetMinutes'] as int,
           parentId: j['parentId'] as String?,
+          nativePcmBytes: native ? j['pcmBytes'] as int : null,
         );
-        if (get(id) != null) {
+        if (!native && await get(id) != null) {
           await file.delete();
           continue;
         }
@@ -251,202 +437,264 @@ class Notebook extends ChangeNotifier {
         recoveryWarnings++;
       }
     }
-    // Files without records or journals can result from interrupted deletion.
-    final referenced = records.map((r) => r.audio).whereType<String>().toSet();
+    if (!await repository.completeReferencedMediaDeletions()) {
+      recoveryWarnings++;
+    }
+    await _drainMediaDeletions();
+    final pendingDeletion = (await repository.pendingMediaDeletions()).toSet();
+    // An unreferenced file is not proof that its original contents are useless.
+    // Known deletion intent is handled separately; retain unknown originals.
+    final referenced = (await repository.audioReferences()).toSet();
     await for (final file in Directory(p.join(home.path, 'audio')).list()) {
       if (file is File &&
           !referenced.contains(p.basename(file.path)) &&
+          !pendingDeletion.contains(p.basename(file.path)) &&
           !await captures
               .marker(p.basenameWithoutExtension(file.path))
               .exists()) {
-        await file.delete();
+        try {
+          final quarantine = await Directory(
+            p.join(home.path, 'quarantine', const Uuid().v4()),
+          ).create(recursive: true);
+          await file.rename(p.join(quarantine.path, p.basename(file.path)));
+        } on FileSystemException {
+          // If isolation fails, leave the original file in place for recovery.
+        }
+        recoveryWarnings++;
       }
     }
   }
 
   int recoveryWarnings = 0;
-  Future<bool> transcribe(String id, Transcriber engine) async {
-    final r = get(id);
-    if (r == null || r.audio == null || !_transcribing.add(id)) {
-      return false;
-    }
-    repository.transcriptionState(id, 'running');
-    notifyListeners();
-    try {
-      final text = (await engine.transcribe(audioPath(r))).trim();
-      if (_closed) {
-        return false;
+  Future<void>? _mediaCleanup;
+
+  Future<void> _drainMediaDeletions() => _mediaCleanup ??= _cleanDeletedMedia()
+      .whenComplete(() => _mediaCleanup = null);
+
+  Future<void> _cleanDeletedMedia() async {
+    final blocked = <String>{};
+    while (!_closed) {
+      final pending = (await repository.pendingMediaDeletions())
+          .where((name) => !blocked.contains(name))
+          .toList();
+      if (pending.isEmpty) return;
+      for (final name in pending) {
+        if (_closed) return;
+        if (p.basename(name) != name ||
+            name == '.' ||
+            name == '..' ||
+            name.contains('\\') ||
+            p.isAbsolute(name)) {
+          blocked.add(name);
+          recoveryWarnings++;
+          continue;
+        }
+        try {
+          final path = p.join(home.path, 'audio', name);
+          final type = await FileSystemEntity.type(path, followLinks: false);
+          if (type == FileSystemEntityType.directory) {
+            throw const FileSystemException('Audio path is occupied');
+          }
+          if (type != FileSystemEntityType.notFound) await File(path).delete();
+          if (!_closed) await repository.completeMediaDeletion(name);
+        } on FileSystemException {
+          blocked.add(name);
+          recoveryWarnings++;
+        } on NotebookException {
+          // The record deletion already committed. Leave its durable intent
+          // for a later retry instead of reporting the user operation failed.
+          blocked.add(name);
+          recoveryWarnings++;
+        }
       }
-      if (text.isEmpty) {
-        throw const NotebookException('未识别到语音，音频已保留，可重试或编辑正文。');
-      }
-      final accepted = repository.transcript(id, r.revision, text);
-      if (!accepted) {
-        repository.transcriptionState(id, 'stale');
-      }
-      notifyListeners();
-      return accepted;
-    } catch (_) {
-      if (!_closed) {
-        repository.transcriptionState(id, 'failed');
-        notifyListeners();
-      }
-      rethrow;
-    } finally {
-      _transcribing.remove(id);
     }
   }
 
-  Future<String> transcribeQuery(CaptureDraft draft, Transcriber engine) async {
-    if (!draft.query) {
-      throw const NotebookException('不是语音查询。');
-    }
-    try {
-      await validateWave(File(draft.path));
-      return await engine.transcribe(draft.path);
-    } finally {
-      await captures.discard(draft);
-    }
-  }
+  Future<bool> transcribe(String id, Transcriber engine) =>
+      _operation(() async {
+        final r = await get(id);
+        if (r == null || r.audio == null || !_transcribing.add(id)) {
+          return false;
+        }
+        await repository.transcriptionState(id, 'running');
+        changed();
+        try {
+          if (_closed) return false;
+          final result = await _untilClosed(engine.transcribe(audioPath(r)));
+          final text = result?.trim() ?? '';
+          if (_closed) {
+            return false;
+          }
+          if (text.isEmpty) {
+            throw const NotebookException('未识别到语音，音频已保留，可重试或编辑正文。');
+          }
+          if (text.length > 100000) {
+            throw const NotebookException('转写超过 100,000 字，未写入正文，音频已保留，可重试。');
+          }
+          final accepted = await repository.transcript(id, r.revision, text);
+          if (!accepted) {
+            await repository.transcriptionState(id, 'stale');
+          }
+          changed();
+          return accepted;
+        } catch (_) {
+          if (!_closed) {
+            await repository.transcriptionState(id, 'failed');
+            changed();
+          }
+          rethrow;
+        } finally {
+          _transcribing.remove(id);
+        }
+      });
 
-  static String normalize(String text) => String.fromCharCodes(
-    text.runes.map(
-      (c) => c == 0x3000 ? 32 : (c >= 0xff01 && c <= 0xff5e ? c - 0xfee0 : c),
-    ),
-  ).toLowerCase().trim();
+  Future<String> transcribeQuery(CaptureDraft draft, Transcriber engine) =>
+      _operation(() async {
+        if (!draft.query) {
+          throw const NotebookException('不是语音查询。');
+        }
+        try {
+          await validateWave(File(draft.path));
+          if (_closed) throw const NotebookException('本地资料库已关闭。');
+          final result = await _untilClosed(engine.transcribe(draft.path));
+          if (result == null) throw const NotebookException('查询已结束。');
+          return result;
+        } finally {
+          await captures.discard(draft);
+        }
+      });
+
+  static String normalize(String text) => RecordSearch.normalize(text);
   Future<SearchResults> search(
     String query, {
     DateTime? from,
     DateTime? to,
     Embedder? embedder,
-  }) async {
-    final q = normalize(query);
-    if (q.isEmpty) {
-      return SearchResults([]);
-    }
-    List<double>? queryVector;
-    String? fallback;
-    bool semanticUsed = false;
-    if (embedder != null) {
-      try {
-        queryVector = await embedder.embed(query, query: true);
-      } catch (_) {
-        fallback = '语义查找暂不可用，已使用关键词查找。';
-      }
-    }
-    if (_closed) {
-      return SearchResults([]);
-    }
-    final hits = <SearchHit>[];
-    for (final r in records) {
-      final date = DateTime(
-        r.recordedLocal.year,
-        r.recordedLocal.month,
-        r.recordedLocal.day,
-      );
-      if (from != null &&
-          date.isBefore(DateTime(from.year, from.month, from.day))) {
-        continue;
-      }
-      if (to != null && date.isAfter(DateTime(to.year, to.month, to.day))) {
-        continue;
-      }
-      final text = normalize(r.body);
-      final exact = text.contains(q);
-      var score = exact ? 2.0 : 0.0;
-      if (queryVector != null &&
-          r.vectorRevision == r.revision &&
-          r.vector?.length == queryVector.length) {
-        semanticUsed = true;
-        final v = r.vector!;
-        double dot = 0;
-        for (var i = 0; i < v.length; i++) {
-          dot += v[i] * queryVector[i];
-        }
-        // Initial calibration from the native synthetic smoke cases. This is a
-        // retrieval cutoff, not a factual confidence score; human evaluation is pending.
-        if (dot >= 0.60) {
-          score += dot;
-        }
-      }
-      if (score <= 0) {
-        continue;
-      }
-      final at = math.max(0, text.indexOf(q) - 30);
-      final end = math.min(r.body.length, at + 150);
-      hits.add(
-        SearchHit(r, r.body.substring(math.min(at, r.body.length), end), score),
-      );
-    }
-    hits.sort(
-      (a, b) => a.score != b.score
-          ? b.score.compareTo(a.score)
-          : b.record.createdAt.compareTo(a.record.createdAt),
-    );
-    return SearchResults(
-      hits,
-      semanticUsed: semanticUsed,
-      fallbackReason:
-          fallback ??
-          (embedder != null && !semanticUsed ? '语义索引尚未就绪，显示关键词结果。' : null),
-    );
-  }
+  }) => _search.search(query, from: from, to: to, embedder: embedder);
 
-  Future<bool> index(String id, Embedder embedder) async {
-    final r = get(id);
-    if (r == null || r.body.isEmpty) {
+  Future<bool> index(String id, Embedder embedder) => _operation(() async {
+    final modelVersion = await repository.indexModelVersion;
+    final r = await get(id);
+    if (_closed || r == null || r.body.isEmpty) {
       return false;
     }
-    final vector = await embedder.embed(r.body, query: false);
+    final result = await _untilClosed(embedder.embed(r.body, query: false));
+    if (result == null) return false;
+    final vector = unitVector(result);
     if (_closed) {
       return false;
     }
-    if (vector.isEmpty || vector.any((v) => !v.isFinite)) {
-      throw const NotebookException('语义模型返回无效向量。');
-    }
-    final ok = repository.embedding(id, r.revision, vector);
-    notifyListeners();
+    final ok = await repository.embedding(
+      id,
+      r.revision,
+      vector,
+      modelVersion: modelVersion,
+    );
+    changed(content: false);
     return ok;
-  }
+  });
 
   final Set<String> _organizing = {};
-  OrganizationConsent prepareOrganization(String id) {
-    final r = get(id);
-    if (r == null || r.body.trim().isEmpty || r.body.length > 8000) {
-      throw const NotebookException('请选择 1–8,000 字的单条正文。');
+  Future<OrganizationConsent> prepareOrganization(String id) =>
+      _operation(() async {
+        final r = await get(id);
+        if (r == null || r.body.trim().isEmpty || r.body.length > 8000) {
+          throw const NotebookException('请选择 1–8,000 字的单条正文。');
+        }
+        return OrganizationConsent(r.id, r.revision, r.body);
+      });
+
+  Future<bool> organize(OrganizationConsent consent, Organizer organizer) =>
+      _operation(() async {
+        // Capture the generation as the first accepted storage request, before
+        // asynchronous record reads can yield to a model replacement.
+        final model = await repository.organizationModelVersion;
+        final r = await get(consent.recordId);
+        if (r == null ||
+            r.revision != consent.revision ||
+            r.body != consent.text) {
+          throw const NotebookException('正文已改变，请重新核对发送内容。');
+        }
+        if (_closed) return false;
+        if (!_organizing.add(r.id)) {
+          throw const NotebookException('正在整理，请勿重复发送。');
+        }
+        try {
+          final result = await _untilClosed(organizer.organize(consent.text));
+          if (_closed || result == null) {
+            return false;
+          }
+          Map<String, dynamic> validated;
+          try {
+            validated = validateOrganization(result, consent.text);
+          } on FormatException {
+            throw const NotebookException('整理结果无效，原文已保留。');
+          }
+          final ok = await repository.derived(
+            r.id,
+            r.revision,
+            validated,
+            modelVersion: model,
+          );
+          changed(content: false);
+          return ok;
+        } finally {
+          _organizing.remove(r.id);
+        }
+      });
+
+  final _closingSignal = Completer<void>();
+  int _operations = 0;
+  Completer<void>? _idle, _mediaIdle;
+  Future<void>? _closeFuture;
+  bool _notifierDisposed = false;
+
+  Future<T> _operation<T>(Future<T> Function() action) async {
+    if (_closed) throw const NotebookException('本地资料库已关闭。');
+    _operations++;
+    try {
+      return await action();
+    } finally {
+      _operations--;
+      if (_operations == 0 && _idle != null && !_idle!.isCompleted) {
+        _idle!.complete();
+      }
     }
-    return OrganizationConsent(r.id, r.revision, r.body);
   }
 
-  Future<bool> organize(
-    OrganizationConsent consent,
-    Organizer organizer,
-  ) async {
-    final r = get(consent.recordId);
-    if (r == null || r.revision != consent.revision || r.body != consent.text) {
-      throw const NotebookException('正文已改变，请重新核对发送内容。');
+  Future<T?> _untilClosed<T>(Future<T> work) => Future.any<T?>([
+    work.then<T?>((value) => value),
+    _closingSignal.future.then<T?>((_) => null),
+  ]);
+
+  Future<void> close() {
+    if (_closeFuture != null) return _closeFuture!;
+    _closed = true;
+    _closingSignal.complete();
+    _closeFuture = _finishClose();
+    dispose();
+    return _closeFuture!;
+  }
+
+  Future<void> _finishClose() async {
+    if (_operations > 0) {
+      _idle = Completer<void>();
+      await _idle!.future;
     }
-    if (!_organizing.add(r.id)) {
-      throw const NotebookException('正在整理，请勿重复发送。');
+    if (_mediaLeases > 0) {
+      _mediaIdle = Completer<void>();
+      await _mediaIdle!.future;
     }
-    try {
-      final result = await organizer.organize(consent.text);
-      if (_closed) {
-        return false;
-      }
-      final ok = repository.derived(r.id, r.revision, result);
-      notifyListeners();
-      return ok;
-    } finally {
-      _organizing.remove(r.id);
-    }
+    await repository.close();
   }
 
   @override
   void dispose() {
-    _closed = true;
-    repository.close();
+    if (_notifierDisposed) return;
+    _notifierDisposed = true;
+    contentChanges.dispose();
     super.dispose();
+    unawaited(close());
   }
 }
 

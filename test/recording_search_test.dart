@@ -6,6 +6,8 @@ import 'package:nianxia/app/notebook.dart';
 import 'package:nianxia/domain/ports.dart';
 import 'package:nianxia/data/capture_store.dart';
 
+import 'support/storage_probe.dart';
+
 Future<void> writeWave(String path, {bool interrupted = false}) async {
   final b = ByteData(32044);
   void tag(int at, String s) {
@@ -60,7 +62,7 @@ void main() {
     book = await Notebook.open(home);
   });
   tearDown(() async {
-    book.dispose();
+    await book.close();
     await home.delete(recursive: true);
   });
   test('录音先验证落盘，转写不覆盖并发编辑，删除后不复活', () async {
@@ -77,7 +79,7 @@ void main() {
     );
     await book.edit(r.id, '用户修订', expectedRevision: r.revision);
     expect(await task, isFalse);
-    expect(book.get(r.id)!.body, '用户修订');
+    expect((await book.get(r.id))!.body, '用户修订');
     final retry = book.transcribe(
       r.id,
       TextTranscriber(
@@ -86,17 +88,20 @@ void main() {
     );
     await book.delete(r.id);
     expect(await retry, isFalse);
-    expect(book.records, isEmpty);
+    expect((await book.records), isEmpty);
     expect(await File(book.audioPath(r)).exists(), isFalse);
   });
   test('重启恢复中断的有效 WAV，取消及查询不会产生记录', () async {
     final draft = await book.beginCapture();
     await writeWave(draft.path, interrupted: true);
-    book.dispose();
+    await book.close();
     book = await Notebook.open(home);
-    expect(book.records.single.durationMs, 1000);
+    expect((await book.records).single.durationMs, 1000);
     expect(book.recoveredCount, 1);
-    expect(await validateWave(File(book.audioPath(book.records.single))), 1000);
+    expect(
+      await validateWave(File(book.audioPath((await book.records).single))),
+      1000,
+    );
     final query = await book.beginCapture(query: true);
     await writeWave(query.path);
     expect(
@@ -107,7 +112,7 @@ void main() {
     final cancel = await book.beginCapture();
     await writeWave(cancel.path);
     await book.cancelCapture(cancel);
-    expect(book.records.length, 1);
+    expect((await book.records).length, 1);
   });
   test('追加可查，日期可筛选，编辑删除与收藏持久一致', () async {
     final parent = await book.saveText('不要自动上传');
@@ -119,10 +124,10 @@ void main() {
     expect(await book.search('中文', from: DateTime(2100)), isEmpty);
     await book.edit(child.id, '改用本地数据库', expectedRevision: child.revision);
     expect(await book.search('sqlite'), isEmpty);
-    expect(book.get(parent.id)!.favorite, isTrue);
+    expect((await book.get(parent.id))!.favorite, isTrue);
     await book.delete(parent.id);
     expect(await book.search('数据库'), isEmpty);
-    expect(book.records, isEmpty);
+    expect((await book.records), isEmpty);
   });
   test('损坏录音不显示成功，空白正文与过期修订被拒绝', () async {
     final draft = await book.beginCapture();
@@ -131,7 +136,7 @@ void main() {
       book.finishCapture(draft),
       throwsA(isA<NotebookException>()),
     );
-    expect(book.records, isEmpty);
+    expect((await book.records), isEmpty);
     await book.cancelCapture(draft);
     await expectLater(book.saveText('  '), throwsA(isA<NotebookException>()));
     final r = await book.saveText('原文');
@@ -140,7 +145,7 @@ void main() {
       book.edit(r.id, '旧页面', expectedRevision: r.revision),
       throwsA(isA<NotebookException>()),
     );
-    expect(book.get(r.id)!.body, '修改');
+    expect((await book.get(r.id))!.body, '修改');
   });
   test('平台 WAV 的额外 chunk 不会误判损坏，恢复后可再次校验', () async {
     final draft = await book.beginCapture();
@@ -166,7 +171,7 @@ void main() {
       book.cancelCapture(draft),
       throwsA(isA<NotebookException>()),
     );
-    expect(book.get(saved.id), isNotNull);
+    expect((await book.get(saved.id)), isNotNull);
     expect(await File(book.audioPath(saved)).exists(), isTrue);
   });
 
@@ -178,21 +183,46 @@ void main() {
     expect(result.fallbackReason, contains('语义'));
   });
   test('模型或索引算法版本改变后旧向量被重建，同版重启保留', () async {
-    book.setSearchModelVersion('bge-v1');
+    await book.setSearchModelVersion('bge-v1');
     final r = await book.saveText('原始正文');
     await book.index(r.id, UnitEmbedder());
     expect(
       (await book.search('另一种说法', embedder: UnitEmbedder())).single.record.id,
       r.id,
     );
-    book.dispose();
+    await book.close();
     book = await Notebook.open(home);
-    book.setSearchModelVersion('bge-v1');
+    await book.setSearchModelVersion('bge-v1');
     expect(
       (await book.search('另一种说法', embedder: UnitEmbedder())).single.record.id,
       r.id,
     );
-    book.setSearchModelVersion('bge-v2');
+    await book.setSearchModelVersion('bge-v2');
     expect(await book.search('另一种说法', embedder: UnitEmbedder()), isEmpty);
+  });
+
+  test('缓存清理失败不把成功的原始编辑或转写误报成失败', () async {
+    final draft = await book.beginCapture();
+    await writeWave(draft.path);
+    final r = await book.finishCapture(draft);
+    await book.edit(r.id, '原始正文', expectedRevision: r.revision);
+    await book.index(r.id, UnitEmbedder());
+    StorageProbe(book).execute(
+      "CREATE TRIGGER fail_cache_delete BEFORE DELETE ON record_embeddings BEGIN SELECT RAISE(ABORT,'cache failure'); END",
+    );
+    await book.edit(
+      r.id,
+      '用户修订',
+      expectedRevision: (await book.get(r.id))!.revision,
+    );
+    expect((await book.get(r.id))!.body, '用户修订');
+    expect(await book.search('另一种说法', embedder: UnitEmbedder()), isEmpty);
+    expect(
+      await book.transcribe(r.id, TextTranscriber(Future.value('原始识别'))),
+      isTrue,
+    );
+    expect((await book.get(r.id))!.body, '用户修订');
+    expect((await book.get(r.id))!.transcript, '原始识别');
+    expect((await book.get(r.id))!.transcription, 'done');
   });
 }

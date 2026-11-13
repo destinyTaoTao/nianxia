@@ -1,0 +1,6 @@
+{
+  "lib/data/compact_graph_store.dart": "7cf33f81f11849658435fcc112656e23b138fd37f79b331aff086ab52056bb91",
+  "lib/data/search_index.dart": "854e8e5575cc60bf4ed69064d3322e9f306e123eec86a30bfa22dde2e26f47f8",
+  "lib/data/hnsw.dart": "a9dcbdfd1bbbdde63e2093a0d7b94917f659c7218999eaf7a9d82a736b18e51f",
+  "tool/benchmark_search.dart": "712a1f156296160f54e15d7bf3ec5739f0083c2b99601e8dd3d6bbf4c1e08adf"
+}

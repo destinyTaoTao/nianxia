@@ -1,0 +1,26 @@
+{
+  "host": {
+    "flutterTests": 213,
+    "pythonTests": 15,
+    "analyzer": "No issues found!"
+  },
+  "android": {
+    "api": 36,
+    "sqlite": "3.54.1",
+    "searchScenarios": 2,
+    "storageScenarios": 4,
+    "package": "app.nianxia.nianxia.test"
+  },
+  "release": {
+    "package": "app.nianxia.nianxia",
+    "architectures": [
+      "arm64-v8a"
+    ],
+    "bytes": 51187617,
+    "sha256": "cdfd102d3672e655c710269ff1a9be57d741c3a957a07780e776160f6966de3e",
+    "installed": false
+  },
+  "dependenciesAndFrozenFixturesUnchanged": true,
+  "gitCommitOrPush": false,
+  "independentReview": "no Critical/Important; one deferred minor bit-pattern coverage gap"
+}

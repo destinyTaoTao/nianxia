@@ -55,13 +55,13 @@ void main() {
     book = await Notebook.open(home);
   });
   tearDown(() async {
-    book.dispose();
+    await book.close();
     await home.delete(recursive: true);
   });
   test('逐次确认只发送单条正文，结果独立绑定修订，编辑后过期', () async {
     final r = await book.saveText('暂时不做同步');
     await book.saveText('其他私密笔记不应被发送');
-    final consent = book.prepareOrganization(r.id);
+    final consent = (await book.prepareOrganization(r.id));
     final wire = CapturingTransport(result());
     expect(
       await book.organize(
@@ -78,9 +78,9 @@ void main() {
       wire.requests.single['url'],
       'https://api.deepseek.com/chat/completions',
     );
-    expect(book.get(r.id)!.body, '暂时不做同步');
+    expect((await book.get(r.id))!.body, '暂时不做同步');
     await book.edit(r.id, '暂时不做同步，先观察', expectedRevision: r.revision);
-    expect(book.get(r.id)!.organizationStale, isTrue);
+    expect((await book.get(r.id))!.organizationStale, isTrue);
     await expectLater(
       book.organize(
         consent,
@@ -92,7 +92,7 @@ void main() {
   });
   test('并发删除和重复点击不会复活记录或重放付费请求', () async {
     final r = await book.saveText('暂时不做同步');
-    final consent = book.prepareOrganization(r.id);
+    final consent = (await book.prepareOrganization(r.id));
     final gate = Completer<void>();
     final wire = CapturingTransport(result(), wait: gate.future);
     final engine = DeepSeekOrganizer(key: 'test-secret', transport: wire);
@@ -104,7 +104,7 @@ void main() {
     await book.delete(r.id);
     gate.complete();
     expect(await work, isFalse);
-    expect(book.records, isEmpty);
+    expect((await book.records), isEmpty);
     expect(wire.requests.length, 1);
   });
   test('错误、重定向、空白、截断和无来源结果均失败且不自动重试', () async {
@@ -121,12 +121,12 @@ void main() {
       final r = await book.saveText('暂时不做同步');
       await expectLater(
         book.organize(
-          book.prepareOrganization(r.id),
+          (await book.prepareOrganization(r.id)),
           DeepSeekOrganizer(key: 'test-secret', transport: wire),
         ),
         throwsA(isA<NotebookException>()),
       );
-      expect(book.get(r.id)!.organization, isNull);
+      expect((await book.get(r.id))!.organization, isNull);
       expect(wire.requests.length, 1);
     }
   });

@@ -1,0 +1,8 @@
+{
+  "files": 8,
+  "beforeManifestSha256": "a6eb261f085784b38ee0c279c7f6008e5e03a5585eb76f955542f2661e52ffe0",
+  "afterManifestSha256": "a6eb261f085784b38ee0c279c7f6008e5e03a5585eb76f955542f2661e52ffe0",
+  "allFileHashesSame": true,
+  "scope": "official records.sqlite,WAL,six WAV; excludes volatile SHM and model directory",
+  "officialReleaseInstalled": false
+}

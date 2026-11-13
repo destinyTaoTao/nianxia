@@ -1,0 +1,17 @@
+[
+  {
+    "mutant": "signed-zero",
+    "expectedFailure": true,
+    "originalSha256": "50c2c2462b46bc398408582b10a780983f09a3c07e7c1697c9adf4b513f0dcdd"
+  },
+  {
+    "mutant": "float32-flush",
+    "expectedFailure": true,
+    "originalSha256": "1b6af63495b131b68ae6c81bd0fe464edb3ecfa0ea57146028784bb971d97ba9"
+  },
+  {
+    "mutant": "normalize-precision",
+    "expectedFailure": true,
+    "originalSha256": "50c2c2462b46bc398408582b10a780983f09a3c07e7c1697c9adf4b513f0dcdd"
+  }
+]

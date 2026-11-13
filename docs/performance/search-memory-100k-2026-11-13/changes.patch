@@ -1,0 +1,230 @@
+--- a/lib/domain/semantic_vector.dart
++++ b/lib/domain/semantic_vector.dart
+@@ -1,18 +1,35 @@
+ import 'dart:math' as math;
++import 'dart:typed_data';
+ 
+ import 'record.dart';
+ 
+ /// The embedding seam accepts finite, nonzero vectors; callers need not know
+ /// the adapter's output magnitude. Scale first to avoid overflow/underflow.
+ List<double> unitVector(List<double> vector) {
+-  if (vector.isEmpty ||
+-      vector.length > 4096 ||
+-      vector.any((v) => !v.isFinite)) {
++  if (vector.isEmpty || vector.length > 4096) {
+     throw const NotebookException('语义模型返回无效向量。');
+   }
+-  final scale = vector.fold<double>(0, (a, v) => math.max(a, v.abs()));
++  var scale = 0.0;
++  for (var i = 0; i < vector.length; i++) {
++    final value = vector[i];
++    if (!value.isFinite) {
++      throw const NotebookException('语义模型返回无效向量。');
++    }
++    scale = math.max(scale, value.abs());
++  }
+   if (scale == 0) throw const NotebookException('语义模型返回无效向量。');
+-  final scaled = vector.map((v) => v / scale).toList();
+-  final norm = math.sqrt(scaled.fold<double>(0, (sum, v) => sum + v * v));
+-  return scaled.map((v) => v / norm).toList();
++  // Keep double precision and summation order, without boxed values or a
++  // second normalized list. The caller's vector remains untouched.
++  final result = Float64List(vector.length);
++  var squared = 0.0;
++  for (var i = 0; i < result.length; i++) {
++    final value = vector[i] / scale;
++    result[i] = value;
++    squared += value * value;
++  }
++  final norm = math.sqrt(squared);
++  for (var i = 0; i < result.length; i++) {
++    result[i] /= norm;
++  }
++  return result;
+ }
+--- a/lib/data/derived_store.dart
++++ b/lib/data/derived_store.dart
+@@ -75,11 +75,14 @@
+       return null;
+     }
+     final bytes = ByteData.sublistView(value);
+-    final vector = <double>[];
++    // Stored values are already Float32. Keep them in one owned numeric
++    // buffer: a generic double list boxes every value, while a view would
++    // alias the caller's BLOB and change its mutation/lifetime contract.
++    final vector = Float32List(dimension);
+     for (var i = 0; i < dimension; i++) {
+       final number = bytes.getFloat32(i * 4, Endian.little);
+       if (!number.isFinite) return null;
+-      vector.add(number);
++      vector[i] = number;
+     }
+     return vector;
+   }
+--- a/lib/data/search_index.dart
++++ b/lib/data/search_index.dart
+@@ -2,6 +2,7 @@
+ import 'dart:convert';
+ import 'dart:io';
+ import 'dart:math' as math;
++import 'dart:typed_data';
+ 
+ import 'package:crypto/crypto.dart';
+ import 'package:path/path.dart' as p;
+@@ -159,6 +160,9 @@
+           }
+           return open();
+         }
++        // Bound native page memory as well as the Dart graph working set.
++        // Negative values are KiB, independent of this SQLite build's defaults.
++        db.execute('PRAGMA cache_size=-2048');
+         final check = db.select('PRAGMA quick_check');
+         if (check.length != 1 || check.first.values.first != 'ok') {
+           throw const _IndexCorruption('Damaged search index');
+@@ -383,10 +387,14 @@
+     final fields = Map<String, Object?>.from(row)..remove('payload');
+     // Include payload bytes to detect external UPDATEs that retain revision or
+     // rowid. Do not decode vectors until the source fingerprint has changed.
+-    final signature = sha256.convert([
+-      ...utf8.encode(jsonEncode(fields)),
+-      if (payload is List<int>) ...payload else ...utf8.encode('$payload'),
+-    ]).toString();
++    final header = utf8.encode(jsonEncode(fields));
++    final tail = payload is List<int> ? payload : utf8.encode('$payload');
++    // Preserve the exact fingerprint bytes without expanding each byte into
++    // a generic list slot during whole-library startup reconciliation.
++    final signatureBytes = Uint8List(header.length + tail.length)
++      ..setRange(0, header.length, header)
++      ..setRange(header.length, header.length + tail.length, tail);
++    final signature = sha256.convert(signatureBytes).toString();
+     final oldRows = _db!.select('SELECT * FROM docs WHERE id=?', [id]);
+     final old = oldRows.isEmpty ? null : oldRows.single;
+     if (old?['signature'] == signature) return;
+--- a/lib/data/record_repository.dart
++++ b/lib/data/record_repository.dart
+@@ -35,6 +35,9 @@
+     }
+     final db = sqlite3.open(path);
+     try {
++      // Connection-local KiB budget: system SQLite may default to 2000 pages
++      // (~8 MiB at 4 KiB/page). This does not change the source file format.
++      db.execute('PRAGMA cache_size=-2048');
+       SchemaMigrations.open(db, path, hook: hook);
+       // Rebuildable access paths; no original fields or schema version change.
+       db.execute(
+--- a/test/vector_allocation_test.dart
++++ b/test/vector_allocation_test.dart
+@@ -0,0 +1,112 @@
++import 'dart:math' as math;
++import 'dart:io';
++import 'dart:typed_data';
++
++import 'package:flutter_test/flutter_test.dart';
++import 'package:nianxia/data/derived_store.dart';
++import 'package:nianxia/data/record_repository.dart';
++import 'package:nianxia/domain/record.dart';
++import 'package:nianxia/domain/semantic_vector.dart';
++
++List<double> referenceUnit(List<double> v) {
++  final scale = v.fold<double>(0, (a, b) => math.max(a, b.abs()));
++  final scaled = v.map((x) => x / scale).toList();
++  final norm = math.sqrt(scaled.fold<double>(0, (a, b) => a + b * b));
++  return scaled.map((x) => x / norm).toList();
++}
++
++void main() {
++  test('source SQLite page cache has a portable two MiB connection budget', () {
++    final home = Directory.systemTemp.createTempSync('nianxia-cache-budget-');
++    final repo = RecordRepository(home);
++    try {
++      final size =
++          repo.db.select('PRAGMA cache_size').single.values.single as int;
++      final page =
++          repo.db.select('PRAGMA page_size').single.values.single as int;
++      final budget = size < 0 ? -size * 1024 : size * page;
++      expect(budget, lessThanOrEqualTo(2 * 1024 * 1024));
++    } finally {
++      repo.close();
++      home.deleteSync(recursive: true);
++    }
++  });
++  test(
++    'normalization keeps double precision in one bounded numeric buffer',
++    () {
++      final random = math.Random(17);
++      for (final magnitude in [1.0, 1e300, 1e-300]) {
++        final input = List.generate(
++          512,
++          (_) => (random.nextDouble() * 2 - 1) * magnitude,
++        );
++        final saved = [...input];
++        final result = unitVector(input);
++        expect(result, orderedEquals(referenceUnit(input)));
++        expect(input, orderedEquals(saved));
++        expect(
++          result,
++          isA<TypedData>(),
++          reason: 'Avoid boxed values and backing slot lists',
++        );
++        expect((result as TypedData).lengthInBytes, 512 * 8);
++        result[0] = 0;
++        expect(input, orderedEquals(saved));
++      }
++    },
++  );
++  test(
++    'decoded Float32 vectors have owned bounded payload and exact values',
++    () {
++      final encoded = DerivedCodec.encodeVector([0.123456789, -2.5, 1e-30])!;
++      for (final offset in [0, 1, 4]) {
++        final backing = Uint8List(encoded.length + offset + 7);
++        backing.setRange(offset, offset + encoded.length, encoded);
++        final slice = Uint8List.sublistView(
++          backing,
++          offset,
++          offset + encoded.length,
++        );
++        final result = DerivedCodec.vector(slice, 3)!;
++        final expected = List.generate(
++          3,
++          (i) => ByteData.sublistView(encoded).getFloat32(i * 4, Endian.little),
++        );
++        expect(result, orderedEquals(expected));
++        expect(
++          result,
++          isA<TypedData>(),
++          reason: 'Do not expand Float32 payload into boxed doubles',
++        );
++        expect((result as TypedData).lengthInBytes, encoded.length);
++        slice.fillRange(0, slice.length, 0);
++        expect(
++          result,
++          orderedEquals(expected),
++          reason: 'Do not retain caller-owned BLOB aliases',
++        );
++        result[0] = 9;
++        expect(slice, everyElement(0));
++      }
++    },
++  );
++  test('invalid and extreme vector contracts are unchanged', () {
++    for (final v in <List<double>>[
++      [],
++      [0, 0],
++      [double.nan],
++      [double.infinity],
++      List.filled(4097, 1),
++    ]) {
++      expect(() => unitVector(v), throwsA(isA<NotebookException>()));
++    }
++    expect(
++      unitVector([double.minPositive, -double.minPositive]),
++      orderedEquals(referenceUnit([double.minPositive, -double.minPositive])),
++    );
++    final invalid = ByteData(4)..setFloat32(0, double.infinity, Endian.little);
++    expect(DerivedCodec.vector(invalid.buffer.asUint8List(), 1), isNull);
++    expect(DerivedCodec.vector(Uint8List(3), 1), isNull);
++    expect(DerivedCodec.vector(Uint8List(4), 0), isNull);
++  });
++}

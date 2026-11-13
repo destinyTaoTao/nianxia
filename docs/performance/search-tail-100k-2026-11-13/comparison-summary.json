@@ -1,0 +1,58 @@
+{
+  "before": {
+    "measure": {
+      "p50Ms": 19.695,
+      "p95Ms": 21.798,
+      "maxMs": 22.612,
+      "meanUserCpuMs": 14.488233333333334,
+      "meanSysCpuMs": 6.085583333333333,
+      "first12P95Ms": 22.612,
+      "remaining48P95Ms": 21.798,
+      "processPeakMiB": 91.71875,
+      "fullyBuiltMs": 636001,
+      "recallAt10": 1.0,
+      "indexBytes": 494825472
+    },
+    "warm": {
+      "p50Ms": 19.365,
+      "p95Ms": 21.307,
+      "maxMs": 22.239,
+      "meanUserCpuMs": 14.133883333333333,
+      "meanSysCpuMs": 6.02565,
+      "first12P95Ms": 21.466,
+      "remaining48P95Ms": 21.307,
+      "processPeakMiB": 92.15625,
+      "fullyBuiltMs": null,
+      "recallAt10": 1.0,
+      "indexBytes": 494825472
+    }
+  },
+  "after": {
+    "measure": {
+      "p50Ms": 15.664,
+      "p95Ms": 17.32,
+      "maxMs": 18.269,
+      "meanUserCpuMs": 11.092883333333333,
+      "meanSysCpuMs": 5.269583333333333,
+      "first12P95Ms": 16.617,
+      "remaining48P95Ms": 17.676,
+      "processPeakMiB": 92.171875,
+      "fullyBuiltMs": 632391,
+      "recallAt10": 1.0,
+      "indexBytes": 494825472
+    },
+    "warm": {
+      "p50Ms": 15.489,
+      "p95Ms": 17.309,
+      "maxMs": 18.248,
+      "meanUserCpuMs": 10.857916666666666,
+      "meanSysCpuMs": 5.291300000000001,
+      "first12P95Ms": 17.309,
+      "remaining48P95Ms": 17.563,
+      "processPeakMiB": 93.5625,
+      "fullyBuiltMs": null,
+      "recallAt10": 1.0,
+      "indexBytes": 494825472
+    }
+  }
+}

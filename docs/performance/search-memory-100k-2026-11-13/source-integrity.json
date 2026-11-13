@@ -1,0 +1,9 @@
+{
+  "sha256": "add387b847714862a5244f63fc0610b6beefca8feb7341278aa8db87b0924fb3",
+  "bytes": 463712256,
+  "afterSha256": "add387b847714862a5244f63fc0610b6beefca8feb7341278aa8db87b0924fb3",
+  "same": true,
+  "preexistingFixtureSha256": "add387b847714862a5244f63fc0610b6beefca8feb7341278aa8db87b0924fb3",
+  "sameSourceBytesAcrossVersions": true,
+  "verifiedAfter": "cold,warm,wide and six first-query clones"
+}

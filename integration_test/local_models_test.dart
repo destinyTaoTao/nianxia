@@ -12,7 +12,10 @@ import 'package:nianxia/platform/local_models.dart';
 import 'package:nianxia/platform/capture_controller.dart';
 import 'package:just_audio/just_audio.dart';
 
+import 'support/test_sandbox.dart';
+
 void main() {
+  requireModelTestSandbox();
   IntegrationTestWidgetsFlutterBinding.ensureInitialized();
   testWidgets('同一个安装包中 CPU 语音识别与 BGE 向量推理可串行运行', (tester) async {
     await tester.runAsync(() async {
@@ -55,7 +58,7 @@ void main() {
           expect(found.first.record.id, record.id);
           expect(await book.search('月球上的火山如何喷发', embedder: models), isEmpty);
         } finally {
-          book.dispose();
+          await book.close();
           await home.delete(recursive: true);
         }
         // Only synthetic test metrics, never user note/audio content.
@@ -79,14 +82,14 @@ void main() {
         await Future<void>.delayed(const Duration(milliseconds: 900));
         await capture.finish();
         expect(capture.state, 'done');
-        expect(book.records.single.durationMs, greaterThan(0));
+        expect((await book.records).single.durationMs, greaterThan(0));
         expect(
-          await File(book.audioPath(book.records.single)).length(),
+          await File(book.audioPath((await book.records).single)).length(),
           greaterThan(44),
         );
         final player = AudioPlayer();
         try {
-          await player.setFilePath(book.audioPath(book.records.single));
+          await player.setFilePath(book.audioPath((await book.records).single));
           await player.play().timeout(const Duration(seconds: 8));
           expect(player.processingState, ProcessingState.completed);
         } finally {
@@ -94,7 +97,7 @@ void main() {
         }
       } finally {
         capture.dispose();
-        book.dispose();
+        await book.close();
         await home.delete(recursive: true);
       }
     });

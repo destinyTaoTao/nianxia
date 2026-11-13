@@ -9,11 +9,13 @@ import android.app.KeyguardManager
 import android.os.Build
 import android.os.PowerManager
 import android.os.Bundle
+import android.os.StatFs
 import android.provider.CalendarContract
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.android.FlutterActivityLaunchConfigs.BackgroundMode
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
+import app.nianxia.nianxia.capture.CaptureChannel
 
 class MainActivity : FlutterActivity() {
     private var pendingCalendar: MethodChannel.Result? = null
@@ -22,9 +24,11 @@ class MainActivity : FlutterActivity() {
     private var launchReady = false
     private var pendingLaunch: String? = null
     private var screenReceiverRegistered = false
+    private var captureChannel: CaptureChannel? = null
     private val screenOffReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             if (intent.action == Intent.ACTION_SCREEN_OFF) {
+                captureChannel?.hidden()
                 systemChannel?.invokeMethod("screenOff", null)
             }
         }
@@ -75,9 +79,18 @@ class MainActivity : FlutterActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        // Prototype remains restricted to the disposable test application.
+        if (applicationContext.packageName == "app.nianxia.nianxia.test") {
+            captureChannel = CaptureChannel(this, flutterEngine.dartExecutor.binaryMessenger)
+        }
         systemChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "app.nianxia/system")
         systemChannel!!.setMethodCallHandler { call, result ->
                 when (call.method) {
+                    "validationIdentity" -> result.success(mapOf(
+                        "applicationId" to applicationContext.packageName,
+                        "cacheRoot" to cacheDir.canonicalPath,
+                        "temporaryRoots" to listOf(cacheDir.canonicalPath, codeCacheDir.canonicalPath)
+                    ))
                     "recordingScreenAvailable" -> result.success(
                         getSystemService(PowerManager::class.java).isInteractive &&
                             !getSystemService(KeyguardManager::class.java).isKeyguardLocked
@@ -89,6 +102,13 @@ class MainActivity : FlutterActivity() {
                     }
                     "dismissCapsule" -> { moveTaskToBack(true); result.success(null) }
                     "protectFiles" -> result.success(true) // Private storage; backup disabled in manifest/rules.
+                    "availableStorageBytes" -> {
+                        try {
+                            result.success(StatFs(filesDir.absolutePath).availableBytes)
+                        } catch (_: Exception) {
+                            result.error("storage_space", "Unable to inspect private storage", null)
+                        }
+                    }
                     "calendar" -> {
                         if (pendingCalendar != null) {
                             result.success("unknown")
@@ -138,6 +158,8 @@ class MainActivity : FlutterActivity() {
     }
 
     override fun onDestroy() {
+        captureChannel?.detach()
+        captureChannel = null
         if (screenReceiverRegistered) {
             unregisterReceiver(screenOffReceiver)
             screenReceiverRegistered = false
@@ -145,5 +167,15 @@ class MainActivity : FlutterActivity() {
         pendingCalendar?.success("unknown")
         pendingCalendar = null
         super.onDestroy()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        captureChannel?.visible()
+    }
+
+    override fun onStop() {
+        captureChannel?.hidden()
+        super.onStop()
     }
 }

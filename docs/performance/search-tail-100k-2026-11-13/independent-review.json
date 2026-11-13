@@ -1,0 +1,19 @@
+{
+  "critical": [],
+  "important": [],
+  "minor": "equal-score/date order and vectorRevision assertions incomplete; completing planned verification, no product fix needed",
+  "scope": [
+    "lib/data/record_repository.dart",
+    "lib/data/search_index.dart",
+    "test/vector_bit_patterns_test.dart",
+    "test/search_candidate_batch_test.dart",
+    "integration_test/indexed_search_test.dart"
+  ],
+  "readOnly": true,
+  "deferredToParent": [
+    "runtime/native/AOT performance, recall, mutation restoration and byte hashes",
+    "large organization memory beyond short-note workload"
+  ],
+  "noRereview": true,
+  "minorResolved": "Added explicit vectorRevision equality and frozen legacy equal-score/equal-time ordered-ID digest; legacy/current complete result digests also match. No production change and no rereview."
+}

@@ -1,0 +1,15 @@
+{
+  "executionDate": "2026-11-14",
+  "platform": "Android emulator API36",
+  "mode": "debug",
+  "applicationId": "app.nianxia.nianxia.test",
+  "case": "screen-off-smoke",
+  "passed": true,
+  "metrics": {
+    "startMs": 130,
+    "nativeFinalizeMs": 54,
+    "recordedMs": 5248,
+    "pcmBytes": 167936
+  },
+  "scope": "Actual emulator screen-off verified by native screen availability; valid WAV, no source commit or real-phone lockscreen acceptance"
+}

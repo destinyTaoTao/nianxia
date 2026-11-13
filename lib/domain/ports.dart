@@ -3,6 +3,9 @@ abstract interface class Transcriber {
 }
 
 abstract interface class Embedder {
+  /// Return a finite, nonzero vector of at most 4096 dimensions. Within a model
+  /// generation, query and document vectors must share dimensions and space.
+  /// The notebook normalizes magnitude before cosine comparison.
   Future<List<double>> embed(String text, {required bool query});
 }
 

@@ -1,0 +1,14 @@
+{
+  "before": {
+    "firstMedianMs": 2486.662,
+    "firstMedianPeakMiB": 61.25,
+    "warmMedianPeakMiB": 102.640625,
+    "warmMedianP95Ms": 23.42
+  },
+  "after": {
+    "firstMedianMs": 995.267,
+    "firstMedianPeakMiB": 27.765625,
+    "warmMedianPeakMiB": 92.140625,
+    "warmMedianP95Ms": 21.439
+  }
+}

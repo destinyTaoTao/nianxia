@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 ThemeData notebookTheme(Brightness brightness, {String? fontFamily}) {
   final dark = brightness == Brightness.dark;
-  final canvas = Color(dark ? 0xff1c1c1c : 0xfff6f6f6);
-  final panel = Color(dark ? 0xff272727 : 0xffffffff);
-  final soft = Color(dark ? 0xff333333 : 0xfff1f1f1);
-  final ink = Color(dark ? 0xfff4f4f4 : 0xff181818);
-  final muted = Color(dark ? 0xffb3b3b3 : 0xff606060);
-  final line = Color(dark ? 0xff414141 : 0xffdddddd);
-  final inverse = Color(dark ? 0xff181818 : 0xffffffff);
+  final canvas = Color(dark ? 0xff212121 : 0xffffffff);
+  final panel = Color(dark ? 0xff303030 : 0xffffffff);
+  final soft = Color(dark ? 0xff303030 : 0xfff1f1f1);
+  final raised = Color(dark ? 0xff393939 : 0xffe7e7e7);
+  final list = Color(dark ? 0xff212121 : 0xfff7f7f8);
+  final ink = Color(dark ? 0xfff5f5f5 : 0xff171717);
+  final muted = Color(dark ? 0xffb4b4b4 : 0xff666666);
+  final line = Color(dark ? 0xff4a4a4a : 0xffe5e5e5);
+  final inverse = Color(dark ? 0xff171717 : 0xffffffff);
   final scheme =
       ColorScheme.fromSeed(
         seedColor: ink,
@@ -19,9 +22,12 @@ ThemeData notebookTheme(Brightness brightness, {String? fontFamily}) {
         onPrimary: inverse,
         secondary: muted,
         onSecondary: inverse,
+        secondaryContainer: soft,
+        onSecondaryContainer: ink,
         surface: panel,
-        surfaceContainerLow: panel,
+        surfaceContainerLow: list,
         surfaceContainer: soft,
+        surfaceContainerHigh: raised,
         surfaceContainerHighest: soft,
         onSurface: ink,
         onSurfaceVariant: muted,
@@ -35,12 +41,10 @@ ThemeData notebookTheme(Brightness brightness, {String? fontFamily}) {
     colorScheme: scheme,
     fontFamily: fontFamily,
   );
-  final controlShape = RoundedRectangleBorder(
-    borderRadius: BorderRadius.circular(14),
-  );
+  const controlShape = StadiumBorder();
   OutlineInputBorder inputBorder(Color color, [double width = 1]) =>
       OutlineInputBorder(
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(17),
         borderSide: BorderSide(color: color, width: width),
       );
   return base.copyWith(
@@ -116,6 +120,15 @@ ThemeData notebookTheme(Brightness brightness, {String? fontFamily}) {
       elevation: 0,
       scrolledUnderElevation: 0,
       toolbarHeight: 64,
+      systemOverlayStyle: SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: dark ? Brightness.light : Brightness.dark,
+        statusBarBrightness: brightness,
+        systemNavigationBarColor: canvas,
+        systemNavigationBarIconBrightness: dark
+            ? Brightness.light
+            : Brightness.dark,
+      ),
       centerTitle: false,
       titleTextStyle: TextStyle(
         fontFamily: fontFamily,
@@ -129,20 +142,17 @@ ThemeData notebookTheme(Brightness brightness, {String? fontFamily}) {
       color: panel,
       elevation: 0,
       margin: EdgeInsets.zero,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
-        side: BorderSide(color: line),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
     ),
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(
-        minimumSize: const Size(48, 52),
+        minimumSize: const Size(48, 54),
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
         elevation: 0,
         shape: controlShape,
         textStyle: TextStyle(
           fontFamily: fontFamily,
-          fontSize: 14,
+          fontSize: 16,
           fontWeight: FontWeight.w600,
         ),
       ),
@@ -150,8 +160,8 @@ ThemeData notebookTheme(Brightness brightness, {String? fontFamily}) {
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: OutlinedButton.styleFrom(
         minimumSize: const Size(48, 52),
-        backgroundColor: panel,
-        side: BorderSide(color: line),
+        backgroundColor: soft,
+        side: BorderSide.none,
         shape: controlShape,
         padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
         textStyle: TextStyle(
@@ -197,12 +207,12 @@ ThemeData notebookTheme(Brightness brightness, {String? fontFamily}) {
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
-      fillColor: panel,
+      fillColor: soft,
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       hintStyle: TextStyle(fontFamily: fontFamily, color: muted, fontSize: 15),
       labelStyle: TextStyle(fontFamily: fontFamily, color: muted, fontSize: 14),
-      border: inputBorder(line),
-      enabledBorder: inputBorder(line),
+      border: inputBorder(Colors.transparent),
+      enabledBorder: inputBorder(Colors.transparent),
       focusedBorder: inputBorder(ink, 1.5),
       errorBorder: inputBorder(scheme.error),
       focusedErrorBorder: inputBorder(scheme.error, 1.5),
@@ -226,7 +236,7 @@ ThemeData notebookTheme(Brightness brightness, {String? fontFamily}) {
       backgroundColor: panel,
       showDragHandle: false,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
       ),
     ),
   );

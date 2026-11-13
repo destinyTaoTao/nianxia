@@ -29,6 +29,8 @@ class _SearchPageState extends State<SearchPage> {
   List<SearchHit> hits = [];
   bool busy = false;
   bool semantic = false;
+  bool approximate = false;
+  bool reviewVoice = false;
   String? error;
   String? fallback;
   int generation = 0;
@@ -64,20 +66,28 @@ class _SearchPageState extends State<SearchPage> {
       hits = [];
       error = null;
       fallback = null;
-      busy = text.text.trim().isNotEmpty;
+      busy = text.text.trim().isNotEmpty && !reviewVoice;
     });
-    debounce = Timer(const Duration(milliseconds: 250), search);
+    if (!reviewVoice) {
+      debounce = Timer(const Duration(milliseconds: 250), search);
+    }
   }
 
   void clearDates() {
     setState(() => range = null);
-    search();
+    if (!reviewVoice) search();
+  }
+
+  Future<void> submitSearch() async {
+    FocusScope.of(context).unfocus();
+    await search();
   }
 
   Future<void> search() async {
     debounce?.cancel();
     final version = ++generation;
     setState(() {
+      reviewVoice = false;
       busy = true;
       error = null;
       hits = [];
@@ -93,6 +103,7 @@ class _SearchPageState extends State<SearchPage> {
       if (mounted && generation == version) {
         setState(() {
           hits = found;
+          approximate = found.semanticApproximate;
           fallback = found.fallbackReason;
           busy = false;
         });
@@ -114,6 +125,7 @@ class _SearchPageState extends State<SearchPage> {
       return;
     }
     if (!mounted) return;
+    FocusScope.of(context).unfocus();
     final result = await openRecorder(
       context,
       widget.book,
@@ -121,8 +133,16 @@ class _SearchPageState extends State<SearchPage> {
       query: true,
     );
     if (mounted && result is String) {
+      debounce?.cancel();
+      generation++;
       text.text = result;
-      search();
+      setState(() {
+        reviewVoice = true;
+        hits = [];
+        busy = false;
+        error = null;
+        fallback = null;
+      });
     }
   }
 
@@ -136,13 +156,14 @@ class _SearchPageState extends State<SearchPage> {
     );
     if (selected != null && mounted) {
       setState(() => range = selected);
-      search();
+      if (!reviewVoice) search();
     }
   }
 
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: const Text('找一下')),
+    backgroundColor: Theme.of(context).colorScheme.surfaceContainerLow,
     body: SafeArea(
       top: false,
       child: ReadingWidth(
@@ -152,39 +173,76 @@ class _SearchPageState extends State<SearchPage> {
             SliverPadding(
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
               sliver: SliverToBoxAdapter(
-                child: TextField(
-                  key: const Key('search-input'),
-                  controller: text,
-                  autofocus: !widget.voice,
-                  textInputAction: TextInputAction.search,
-                  maxLength: 500,
-                  decoration: InputDecoration(
-                    hintText: semantic ? '输入关键词或描述' : '输入记得的关键词',
-                    hintMaxLines: 2,
-                    counterText: '',
-                    prefixIcon: const Icon(Icons.search_rounded),
-                    suffixIcon: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (text.text.isNotEmpty)
-                          IconButton(
-                            tooltip: '清空查找内容',
-                            onPressed: () {
-                              text.clear();
-                              changed();
-                            },
-                            icon: const Icon(Icons.close_rounded, size: 20),
-                          ),
-                        IconButton(
-                          tooltip: '语音查找',
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    TextField(
+                      key: const Key('search-input'),
+                      controller: text,
+                      autofocus: !widget.voice,
+                      textInputAction: TextInputAction.search,
+                      maxLength: 500,
+                      decoration: InputDecoration(
+                        hintText: semantic ? '输入关键词或描述' : '输入记得的关键词',
+                        hintMaxLines: 2,
+                        counterText: '',
+                        prefixIcon: const Icon(Icons.search_rounded),
+                        suffixIcon: text.text.isEmpty
+                            ? null
+                            : IconButton(
+                                tooltip: '清空查找内容',
+                                onPressed: () {
+                                  reviewVoice = false;
+                                  text.clear();
+                                  changed();
+                                },
+                                icon: const Icon(Icons.close_rounded, size: 20),
+                              ),
+                      ),
+                      onChanged: (_) => changed(),
+                      onSubmitted: (_) => submitSearch(),
+                    ),
+                    const SizedBox(height: 12),
+                    LayoutBuilder(
+                      builder: (context, constraints) {
+                        final voiceButton = OutlinedButton.icon(
                           onPressed: voice,
                           icon: const Icon(Icons.mic_none_rounded),
-                        ),
-                      ],
+                          label: const Text('语音查找'),
+                        );
+                        final searchButton = FilledButton(
+                          onPressed: text.text.trim().isEmpty || busy
+                              ? null
+                              : submitSearch,
+                          child: Text(busy ? '查找中' : '查找'),
+                        );
+                        if (MediaQuery.textScalerOf(context).scale(16) > 22) {
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              voiceButton,
+                              const SizedBox(height: 10),
+                              searchButton,
+                            ],
+                          );
+                        }
+                        return Row(
+                          children: [
+                            Expanded(flex: 3, child: voiceButton),
+                            const SizedBox(width: 12),
+                            Expanded(flex: 2, child: searchButton),
+                          ],
+                        );
+                      },
                     ),
-                  ),
-                  onChanged: (_) => changed(),
-                  onSubmitted: (_) => search(),
+                    if (reviewVoice) ...[
+                      const SizedBox(height: 12),
+                      Text(
+                        '识别文字可以修改，确认后点“查找”。',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
+                  ],
                 ),
               ),
             ),
@@ -243,10 +301,12 @@ class _SearchPageState extends State<SearchPage> {
                   icon: Icons.search_rounded,
                   title: '找回之前的想法',
                   detail: range == null
-                      ? '输入关键词，或点麦克风说出要找的内容。'
+                      ? '输入关键词，或用语音说出你记得的内容。'
                       : '输入关键词，在所选日期内查找。',
                 ),
               )
+            else if (reviewVoice)
+              const SliverToBoxAdapter(child: SizedBox(height: 24))
             else if (hits.isEmpty && !busy)
               SliverFillRemaining(
                 hasScrollBody: false,
@@ -270,7 +330,9 @@ class _SearchPageState extends State<SearchPage> {
                     child: Semantics(
                       liveRegion: true,
                       child: Text(
-                        '找到 ${hits.length} 条记录',
+                        approximate
+                            ? '找到 ${hits.length} 条记录，含近似语义匹配'
+                            : '找到 ${hits.length} 条记录',
                         style: Theme.of(context).textTheme.bodySmall,
                       ),
                     ),

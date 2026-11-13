@@ -1,0 +1,513 @@
+{
+  "before-ready-true": {
+    "memoryUsage": {
+      "type": "MemoryUsage",
+      "heapUsage": 13657872,
+      "heapCapacity": 22986752,
+      "externalUsage": 112
+    },
+    "largestClasses": [
+      {
+        "name": "_List",
+        "bytes": 3173920,
+        "instances": 39872
+      },
+      {
+        "name": "Instructions",
+        "bytes": 1798416,
+        "instances": 3001
+      },
+      {
+        "name": "Function",
+        "bytes": 1565312,
+        "instances": 12229
+      },
+      {
+        "name": "_OneByteString",
+        "bytes": 1363024,
+        "instances": 13611
+      },
+      {
+        "name": "_FunctionType",
+        "bytes": 659040,
+        "instances": 8238
+      },
+      {
+        "name": "ICData",
+        "bytes": 653952,
+        "instances": 10218
+      },
+      {
+        "name": "_Uint32List",
+        "bytes": 631184,
+        "instances": 1322
+      },
+      {
+        "name": "Code",
+        "bytes": 528176,
+        "instances": 3001
+      },
+      {
+        "name": "ObjectPool",
+        "bytes": 396112,
+        "instances": 2504
+      },
+      {
+        "name": "PcDescriptors",
+        "bytes": 395984,
+        "instances": 2456
+      },
+      {
+        "name": "Class",
+        "bytes": 365120,
+        "instances": 1630
+      },
+      {
+        "name": "CodeSourceMap",
+        "bytes": 346032,
+        "instances": 2588
+      },
+      {
+        "name": "WeakArray",
+        "bytes": 294576,
+        "instances": 193
+      },
+      {
+        "name": "Field",
+        "bytes": 265888,
+        "instances": 2374
+      },
+      {
+        "name": "_Uint16List",
+        "bytes": 234784,
+        "instances": 344
+      }
+    ]
+  },
+  "before-warm11-true": {
+    "memoryUsage": {
+      "type": "MemoryUsage",
+      "heapUsage": 21971920,
+      "heapCapacity": 86622208,
+      "externalUsage": 112
+    },
+    "largestClasses": [
+      {
+        "name": "_Uint8List",
+        "bytes": 4505376,
+        "instances": 5278
+      },
+      {
+        "name": "_List",
+        "bytes": 4272080,
+        "instances": 48327
+      },
+      {
+        "name": "_OneByteString",
+        "bytes": 2823680,
+        "instances": 59032
+      },
+      {
+        "name": "Instructions",
+        "bytes": 2164256,
+        "instances": 3479
+      },
+      {
+        "name": "Function",
+        "bytes": 1607936,
+        "instances": 12562
+      },
+      {
+        "name": "ICData",
+        "bytes": 782016,
+        "instances": 12219
+      },
+      {
+        "name": "_Uint32List",
+        "bytes": 720448,
+        "instances": 1522
+      },
+      {
+        "name": "_FunctionType",
+        "bytes": 678800,
+        "instances": 8485
+      },
+      {
+        "name": "Code",
+        "bytes": 612304,
+        "instances": 3479
+      },
+      {
+        "name": "ObjectPool",
+        "bytes": 476208,
+        "instances": 2928
+      },
+      {
+        "name": "PcDescriptors",
+        "bytes": 472160,
+        "instances": 2867
+      },
+      {
+        "name": "CodeSourceMap",
+        "bytes": 422832,
+        "instances": 3032
+      },
+      {
+        "name": "Class",
+        "bytes": 365120,
+        "instances": 1630
+      },
+      {
+        "name": "WeakArray",
+        "bytes": 308848,
+        "instances": 273
+      },
+      {
+        "name": "Field",
+        "bytes": 274736,
+        "instances": 2453
+      }
+    ]
+  },
+  "typed-ready-false": {
+    "memoryUsage": {
+      "type": "MemoryUsage",
+      "heapUsage": 20718928,
+      "heapCapacity": 22986752,
+      "externalUsage": 112
+    },
+    "largestClasses": [
+      {
+        "name": "_List",
+        "bytes": 4972112,
+        "instances": 52181
+      },
+      {
+        "name": "_OneByteString",
+        "bytes": 2140448,
+        "instances": 35980
+      },
+      {
+        "name": "Instructions",
+        "bytes": 1673248,
+        "instances": 2767
+      },
+      {
+        "name": "Function",
+        "bytes": 1535360,
+        "instances": 11995
+      },
+      {
+        "name": "_Type",
+        "bytes": 1254096,
+        "instances": 26127
+      },
+      {
+        "name": "ICData",
+        "bytes": 1021312,
+        "instances": 15958
+      },
+      {
+        "name": "_FunctionType",
+        "bytes": 910640,
+        "instances": 11383
+      },
+      {
+        "name": "TypeArguments",
+        "bytes": 801840,
+        "instances": 16318
+      },
+      {
+        "name": "_Uint32List",
+        "bytes": 680672,
+        "instances": 2067
+      },
+      {
+        "name": "WeakArray",
+        "bytes": 659776,
+        "instances": 740
+      },
+      {
+        "name": "_Uint8ArrayView",
+        "bytes": 532464,
+        "instances": 11093
+      },
+      {
+        "name": "Code",
+        "bytes": 486992,
+        "instances": 2767
+      },
+      {
+        "name": "Field",
+        "bytes": 436912,
+        "instances": 3901
+      },
+      {
+        "name": "Class",
+        "bytes": 369152,
+        "instances": 1648
+      },
+      {
+        "name": "ObjectPool",
+        "bytes": 367312,
+        "instances": 2291
+      }
+    ]
+  },
+  "typed-ready-true": {
+    "memoryUsage": {
+      "type": "MemoryUsage",
+      "heapUsage": 15243696,
+      "heapCapacity": 34996224,
+      "externalUsage": 160
+    },
+    "largestClasses": [
+      {
+        "name": "_List",
+        "bytes": 3181904,
+        "instances": 40021
+      },
+      {
+        "name": "_OneByteString",
+        "bytes": 2928608,
+        "instances": 13612
+      },
+      {
+        "name": "Instructions",
+        "bytes": 1800656,
+        "instances": 3002
+      },
+      {
+        "name": "Function",
+        "bytes": 1565312,
+        "instances": 12229
+      },
+      {
+        "name": "_FunctionType",
+        "bytes": 659040,
+        "instances": 8238
+      },
+      {
+        "name": "ICData",
+        "bytes": 655808,
+        "instances": 10247
+      },
+      {
+        "name": "_Uint32List",
+        "bytes": 631696,
+        "instances": 1327
+      },
+      {
+        "name": "Code",
+        "bytes": 528352,
+        "instances": 3002
+      },
+      {
+        "name": "ObjectPool",
+        "bytes": 396928,
+        "instances": 2506
+      },
+      {
+        "name": "PcDescriptors",
+        "bytes": 396784,
+        "instances": 2458
+      },
+      {
+        "name": "Class",
+        "bytes": 365120,
+        "instances": 1630
+      },
+      {
+        "name": "CodeSourceMap",
+        "bytes": 346496,
+        "instances": 2590
+      },
+      {
+        "name": "WeakArray",
+        "bytes": 294576,
+        "instances": 193
+      },
+      {
+        "name": "Field",
+        "bytes": 265888,
+        "instances": 2374
+      },
+      {
+        "name": "_Uint16List",
+        "bytes": 234832,
+        "instances": 344
+      }
+    ]
+  },
+  "typed-warm11-false": {
+    "memoryUsage": {
+      "type": "MemoryUsage",
+      "heapUsage": 57175904,
+      "heapCapacity": 59867136,
+      "externalUsage": 208
+    },
+    "largestClasses": [
+      {
+        "name": "_Uint8List",
+        "bytes": 19115472,
+        "instances": 12731
+      },
+      {
+        "name": "_OneByteString",
+        "bytes": 10323504,
+        "instances": 180264
+      },
+      {
+        "name": "_List",
+        "bytes": 8588800,
+        "instances": 101182
+      },
+      {
+        "name": "Instructions",
+        "bytes": 2171936,
+        "instances": 3479
+      },
+      {
+        "name": "Function",
+        "bytes": 1607296,
+        "instances": 12557
+      },
+      {
+        "name": "_Double",
+        "bytes": 1500928,
+        "instances": 93808
+      },
+      {
+        "name": "_Uint32List",
+        "bytes": 1096912,
+        "instances": 4522
+      },
+      {
+        "name": "ICData",
+        "bytes": 968256,
+        "instances": 15129
+      },
+      {
+        "name": "Pointer",
+        "bytes": 854912,
+        "instances": 26716
+      },
+      {
+        "name": "_GrowableList",
+        "bytes": 735168,
+        "instances": 22974
+      },
+      {
+        "name": "_Utf8Decoder",
+        "bytes": 733440,
+        "instances": 15280
+      },
+      {
+        "name": "_Float64List",
+        "bytes": 701760,
+        "instances": 170
+      },
+      {
+        "name": "_FunctionType",
+        "bytes": 692400,
+        "instances": 8655
+      },
+      {
+        "name": "_Type",
+        "bytes": 688176,
+        "instances": 14337
+      },
+      {
+        "name": "Code",
+        "bytes": 612304,
+        "instances": 3479
+      }
+    ]
+  },
+  "typed-warm11-true": {
+    "memoryUsage": {
+      "type": "MemoryUsage",
+      "heapUsage": 23530352,
+      "heapCapacity": 71057408,
+      "externalUsage": 160
+    },
+    "largestClasses": [
+      {
+        "name": "_Uint8List",
+        "bytes": 4500432,
+        "instances": 5201
+      },
+      {
+        "name": "_OneByteString",
+        "bytes": 4390240,
+        "instances": 59031
+      },
+      {
+        "name": "_List",
+        "bytes": 4271312,
+        "instances": 48336
+      },
+      {
+        "name": "Instructions",
+        "bytes": 2161360,
+        "instances": 3469
+      },
+      {
+        "name": "Function",
+        "bytes": 1607296,
+        "instances": 12557
+      },
+      {
+        "name": "ICData",
+        "bytes": 784384,
+        "instances": 12256
+      },
+      {
+        "name": "_Uint32List",
+        "bytes": 720848,
+        "instances": 1522
+      },
+      {
+        "name": "_FunctionType",
+        "bytes": 678720,
+        "instances": 8484
+      },
+      {
+        "name": "Code",
+        "bytes": 610544,
+        "instances": 3469
+      },
+      {
+        "name": "ObjectPool",
+        "bytes": 475808,
+        "instances": 2922
+      },
+      {
+        "name": "PcDescriptors",
+        "bytes": 472576,
+        "instances": 2861
+      },
+      {
+        "name": "CodeSourceMap",
+        "bytes": 421616,
+        "instances": 3022
+      },
+      {
+        "name": "Class",
+        "bytes": 365120,
+        "instances": 1630
+      },
+      {
+        "name": "WeakArray",
+        "bytes": 306288,
+        "instances": 254
+      },
+      {
+        "name": "Field",
+        "bytes": 274736,
+        "instances": 2453
+      }
+    ]
+  },
+  "limits": "JIT VM-service diagnostics only, not AOT RSS; explicit GC alters capacity and prior profile HTTP responses can remain live. Compare phase deltas within each process, not absolute before-vs-typed heap sizes."
+}
