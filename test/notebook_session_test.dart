@@ -4,6 +4,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sqlite3/sqlite3.dart';
 import 'package:nianxia/app/notebook_session.dart';
 
+import 'recording_search_test.dart' show writeWave;
+
 void main() {
   late Directory home;
   setUp(
@@ -12,30 +14,34 @@ void main() {
   );
   tearDown(() async => home.delete(recursive: true));
 
-  test('模型初始化失败释放已打开资料库，不阻止下次重试', () async {
-    await expectLater(
-      NotebookSession.open(
-        home,
-        loadModelManifest: () async =>
-            throw const FormatException('bad manifest'),
-      ),
-      throwsA(isA<FormatException>()),
-    );
-    final db = sqlite3.open('${home.path}/records.sqlite');
-    try {
-      db.execute('PRAGMA locking_mode = EXCLUSIVE');
-      db.execute('BEGIN EXCLUSIVE');
-      expect(db.select('SELECT COUNT(*) AS n FROM records').single['n'], 0);
-      db.execute('ROLLBACK');
-    } finally {
-      db.close();
-    }
+  test('模型目录加载失败仍可记录和关键词查找', () async {
     final session = await NotebookSession.open(
       home,
-      loadModelManifest: () => File('assets/models.json').readAsString(),
+      loadModelManifest: () async =>
+          throw const FormatException('bad manifest'),
     );
-    await session.book.saveText('重试后保存');
-    expect((await session.book.records).single.body, '重试后保存');
+    try {
+      expect(session.modelNotice, isNotNull);
+      await session.book.saveText('synthetic fallback');
+      expect((await session.book.records).single.body, 'synthetic fallback');
+      expect(session.models.store.models, isEmpty);
+    } finally {
+      await session.close();
+    }
+  });
+
+  test('启动先返回资料库，完整孤儿维护可延后且不移动新录音', () async {
+    final audio = await Directory('${home.path}/audio').create(recursive: true);
+    await File('${audio.path}/unknown.wav').writeAsBytes([1, 2, 3]);
+    final session = await NotebookSession.open(
+      home,
+      loadModelManifest: () async => '[]',
+    );
+    final draft = await session.book.beginCapture();
+    await writeWave(draft.path);
+    await session.maintenance;
+    expect(await File(draft.path).exists(), isTrue);
+    expect(session.book.isClosed, isFalse);
     await session.close();
   });
 

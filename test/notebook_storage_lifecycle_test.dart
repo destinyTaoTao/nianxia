@@ -55,6 +55,27 @@ void main() {
     expect((await book.records), isEmpty);
   });
 
+  test('采集中和媒体租约期间维护不移动音频，空闲后可再处理', () async {
+    final book = await Notebook.open(home, deferMaintenance: true);
+    addTearDown(book.close);
+    final orphan = File('${home.path}/audio/synthetic-orphan.wav');
+    await orphan.writeAsBytes([1, 2, 3]);
+    book.captureActive = true;
+    await book.runMaintenance();
+    expect(await orphan.exists(), isTrue);
+    book.captureActive = false;
+    await book.withMediaLease(() async {
+      await book.runMaintenance();
+      expect(await orphan.exists(), isTrue);
+    });
+    final draft = await book.beginCapture();
+    await writeWave(draft.path);
+    final saved = await book.finishCapture(draft);
+    await book.runMaintenance();
+    expect(await File(book.audioPath(saved)).exists(), isTrue);
+    expect(await orphan.exists(), isFalse);
+  });
+
   test('启动未知孤儿音频保留在隔离目录，不永久删除字节', () async {
     var book = await Notebook.open(home);
     final record = await book.saveText('健康资料');

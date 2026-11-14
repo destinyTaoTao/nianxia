@@ -13,6 +13,12 @@ import 'recording_search_test.dart' show writeWave;
 class _Runtime extends ChangeNotifier implements InferenceRuntime {
   final priorities = <bool>[];
   @override
+  String get speechModelVersion => 'test-speech-v1';
+  @override
+  void setCaptureActive(bool active) {}
+  @override
+  Future<void> close() async => dispose();
+  @override
   String get searchModelVersion => 'replacement-model-v1';
   @override
   Future<bool> ready(InferenceCapability capability) async => true;
@@ -30,6 +36,32 @@ class _Runtime extends ChangeNotifier implements InferenceRuntime {
 }
 
 void main() {
+  test('采集中暂停后台任务，停止采集后无需修改记录即可继续', () async {
+    final home = await Directory.systemTemp.createTemp('nx-paused-jobs-');
+    final book = await Notebook.open(home);
+    final runtime = _Runtime();
+    BackgroundTasks? tasks;
+    try {
+      final saved = await book.saveText('synthetic paused indexing');
+      book.captureActive = true;
+      tasks = BackgroundTasks(book, runtime);
+      await Future<void>.delayed(const Duration(milliseconds: 400));
+      expect((await book.get(saved.id))!.vectorRevision, isNull);
+      book.captureActive = false;
+      final until = DateTime.now().add(const Duration(seconds: 1));
+      while (DateTime.now().isBefore(until) &&
+          (await book.get(saved.id))!.vectorRevision == null) {
+        await Future<void>.delayed(const Duration(milliseconds: 25));
+      }
+      expect((await book.get(saved.id))!.vectorRevision, 1);
+    } finally {
+      tasks?.dispose();
+      runtime.dispose();
+      await book.close();
+      await home.delete(recursive: true);
+    }
+  });
+
   test('调度器可替换推理Adapter，真实SQLite落地转写与索引', () async {
     final home = await Directory.systemTemp.createTemp('nianxia-runtime-');
     final book = await Notebook.open(home);

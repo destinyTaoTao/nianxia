@@ -83,6 +83,7 @@ class CaptureSessionController extends ChangeNotifier {
       NativeCapturePhase.recording,
       NativeCapturePhase.finalizing,
     }.contains(value.phase);
+    runtime.setCaptureActive(book.captureActive);
     _notify();
   }
 

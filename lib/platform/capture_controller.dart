@@ -129,7 +129,7 @@ class CaptureController extends ChangeNotifier with WidgetsBindingObserver {
       _ensureStartAllowed();
       draft = await book.beginCapture(parentId: parentId, query: query);
       _ensureStartAllowed();
-      models?.queue.paused = true;
+      models?.setCaptureActive(true);
       _writer = await PcmWaveWriter.open(
         draft!.path,
         onLimit: () {
@@ -195,7 +195,7 @@ class CaptureController extends ChangeNotifier with WidgetsBindingObserver {
       book.captureActive = false;
       state = 'failed';
       error = e is NotebookException ? e.message : '无法开始录音，请检查麦克风权限和剩余空间。';
-      models?.queue.paused = false;
+      models?.setCaptureActive(false);
       _notify();
     }
   }
@@ -218,7 +218,7 @@ class CaptureController extends ChangeNotifier with WidgetsBindingObserver {
       await microphone.stop();
       await _pcm?.cancel();
       await _closeWriter();
-      models?.queue.paused = false;
+      models?.setCaptureActive(false);
       if (query) {
         queryText = await book.transcribeQuery(draft!, models!);
         if (queryText!.trim().isEmpty) {
@@ -257,7 +257,7 @@ class CaptureController extends ChangeNotifier with WidgetsBindingObserver {
         await _cleanQuery();
       }
       book.captureActive = false;
-      models?.queue.paused = false;
+      models?.setCaptureActive(false);
       _notify();
     }
   }
@@ -312,7 +312,7 @@ class CaptureController extends ChangeNotifier with WidgetsBindingObserver {
       error = '丢弃未完成，请重试。';
     } finally {
       book.captureActive = false;
-      models?.queue.paused = false;
+      models?.setCaptureActive(false);
       _notify();
     }
   }
@@ -380,7 +380,7 @@ class CaptureController extends ChangeNotifier with WidgetsBindingObserver {
     _amplitude?.cancel();
     _states?.cancel();
     unawaited(_release());
-    models?.queue.paused = false;
+    models?.setCaptureActive(false);
     super.dispose();
   }
 }

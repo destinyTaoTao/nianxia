@@ -107,6 +107,12 @@ class HandoffEndpoint implements NativeCapturePort {
 class HandoffRuntime extends ChangeNotifier implements InferenceRuntime {
   int transcriptions = 0, readinessChecks = 0;
   @override
+  String get speechModelVersion => 'test-speech-v1';
+  @override
+  void setCaptureActive(bool active) {}
+  @override
+  Future<void> close() async => dispose();
+  @override
   String? get searchModelVersion => null;
   @override
   Future<bool> ready(InferenceCapability capability) async {

@@ -5,6 +5,7 @@ import 'dart:async';
 import 'package:crypto/crypto.dart';
 
 import '../domain/capture_session.dart';
+import '../domain/local_job.dart';
 import '../domain/search_page.dart';
 
 import '../domain/ports.dart';
@@ -29,6 +30,7 @@ class Notebook extends ChangeNotifier {
   static Future<Notebook> open(
     Directory home, {
     DateTime Function()? clock,
+    bool deferMaintenance = false,
   }) async {
     await home.create(recursive: true);
     await Directory(p.join(home.path, 'audio')).create();
@@ -41,6 +43,7 @@ class Notebook extends ChangeNotifier {
     try {
       book._themeMode = await book.repository.themeMode;
       await book._recover();
+      if (!deferMaintenance) await book.runMaintenance();
       return book;
     } catch (_) {
       await book.close();
@@ -57,6 +60,15 @@ class Notebook extends ChangeNotifier {
     await repository.saveThemeMode(mode);
     _themeMode = mode;
   });
+  Future<LocalJob?> claimLocalJob({
+    Set<JobKind> kinds = const {JobKind.transcription, JobKind.embedding},
+    String speechModelVersion = 'unversioned',
+  }) => repository.claimLocalJob(
+    kinds: kinds,
+    speechModelVersion: speechModelVersion,
+  );
+  Future<void> finishLocalJob(LocalJob job, {required JobOutcome outcome}) =>
+      repository.finishLocalJob(job, outcome: outcome);
   Future<List<Record>> get records => repository.all();
   Future<Record?> get(String id) => repository.get(id);
   Future<RecordPage> page({
@@ -149,7 +161,15 @@ class Notebook extends ChangeNotifier {
     changed(content: false);
   });
 
-  bool captureActive = false;
+  final captureChanges = ValueNotifier<bool>(false);
+  bool _captureActive = false;
+  bool get captureActive => _captureActive;
+  set captureActive(bool active) {
+    if (_captureActive == active || _closed) return;
+    _captureActive = active;
+    captureChanges.value = active;
+  }
+
   int recoveredCount = 0;
   final List<CaptureDraft> recoveryDrafts = [];
   final Set<String> _transcribing = {};
@@ -438,33 +458,53 @@ class Notebook extends ChangeNotifier {
         recoveryWarnings++;
       }
     }
+  }
+
+  Future<void>? _maintenance;
+
+  /// Optional full scan runs after startup. Every move shares capture's lock
+  /// and a media barrier; reference checks are fresh, never an old snapshot.
+  Future<void> runMaintenance() => _maintenance ??= _operation(() async {
+    if (_mediaLeases > 0 || captureActive) return;
     if (!await repository.completeReferencedMediaDeletions()) {
       recoveryWarnings++;
     }
     await _drainMediaDeletions();
-    final pendingDeletion = (await repository.pendingMediaDeletions()).toSet();
-    // An unreferenced file is not proof that its original contents are useless.
-    // Known deletion intent is handled separately; retain unknown originals.
-    final referenced = (await repository.audioReferences()).toSet();
     await for (final file in Directory(p.join(home.path, 'audio')).list()) {
-      if (file is File &&
-          !referenced.contains(p.basename(file.path)) &&
-          !pendingDeletion.contains(p.basename(file.path)) &&
-          !await captures
-              .marker(p.basenameWithoutExtension(file.path))
-              .exists()) {
+      if (_closed) break;
+      if (file is! File) continue;
+      final id = p.basenameWithoutExtension(file.path);
+      await _withCapture(id, () async {
+        if (_closed || _mediaLeases > 0 || captureActive) return;
+        final previous = _mediaMutation;
+        final complete = Completer<void>();
+        _mediaMutation = complete.future;
         try {
-          final quarantine = await Directory(
-            p.join(home.path, 'quarantine', const Uuid().v4()),
-          ).create(recursive: true);
-          await file.rename(p.join(quarantine.path, p.basename(file.path)));
-        } on FileSystemException {
-          // If isolation fails, leave the original file in place for recovery.
+          await previous;
+          if (_closed ||
+              _mediaLeases > 0 ||
+              captureActive ||
+              await repository.audioProtected(p.basename(file.path)) ||
+              await captures.marker(id).exists()) {
+            return;
+          }
+          try {
+            final quarantine = await Directory(
+              p.join(home.path, 'quarantine', const Uuid().v4()),
+            ).create(recursive: true);
+            await file.rename(p.join(quarantine.path, p.basename(file.path)));
+          } on FileSystemException {
+            /* Preserve original if isolation fails. */
+          }
+          recoveryWarnings++;
+        } finally {
+          complete.complete();
+          if (identical(_mediaMutation, complete.future)) _mediaMutation = null;
         }
-        recoveryWarnings++;
-      }
+      });
+      await Future<void>.delayed(Duration.zero);
     }
-  }
+  }).whenComplete(() => _maintenance = null);
 
   int recoveryWarnings = 0;
   Future<void>? _mediaCleanup;
@@ -707,6 +747,7 @@ class Notebook extends ChangeNotifier {
     if (_notifierDisposed) return;
     _notifierDisposed = true;
     contentChanges.dispose();
+    captureChanges.dispose();
     super.dispose();
     unawaited(close());
   }

@@ -1,0 +1,15 @@
+{
+  "applicationId": "app.nianxia.nianxia.test",
+  "runId": "287dc40d-8a75-4d25-9813-1b026c1ad8fd",
+  "case": "local-jobs",
+  "passed": true,
+  "metrics": {
+    "sourceRows": 2,
+    "committedTranscriptReplayed": 0,
+    "staleLeaseRejected": 1,
+    "inFlightActionReleased": 1,
+    "sourceSchema": 2,
+    "captureStateWakeup": 1,
+    "ownerLeaseProtected": 1
+  }
+}

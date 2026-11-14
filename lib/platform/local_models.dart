@@ -108,6 +108,13 @@ class InferenceQueue {
   bool _paused = false;
   bool _closed = false;
   _Work? _active;
+  Completer<void>? _closedIdle;
+  Future<void> close() {
+    dispose();
+    if (!_running) return Future.value();
+    return (_closedIdle ??= Completer<void>()).future;
+  }
+
   set paused(bool value) {
     if (_closed) return;
     _paused = value;
@@ -151,6 +158,9 @@ class InferenceQueue {
       }
     } finally {
       _running = false;
+      if (_closedIdle != null && !_closedIdle!.isCompleted) {
+        _closedIdle!.complete();
+      }
     }
   }
 
@@ -175,6 +185,20 @@ class LocalModels extends ChangeNotifier implements InferenceRuntime {
   }
   final ModelStore store;
   final queue = InferenceQueue();
+  @override
+  String? get speechModelVersion {
+    final models = store.models.where((m) => m.id == 'sensevoice');
+    return models.isEmpty ? null : models.first.version;
+  }
+
+  @override
+  void setCaptureActive(bool active) => queue.paused = active;
+  @override
+  Future<void> close() async {
+    dispose();
+    await queue.close();
+  }
+
   static const queryInstruction = '为这个句子生成表示以用于检索相关文章：';
   @override
   String? get searchModelVersion {

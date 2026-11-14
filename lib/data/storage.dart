@@ -3,6 +3,8 @@ import 'dart:io';
 import 'dart:isolate';
 
 import '../domain/record.dart';
+import '../domain/local_job.dart';
+import 'local_job_store.dart';
 import '../domain/record_page.dart';
 import '../domain/restore_report.dart';
 import '../domain/search_page.dart';
@@ -115,6 +117,16 @@ class Storage {
     }
   }
 
+  Future<LocalJob?> claimLocalJob({
+    Set<JobKind> kinds = const {JobKind.transcription, JobKind.embedding},
+    String speechModelVersion = 'unversioned',
+  }) => _call(_Command.claimJob, [kinds, speechModelVersion]);
+  Future<void> finishLocalJob(LocalJob job, {required JobOutcome outcome}) =>
+      _call(_Command.finishJob, [job, outcome]);
+  Future<DateTime?> nextLocalJobAttempt(Set<JobKind> kinds) =>
+      _call(_Command.nextJobAttempt, [kinds]);
+  Future<bool> audioProtected(String name) =>
+      _call(_Command.audioProtected, [name]);
   Future<Record?> get(String id) => _call(_Command.get, [id]);
   Future<List<Record>> all({bool includeVectors = false}) =>
       _call(_Command.all, [includeVectors]);
@@ -244,6 +256,10 @@ class Storage {
 }
 
 enum _Command {
+  nextJobAttempt,
+  audioProtected,
+  claimJob,
+  finishJob,
   get,
   all,
   page,
@@ -291,6 +307,7 @@ void _storageMain(List<Object> arguments) {
   late final RecordRepository repository;
   late final SearchIndex searchIndex;
   late final SearchPagingStore searchPages;
+  late final LocalJobStore jobs;
   try {
     repository = RecordRepository(Directory(arguments[0] as String));
     searchIndex = SearchIndex(repository, Directory(arguments[0] as String));
@@ -299,6 +316,7 @@ void _storageMain(List<Object> arguments) {
       searchIndex,
       Directory(arguments[0] as String),
     );
+    jobs = LocalJobStore(repository, Directory(arguments[0] as String));
     replies.send([0, true, commands.sendPort]);
   } catch (error) {
     replies.send([0, false, _failure(error)]);
@@ -313,6 +331,7 @@ void _storageMain(List<Object> arguments) {
         repository,
         searchIndex,
         searchPages,
+        jobs,
         command,
         args,
         Directory(arguments[0] as String),
@@ -331,12 +350,25 @@ Object? _execute(
   RecordRepository r,
   SearchIndex searchIndex,
   SearchPagingStore searchPages,
+  LocalJobStore jobs,
   _Command command,
   List a,
   Directory home,
   void Function(double) progress,
 ) {
   switch (command) {
+    case _Command.nextJobAttempt:
+      return jobs.nextAttempt(a[0] as Set<JobKind>);
+    case _Command.audioProtected:
+      return r.db.select(
+        'SELECT 1 FROM records WHERE audio=? UNION ALL SELECT 1 FROM pending_media_deletions WHERE audio=? LIMIT 1',
+        [a[0], a[0]],
+      ).isNotEmpty;
+    case _Command.claimJob:
+      return jobs.claim(a[0] as Set<JobKind>, a[1] as String);
+    case _Command.finishJob:
+      jobs.finish(a[0] as LocalJob, a[1] as JobOutcome);
+      return null;
     case _Command.get:
       return r.get(a[0] as String);
     case _Command.all:
@@ -423,6 +455,7 @@ Object? _execute(
       return searchIndex.close().then((_) {
         try {
           searchPages.close();
+          jobs.close();
         } finally {
           r.close();
         }

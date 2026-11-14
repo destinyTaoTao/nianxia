@@ -49,8 +49,12 @@
     "androidSummaryPagingProfile": "passed 10001 rows / 251 pages",
     "androidSummaryPagingRelease": "passed isolated non-debuggable AOT",
     "androidDiagnosticsProfile": "passed",
-    "androidDiagnosticsRelease": "passed isolated AOT"
+    "androidDiagnosticsRelease": "passed isolated AOT",
+    "flutterTests": 278,
+    "pythonTests": 31,
+    "androidLocalJobsRelease": "passed isolated non-debuggable AOT"
   },
-  "committed": false,
-  "pushed": false
+  "committed": true,
+  "pushed": true,
+  "deliveryStatus": "verified incremental batches pushed; final merge pending"
 }

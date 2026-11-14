@@ -13,7 +13,24 @@ import 'dart:async';
 
 /// Owns startup/teardown of the notebook and its optional inference resources.
 class NotebookSession {
-  NotebookSession._(this.book, this.models, this.tasks, this.diagnostics);
+  NotebookSession._(
+    this.book,
+    this.models,
+    this.tasks,
+    this.diagnostics,
+    this.modelNotice,
+  ) {
+    maintenance = Future<void>.delayed(Duration.zero, () async {
+      if (book.isClosed) return;
+      try {
+        await book.runMaintenance();
+      } catch (_) {
+        if (!book.isClosed) book.recoveryWarnings++;
+      }
+    });
+  }
+  final String? modelNotice;
+  late final Future<void> maintenance;
   final Notebook book;
   final LocalModels models;
   final BackgroundTasks tasks;
@@ -33,9 +50,16 @@ class NotebookSession {
     );
     try {
       return await diagnostics.trace(DiagnosticKind.startup, () async {
-        final openedBook = await Notebook.open(home);
+        final openedBook = await Notebook.open(home, deferMaintenance: true);
         book = openedBook;
-        final manifest = ModelSpec.parse(await loadModelManifest());
+        List<ModelSpec> manifest;
+        String? modelNotice;
+        try {
+          manifest = ModelSpec.parse(await loadModelManifest());
+        } catch (_) {
+          manifest = [];
+          modelNotice = '模型目录暂不可用，仍可记录和关键词查找。请重新打开应用重试。';
+        }
         final openedStore = ModelStore(
           Directory(p.join(home.path, 'models')),
           manifest,
@@ -54,6 +78,7 @@ class NotebookSession {
           openedModels,
           openedTasks,
           diagnostics,
+          modelNotice,
         );
       }, phase: DiagnosticPhase.prepare);
     } catch (_) {
@@ -81,6 +106,8 @@ class NotebookSession {
 
   Future<void> close() async {
     dispose();
+    await maintenance;
+    await models.close();
     await book.close();
     await diagnostics.close();
   }

@@ -25,6 +25,12 @@ void main() {
           ),
           throwsA(isA<FileSystemException>()),
         );
+        await diag.trace(
+          DiagnosticKind.embedding,
+          () async => true,
+          modelGeneration: 42,
+          attempt: 2,
+        );
         await diag.flush();
         final preview = await diag.previewExport();
         expect(preview.entries, greaterThan(0));
@@ -34,6 +40,8 @@ void main() {
         expect(contents, isNot(contains(sentinel)));
         expect(contents, isNot(contains(home.path)));
         expect(contents, contains('ioFailure'));
+        expect(contents, contains('"modelGeneration":42'));
+        expect(contents, contains('"attempt":2'));
       } finally {
         await diag.close();
         await home.delete(recursive: true);

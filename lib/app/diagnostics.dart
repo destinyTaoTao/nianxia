@@ -245,6 +245,8 @@ class LocalDiagnostics {
     Future<T> Function() action, {
     DiagnosticPhase phase = DiagnosticPhase.run,
     int? sourceRevision,
+    int modelGeneration = 0,
+    int attempt = 0,
   }) async {
     final watch = Stopwatch()..start();
     DiagnosticTraceId? trace;
@@ -258,6 +260,8 @@ class LocalDiagnostics {
             errorCode: code,
             elapsedMs: watch.elapsedMilliseconds,
             sourceRevision: sourceRevision,
+            modelGeneration: modelGeneration,
+            attempt: attempt,
             traceId: trace ??= DiagnosticTraceId(),
           ),
         );

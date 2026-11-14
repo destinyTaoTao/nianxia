@@ -9,6 +9,9 @@ enum InferenceCapability { speech, semantic }
 abstract interface class InferenceRuntime
     implements Transcriber, Embedder, Listenable {
   String? get searchModelVersion;
+  String? get speechModelVersion;
+  void setCaptureActive(bool active);
+  Future<void> close();
   Future<bool> ready(InferenceCapability capability);
   @override
   Future<String> transcribe(String path, {bool foreground = true});
