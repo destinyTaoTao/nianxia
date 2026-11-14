@@ -21,7 +21,7 @@ CASES = {
     'capture': ('isolation-smoke', 'background-smoke', 'capture-matrix', 'deadline-auto-finalize',
                 'process-kill-active', 'process-kill-query', 'kill-after-finalize', 'kill-after-source-commit'),
     'backup': ('isolation-smoke', 'cipher-smoke', 'cipher-resources', 'backup-matrix'),
-    'acceptance': ('isolation-smoke', 'offline-end-to-end', 'performance', 'search-paging', 'diagnostics', 'local-jobs'),
+    'acceptance': ('isolation-smoke', 'offline-end-to-end', 'performance', 'search-paging', 'diagnostics', 'local-jobs', 'ui-flows'),
 }
 TARGETS = {'capture': 'background_capture_test.dart', 'backup': 'backup_crypto_test.dart',
            'acceptance': 'app_acceptance_test.dart'}
@@ -161,7 +161,7 @@ def main():
     if args.mode == 'release' and (args.case in KILL_PHASES or args.case == 'capture-matrix'):
         raise ValidationError('Automatic capture faults require the debug/profile orchestrator; release refused')
     target = 'integration_test/' + ('isolation_smoke_test.dart' if args.case == 'isolation-smoke'
-                                    else 'deadline_capture_test.dart' if args.case == 'deadline-auto-finalize' else 'search_paging_test.dart' if args.case == 'search-paging' else 'local_jobs_test.dart' if args.case == 'local-jobs' else 'diagnostics_test.dart' if args.case == 'diagnostics' else TARGETS[args.target])
+                                    else 'deadline_capture_test.dart' if args.case == 'deadline-auto-finalize' else 'search_paging_test.dart' if args.case == 'search-paging' else 'local_jobs_test.dart' if args.case == 'local-jobs' else 'ui_flows_test.dart' if args.case == 'ui-flows' else 'diagnostics_test.dart' if args.case == 'diagnostics' else TARGETS[args.target])
     if not (root / target).is_file():
         raise ValidationError('Requested test entry point is not implemented')
     run_id = str(uuid.uuid4())
@@ -198,7 +198,7 @@ def main():
             if identity is None or identity.group(1) != TEST_ID:
                 raise ValidationError('APK identity is not the isolated test package; refused')
             run([*adb, 'install', '-r', '-t', str(artifact)])
-            if args.target == 'capture' and args.case != 'isolation-smoke':
+            if args.target == 'capture' and args.case != 'isolation-smoke' or args.case == 'ui-flows':
                 run([*adb, 'shell', 'pm', 'grant', TEST_ID, 'android.permission.RECORD_AUDIO'])
         else:
             destination = 'iphonesimulator' if device.get('emulator') else 'iphoneos'

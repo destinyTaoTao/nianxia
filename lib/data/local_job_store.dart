@@ -16,8 +16,10 @@ class LocalJobStore {
   final RecordRepository source;
   final Directory home;
   Database? _db, _owner;
-  bool _attempted = false;
+  bool _attempted = false, _failed = false;
+  bool get available => _open() != null;
   Database? _open() {
+    if (_failed) return null;
     if (_attempted) return _db;
     _attempted = true;
     Database? db;
@@ -182,6 +184,7 @@ class LocalJobStore {
         }
       }
     } catch (_) {
+      _failed = true;
       /* Optional queue failure leaves source and manual retry intact. */
     }
     return null;
@@ -239,6 +242,7 @@ class LocalJobStore {
         ],
       );
     } catch (_) {
+      _failed = true;
       /* Source is authoritative on next reconciliation. */
     }
   }

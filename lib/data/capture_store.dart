@@ -149,14 +149,17 @@ class CaptureStore {
     if (!draft.query) {
       await marker(draft.id).writeAsString('{"discarded":true}', flush: true);
     }
-    for (final path in [draft.path, audio('${draft.id}.wav')]) {
+    for (final path in [
+      draft.path,
+      if (!draft.query) audio('${draft.id}.wav'),
+    ]) {
       final file = File(path);
       if (await file.exists()) {
         await file.delete();
       }
     }
     final journal = marker(draft.id);
-    if (await journal.exists()) {
+    if (!draft.query && await journal.exists()) {
       await journal.delete();
     }
   }

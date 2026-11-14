@@ -4,6 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../app/notebook.dart';
+import '../app/backup.dart';
+import '../app/diagnostics.dart';
+import '../app/capture_session_controller.dart';
+import '../domain/capture_session.dart';
+import 'native_recorder.dart';
+import 'recovery.dart';
 import '../platform/local_models.dart';
 import 'common.dart';
 import 'theme.dart';
@@ -18,12 +24,20 @@ class HomePage extends StatefulWidget {
     super.key,
     required this.book,
     this.models,
+    this.captureSession,
+    this.backupService,
+    this.diagnostics,
+    this.startupNotice,
     this.shortcut,
     required this.themeMode,
     required this.onTheme,
   });
   final Notebook book;
   final LocalModels? models;
+  final CaptureSessionController? captureSession;
+  final BackupService? backupService;
+  final LocalDiagnostics? diagnostics;
+  final String? startupNotice;
   final ValueNotifier<String?>? shortcut;
   final ThemeMode themeMode;
   final FutureOr<bool> Function(ThemeMode) onTheme;
@@ -45,6 +59,46 @@ class _HomePageState extends State<HomePage> {
   bool loading = true;
   Object? loadError;
   bool retryRefresh = false;
+  bool hasRecovery = false;
+  int recoveryCheck = 0;
+  int? seenWarnings;
+  String? seenNotice;
+  Future<void> loadRecoveryState() async {
+    if (!mounted) return;
+    final version = ++recoveryCheck;
+    try {
+      final page = await widget.book.recoveryPage(limit: 1);
+      if (mounted && version == recoveryCheck) {
+        setState(
+          () => hasRecovery = page.entries.isNotEmpty || page.next != null,
+        );
+      }
+    } catch (_) {}
+  }
+
+  void statusChanged() {
+    if (!mounted) return;
+    if (seenWarnings != widget.book.recoveryWarnings) {
+      seenWarnings = widget.book.recoveryWarnings;
+      unawaited(loadRecoveryState());
+    }
+    if (seenNotice != widget.book.backgroundNotice) {
+      setState(() => seenNotice = widget.book.backgroundNotice);
+    }
+  }
+
+  Future<void> recovery() async {
+    await Navigator.push<void>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => RecoveryScreen(
+          book: widget.book,
+          captureSession: widget.captureSession,
+        ),
+      ),
+    );
+    if (mounted) await loadRecoveryState();
+  }
 
   void recordsChanged() => unawaited(loadRecords(reset: true));
 
@@ -121,6 +175,8 @@ class _HomePageState extends State<HomePage> {
   void initState() {
     super.initState();
     widget.book.contentChanges.addListener(recordsChanged);
+    widget.book.addListener(statusChanged);
+    unawaited(loadRecoveryState());
     scroll.addListener(scrolled);
     unawaited(loadRecords(reset: true));
     widget.shortcut?.addListener(_shortcut);
@@ -137,6 +193,7 @@ class _HomePageState extends State<HomePage> {
   @override
   void dispose() {
     widget.book.contentChanges.removeListener(recordsChanged);
+    widget.book.removeListener(statusChanged);
     scroll.dispose();
     widget.shortcut?.removeListener(_shortcut);
     widget.models?.store.removeListener(modelChanged);
@@ -148,7 +205,10 @@ class _HomePageState extends State<HomePage> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.book != widget.book) {
       oldWidget.book.contentChanges.removeListener(recordsChanged);
+      oldWidget.book.removeListener(statusChanged);
       widget.book.contentChanges.addListener(recordsChanged);
+      widget.book.addListener(statusChanged);
+      unawaited(loadRecoveryState());
       entries = [];
       next = null;
       generation = null;
@@ -193,7 +253,8 @@ class _HomePageState extends State<HomePage> {
       return;
     }
     widget.shortcut!.value = null;
-    if (widget.book.captureActive) {
+    if (widget.book.captureActive &&
+        (widget.captureSession == null || action == 'search')) {
       notice(context, '正在录音，请先停止保存或丢弃。');
       return;
     }
@@ -215,6 +276,16 @@ class _HomePageState extends State<HomePage> {
         widget.book,
         widget.models,
         onSaved: showSavedRecord,
+        captureSession: widget.captureSession,
+        parentId:
+            widget.captureSession?.snapshot?.request.mode ==
+                    CaptureMode.record &&
+                widget.captureSession?.savedId !=
+                    widget.captureSession?.snapshot?.sessionId &&
+                widget.captureSession?.snapshot?.phase !=
+                    NativeCapturePhase.cancelled
+            ? widget.captureSession?.snapshot?.request.parentId
+            : null,
       );
       if (mounted && r is Record) {
         notice(context, '音频已保存，转写稍后完成');
@@ -236,8 +307,12 @@ class _HomePageState extends State<HomePage> {
     Navigator.push(
       context,
       MaterialPageRoute<void>(
-        builder: (_) =>
-            SearchPage(book: widget.book, models: widget.models, voice: voice),
+        builder: (_) => SearchPage(
+          book: widget.book,
+          models: widget.models,
+          voice: voice,
+          captureSession: widget.captureSession,
+        ),
       ),
     );
   }
@@ -252,10 +327,15 @@ class _HomePageState extends State<HomePage> {
           themeMode: widget.themeMode,
           onTheme: widget.onTheme,
           modelsFirst: modelsFirst,
+          captureSession: widget.captureSession,
+          backupService: widget.backupService,
+          diagnostics: widget.diagnostics,
+          startupNotice: widget.startupNotice,
         ),
       ),
     );
     await loadSpeechStatus();
+    await loadRecoveryState();
   }
 
   Future<void> changeTheme(ThemeMode mode) async {
@@ -287,23 +367,30 @@ class _HomePageState extends State<HomePage> {
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: theme.appBarTheme.systemOverlayStyle!,
       child: Scaffold(
-        bottomNavigationBar: BottomActions(
-          primary: FilledButton.icon(
-            onPressed: record,
-            icon: const Icon(Icons.mic_none_rounded),
-            label: const Text('记一下'),
-          ),
-          secondary: FilledButton.tonalIcon(
-            onPressed: () =>
-                openEditor(context, widget.book, onSaved: showSavedRecord),
-            icon: const Icon(Icons.edit_outlined),
-            label: const Text('写文字'),
-          ),
+        bottomNavigationBar: ListenableBuilder(
+          listenable: widget.captureSession ?? Listenable.merge(const []),
+          builder: (_, _) {
+            final capture = widget.captureSession;
+            final value = capture?.snapshot;
+            if (capture != null &&
+                value?.request.mode == CaptureMode.record &&
+                capture.savedId != value!.sessionId &&
+                value.phase != NativeCapturePhase.cancelled) {
+              return NativeCaptureBar(capture: capture, onOpen: record);
+            }
+            return BottomActions(
+              primary: FilledButton.icon(
+                onPressed: record,
+                icon: const Icon(Icons.mic_none_rounded),
+                label: const Text('记一下'),
+              ),
+            );
+          },
         ),
         body: SafeArea(
           bottom: false,
           child: ColoredBox(
-            color: colors.surfaceContainerLow,
+            color: theme.scaffoldBackgroundColor,
             child: CustomScrollView(
               controller: scroll,
               slivers: [
@@ -316,46 +403,104 @@ class _HomePageState extends State<HomePage> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Row(
+                            Wrap(
+                              alignment: WrapAlignment.spaceBetween,
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              runSpacing: 8,
                               children: [
-                                const NoteMark(size: 26),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: Text(
-                                    '念下',
-                                    style: theme.textTheme.titleLarge,
-                                  ),
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const NoteMark(size: 26),
+                                    const SizedBox(width: 10),
+                                    Text(
+                                      '念下',
+                                      style: theme.textTheme.titleLarge,
+                                    ),
+                                  ],
                                 ),
-                                IconButton(
-                                  tooltip: theme.brightness == Brightness.dark
-                                      ? '切换浅色主题'
-                                      : '切换深色主题',
-                                  onPressed: themeBusy
-                                      ? null
-                                      : () => changeTheme(
+                                Wrap(
+                                  crossAxisAlignment: WrapCrossAlignment.center,
+                                  children: [
+                                    TextButton.icon(
+                                      onPressed: () => openEditor(
+                                        context,
+                                        widget.book,
+                                        onSaved: showSavedRecord,
+                                      ),
+                                      icon: const Icon(Icons.edit_outlined),
+                                      label: const Text('写文字'),
+                                    ),
+                                    IconButton(
+                                      tooltip:
                                           theme.brightness == Brightness.dark
-                                              ? ThemeMode.light
-                                              : ThemeMode.dark,
-                                        ),
-                                  icon: Icon(
-                                    theme.brightness == Brightness.dark
-                                        ? Icons.light_mode_outlined
-                                        : Icons.dark_mode_outlined,
-                                  ),
-                                ),
-                                IconButton(
-                                  tooltip: '设置',
-                                  onPressed: () => settings(),
-                                  icon: const Icon(Icons.settings_outlined),
+                                          ? '切换浅色主题'
+                                          : '切换深色主题',
+                                      onPressed: themeBusy
+                                          ? null
+                                          : () => changeTheme(
+                                              theme.brightness ==
+                                                      Brightness.dark
+                                                  ? ThemeMode.light
+                                                  : ThemeMode.dark,
+                                            ),
+                                      icon: Icon(
+                                        theme.brightness == Brightness.dark
+                                            ? Icons.light_mode_outlined
+                                            : Icons.dark_mode_outlined,
+                                      ),
+                                    ),
+                                    IconButton(
+                                      tooltip: '设置',
+                                      onPressed: () => settings(),
+                                      icon: const Icon(Icons.settings_outlined),
+                                    ),
+                                  ],
                                 ),
                               ],
                             ),
                             const SizedBox(height: 20),
-                            Text(
-                              '随手记，慢慢想。',
-                              style: theme.textTheme.headlineMedium,
+                            Material(
+                              key: const Key('home-search'),
+                              color: colors.surfaceContainer,
+                              borderRadius: BorderRadius.circular(18),
+                              clipBehavior: Clip.antiAlias,
+                              child: InkWell(
+                                onTap: find,
+                                child: Padding(
+                                  padding: const EdgeInsets.only(
+                                    left: 16,
+                                    top: 8,
+                                    bottom: 8,
+                                    right: 4,
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      const Icon(Icons.search_rounded),
+                                      const SizedBox(width: 12),
+                                      const Text('找一下'),
+                                      Expanded(
+                                        child: Text(
+                                          '，输入关键词',
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            color: colors.onSurfaceVariant,
+                                          ),
+                                        ),
+                                      ),
+                                      IconButton(
+                                        tooltip: '语音查找',
+                                        onPressed: () => find(voice: true),
+                                        icon: const Icon(
+                                          Icons.mic_none_rounded,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
                             ),
-                            const SizedBox(height: 24),
+                            const SizedBox(height: 20),
                             SizedBox(
                               width: double.infinity,
                               child: Wrap(
@@ -407,68 +552,35 @@ class _HomePageState extends State<HomePage> {
                                       ),
                                     ),
                                   ),
-                                  TextButton.icon(
-                                    onPressed: find,
-                                    icon: const Icon(Icons.search_rounded),
-                                    label: const Text('找一下'),
-                                  ),
                                 ],
                               ),
                             ),
-                            if (speechReady == false) ...[
-                              const SizedBox(height: 14),
-                              Material(
-                                color: colors.surfaceContainerHighest,
-                                borderRadius: BorderRadius.circular(16),
-                                clipBehavior: Clip.antiAlias,
-                                child: InkWell(
-                                  onTap: () => settings(modelsFirst: true),
-                                  child: Padding(
-                                    padding: const EdgeInsets.all(16),
-                                    child: Row(
-                                      children: [
-                                        const Icon(
-                                          Icons.download_outlined,
-                                          size: 22,
-                                        ),
-                                        const SizedBox(width: 12),
-                                        Expanded(
-                                          child: Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                              Text(
-                                                '离线转写尚未就绪',
-                                                style: theme
-                                                    .textTheme
-                                                    .titleMedium
-                                                    ?.copyWith(fontSize: 14),
-                                              ),
-                                              Text(
-                                                '录音照常保存',
-                                                style:
-                                                    theme.textTheme.bodySmall,
-                                              ),
-                                              const SizedBox(height: 4),
-                                              Text(
-                                                '准备语音转写',
-                                                style:
-                                                    theme.textTheme.labelLarge,
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                        const SizedBox(width: 8),
-                                        const Icon(
-                                          Icons.chevron_right_rounded,
-                                          size: 20,
-                                        ),
-                                      ],
-                                    ),
-                                  ),
+                            if (hasRecovery)
+                              TextButton.icon(
+                                onPressed: recovery,
+                                icon: const Icon(
+                                  Icons.restore_rounded,
+                                  size: 18,
+                                ),
+                                label: const Text('核对待恢复资料'),
+                              ),
+                            if (widget.book.backgroundNotice != null)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 12),
+                                child: Text(
+                                  widget.book.backgroundNotice!,
+                                  style: theme.textTheme.bodySmall,
                                 ),
                               ),
-                            ],
+                            if (speechReady == false)
+                              TextButton.icon(
+                                onPressed: () => settings(modelsFirst: true),
+                                icon: const Icon(
+                                  Icons.download_outlined,
+                                  size: 18,
+                                ),
+                                label: const Text('准备语音转写（录音照常保存）'),
+                              ),
                           ],
                         ),
                       ),
@@ -586,15 +698,17 @@ class RecordRow extends StatelessWidget {
       preview = preview.substring(title.length).trimLeft();
     }
     return Padding(
-      padding: const EdgeInsets.only(bottom: 18),
+      padding: EdgeInsets.zero,
       child: Material(
-        color: theme.colorScheme.surface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+        color: theme.scaffoldBackgroundColor,
+        shape: Border(
+          bottom: BorderSide(color: theme.colorScheme.outlineVariant),
+        ),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: onTap,
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 20, 12, 10),
+            padding: const EdgeInsets.fromLTRB(4, 20, 0, 12),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -604,7 +718,7 @@ class RecordRow extends StatelessWidget {
                     title,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.titleMedium?.copyWith(fontSize: 20),
+                    style: theme.textTheme.titleMedium?.copyWith(fontSize: 18),
                   ),
                 ),
                 if (preview.isNotEmpty) ...[

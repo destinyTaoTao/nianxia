@@ -27,6 +27,25 @@ import java.util.concurrent.Executors
 
 object CaptureOwners {
     private var instance: NativeCaptureSession? = null
+    private var validationRunId: String? = null
+    private var validationRoot: File? = null
+
+    // Isolated UI fixtures accept an identity, never an arbitrary caller path.
+    @Synchronized fun validationWorkspace(context: Context, runId: String, end: Boolean) {
+        if (context.packageName != "app.nianxia.nianxia.test") throw CaptureFailure("capture_validation")
+        CaptureRequest.checkId(runId)
+        if (instance?.current()?.active == true) throw CaptureFailure("capture_busy")
+        if (end && validationRunId != runId || !end && validationRunId != null) {
+            throw CaptureFailure("capture_validation")
+        }
+        val cache = context.applicationContext.cacheDir.canonicalFile
+        val root = File(cache, "validation-ui/$runId/nianxia/native-captures")
+        if (root.canonicalFile != root.absoluteFile) throw CaptureFailure("capture_validation")
+        instance?.close()
+        instance = null
+        validationRunId = if (end) null else runId
+        validationRoot = if (end) null else root
+    }
     val commands = Executors.newSingleThreadExecutor()
     val listeners = CopyOnWriteArrayList<(CaptureSnapshot) -> Unit>()
     @Volatile var visible = false
@@ -34,7 +53,7 @@ object CaptureOwners {
 
     @Synchronized fun get(context: Context): NativeCaptureSession {
         return instance ?: NativeCaptureSession(
-            File(context.applicationContext.filesDir.canonicalFile, "nianxia/native-captures"),
+            validationRoot ?: File(context.applicationContext.filesDir.canonicalFile, "nianxia/native-captures"),
             { AndroidPcmInput(context.applicationContext) }, { SystemClock.elapsedRealtime() }
         ) { snapshot -> main.post {
             listeners.forEach { it(snapshot) }

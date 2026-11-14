@@ -123,6 +123,7 @@ class Storage {
   }) => _call(_Command.claimJob, [kinds, speechModelVersion]);
   Future<void> finishLocalJob(LocalJob job, {required JobOutcome outcome}) =>
       _call(_Command.finishJob, [job, outcome]);
+  Future<bool> get localJobsAvailable => _call(_Command.jobsAvailable);
   Future<DateTime?> nextLocalJobAttempt(Set<JobKind> kinds) =>
       _call(_Command.nextJobAttempt, [kinds]);
   Future<bool> audioProtected(String name) =>
@@ -256,6 +257,7 @@ class Storage {
 }
 
 enum _Command {
+  jobsAvailable,
   nextJobAttempt,
   audioProtected,
   claimJob,
@@ -357,6 +359,8 @@ Object? _execute(
   void Function(double) progress,
 ) {
   switch (command) {
+    case _Command.jobsAvailable:
+      return jobs.available;
     case _Command.nextJobAttempt:
       return jobs.nextAttempt(a[0] as Set<JobKind>);
     case _Command.audioProtected:

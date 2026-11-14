@@ -22,6 +22,17 @@ class CaptureChannel(private val activity: Activity, messenger: BinaryMessenger)
             override fun onCancel(arguments: Any?) { sink = null }
         })
         methods.setMethodCallHandler { call, reply ->
+            if (call.method == "setValidationWorkspace" || call.method == "endValidationWorkspace") {
+                CaptureOwners.commands.execute {
+                    try {
+                        val args = call.arguments as? Map<*, *> ?: throw CaptureFailure("capture_validation")
+                        CaptureOwners.validationWorkspace(activity, args["runId"] as? String
+                            ?: throw CaptureFailure("capture_validation"), call.method == "endValidationWorkspace")
+                        main.post { reply.success(null) }
+                    } catch (error: Exception) { main.post { fail(reply, error) } }
+                }
+                return@setMethodCallHandler
+            }
             val owner = CaptureOwners.get(activity)
             if (call.method == "start") {
                 try {

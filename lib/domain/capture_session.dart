@@ -9,7 +9,7 @@ enum NativeCapturePhase {
   cancelled,
 }
 
-enum CaptureDisposition { importedRecord, queryCompleted }
+enum CaptureDisposition { importedRecord, queryCompleted, discardedRecord }
 
 void validateCaptureId(String value) {
   if (!RegExp(
@@ -124,7 +124,8 @@ class CaptureSnapshot {
           level > 1 ||
           name != null && name != '${request.sessionId}.wav' ||
           error != null && !RegExp(r'^[a-z][a-z0-9_]{0,63}$').hasMatch(error) ||
-          phase == NativeCapturePhase.finalized && (bytes == 0 || name == null)) {
+          phase == NativeCapturePhase.finalized &&
+              (bytes == 0 || name == null)) {
         throw const FormatException();
       }
       return CaptureSnapshot._(

@@ -6,6 +6,8 @@ import 'package:crypto/crypto.dart';
 
 import '../domain/capture_session.dart';
 import '../domain/local_job.dart';
+import '../domain/recovery_entry.dart';
+import '../data/recovery_catalog.dart';
 import '../domain/search_page.dart';
 
 import '../domain/ports.dart';
@@ -54,6 +56,14 @@ class Notebook extends ChangeNotifier {
   final Directory home;
   final Storage repository;
   final DateTime Function() clock;
+  String? _backgroundNotice;
+  String? get backgroundNotice => _backgroundNotice;
+  void setBackgroundNotice(String? value) {
+    if (_closed || value == _backgroundNotice) return;
+    _backgroundNotice = value;
+    changed(content: false);
+  }
+
   String? _themeMode;
   String? get themeMode => _themeMode;
   Future<void> saveThemeMode(String mode) => _operation(() async {
@@ -250,6 +260,166 @@ class Notebook extends ChangeNotifier {
     () => _finishCapture(draft, recovering: recovering, standalone: standalone),
   );
 
+  late final _recoveryCatalog = RecoveryCatalog(home);
+  Future<RecoveryPage> recoveryPage({String? after, int limit = 40}) =>
+      _recoveryCatalog.page(after: after, limit: limit);
+  Future<File> exportRecoveryEntry(String id) => _withCapture(
+    id.substring(id.indexOf(':') + 1),
+    () => withMediaLease(
+      () async => _recoveryCatalog.export(await _recoveryCatalog.resolve(id)),
+    ),
+  );
+  Future<File> previewRecoveryAudio(String id) => _withCapture(
+    id.substring(id.indexOf(':') + 1),
+    () => withMediaLease(
+      () async => _recoveryCatalog.export(
+        await _recoveryCatalog.resolve(id),
+        audioOnly: true,
+      ),
+    ),
+  );
+  File _nativeDiscardFlag(String id) {
+    validateCaptureId(id);
+    return File(p.join(home.path, 'drafts', '$id.discard'));
+  }
+
+  Future<bool> nativeCaptureDiscarded(String id) async {
+    final file = _nativeDiscardFlag(id);
+    final type = await FileSystemEntity.type(file.path, followLinks: false);
+    if (type == FileSystemEntityType.notFound) return false;
+    if (type != FileSystemEntityType.file ||
+        await file.length() > 16 ||
+        await file.readAsString() != 'v1') {
+      throw const NotebookException('丢弃标记无法识别，原始片段已保留。');
+    }
+    return true;
+  }
+
+  Future<void> discardRecoveryEntry(String id) =>
+      _withCapture(id.substring(id.indexOf(':') + 1), () async {
+        if (captureActive) throw const NotebookException('正在录音，请停止后再管理待恢复片段。');
+        if (_mediaLeases > 0) throw const NotebookException('正在备份或导出，请完成后再丢弃。');
+        final item = await _recoveryCatalog.resolve(id);
+        if (!item.entry.canDiscard) {
+          throw const NotebookException('未知格式只能保留或导出，不能在此丢弃。');
+        }
+        if (id.startsWith('d:') && await get(id.substring(2)) != null) {
+          throw const NotebookException('此录音已经保存，请从记录详情操作。');
+        }
+        if (item.native) {
+          final flag = _nativeDiscardFlag(id.substring(2));
+          if (!await nativeCaptureDiscarded(id.substring(2))) {
+            final stage = File('${flag.path}.${const Uuid().v4()}.partial');
+            await stage.writeAsString('v1', flush: true);
+            await stage.rename(flag.path);
+          }
+          for (final f in item.files.where((f) => f.$2 != 'capture.json')) {
+            await f.$1.delete();
+          }
+        } else if (item.draft != null) {
+          await captures.discard(item.draft!);
+        } else {
+          for (final f in item.files) {
+            await f.$1.delete();
+          }
+          if (id.startsWith('q:')) {
+            await Directory(p.join(home.path, 'quarantine', id.substring(2)))
+                .delete();
+          }
+        }
+        recoveryDrafts.removeWhere((d) => d.id == id.substring(2));
+        changed(content: false);
+      });
+  Future<List<String>> pendingNativeDiscards({String? after}) async {
+    final ids = <String>[];
+    await for (final f in Directory(
+      p.join(home.path, 'drafts'),
+    ).list(followLinks: false)) {
+      if (f is! File || !f.path.endsWith('.discard')) continue;
+      final id = p.basename(f.path).replaceFirst(RegExp(r'\.discard$'), '');
+      try {
+        if ((after == null || id.compareTo(after) > 0) &&
+            await nativeCaptureDiscarded(id)) {
+          ids.add(id);
+          ids.sort();
+          if (ids.length > 32) ids.removeLast();
+        }
+      } catch (_) {
+        recoveryWarnings++;
+      }
+    }
+    return ids;
+  }
+
+  Future<bool> nativeDiscardRequiresCancel(String id) async =>
+      (await _recoveryCatalog.resolve('d:$id')).nativeFailure;
+  Future<void> retainFailedNative(CaptureSnapshot value) =>
+      _withCapture(value.sessionId, () async {
+        if (value.request.mode != CaptureMode.record ||
+            value.phase != NativeCapturePhase.failed) {
+          throw const NotebookException('此片段不属于失败录音。');
+        }
+        if (await get(value.sessionId) != null ||
+            await nativeCaptureDiscarded(value.sessionId)) {
+          return;
+        }
+        final marker = captures.marker(value.sessionId);
+        if (await marker.exists()) {
+          return; // Unknown/newer recovery metadata is never overwritten.
+        }
+        final request = value.request;
+        final data = {
+          'id': request.sessionId,
+          'createdAt': request.createdAtUtc.toIso8601String(),
+          'timezone': request.timezone,
+          'offsetMinutes': request.offsetMinutes,
+          'parentId': request.parentId,
+          'nativeCaptureVersion': 1,
+          'pcmBytes': value.pcmBytes,
+          'nativeRecoveryFailed': true,
+        };
+        final stage = File('${marker.path}.${const Uuid().v4()}.partial');
+        try {
+          await stage.writeAsString(jsonEncode(data), flush: true);
+          await stage.rename(marker.path);
+        } finally {
+          if (await stage.exists()) await stage.delete();
+        }
+        recoveryWarnings++;
+        changed(content: false);
+      });
+
+  Future<void> completeNativeDiscard(String id) => _withCapture(id, () async {
+    if (!await nativeCaptureDiscarded(id)) return;
+    if (await get(id) != null) throw const NotebookException('片段已成为记录，不能继续丢弃。');
+    final marker = captures.marker(id);
+    if (await marker.exists()) {
+      final item = await _recoveryCatalog.resolve('d:$id');
+      if (!item.native || !item.entry.canDiscard) {
+        throw const NotebookException('恢复标记格式已变化，未清理原文件。');
+      }
+      for (final f in item.files.where((f) => f.$2 != 'capture.json')) {
+        await f.$1.delete();
+      }
+      await marker.delete();
+    } else {
+      // Native acknowledgement already succeeded. Finish an interrupted Dart
+      // cleanup without requiring the marker that was just removed.
+      for (final root in ['native-captures', 'audio']) {
+        final path = p.join(home.path, root, '$id.wav');
+        final type = await FileSystemEntity.type(path, followLinks: false);
+        if (type == FileSystemEntityType.notFound) continue;
+        if (type != FileSystemEntityType.file ||
+            await File(path).resolveSymbolicLinks() !=
+                p.join(await home.resolveSymbolicLinks(), root, '$id.wav')) {
+          throw const NotebookException('清理路径无法核验，原始文件保留。');
+        }
+        await File(path).delete();
+      }
+    }
+    await _nativeDiscardFlag(id).delete();
+  });
+
   Future<Record> acceptNativeCapture(
     FinalizedCapture clip, {
     bool standalone = false,
@@ -258,6 +428,9 @@ class Notebook extends ChangeNotifier {
     return _withCapture(
       draft.id,
       () => withMediaLease(() async {
+        if (await nativeCaptureDiscarded(draft.id)) {
+          throw const NotebookException('此待恢复片段已被丢弃。');
+        }
         if (await get(draft.id) == null) await captures.persistNative(clip);
         return _finishCapture(draft, standalone: standalone);
       }),
@@ -365,17 +538,21 @@ class Notebook extends ChangeNotifier {
     await validateWave(file);
   }
 
-  Future<void> cancelCapture(CaptureDraft draft) =>
-      _withCapture(draft.id, () async {
-        if (!draft.query && await get(draft.id) != null) {
-          throw const NotebookException('录音已经保存。若要删除，请从记录详情操作。');
-        }
-        await captures.discard(draft);
-        recoveryDrafts.removeWhere((d) => d.id == draft.id);
-        if (!_closed) {
-          changed();
-        }
-      });
+  Future<void> cancelCapture(CaptureDraft draft) {
+    if (draft.nativePcmBytes != null) {
+      return discardRecoveryEntry('d:${draft.id}');
+    }
+    return _withCapture(draft.id, () async {
+      if (!draft.query && await get(draft.id) != null) {
+        throw const NotebookException('录音已经保存。若要删除，请从记录详情操作。');
+      }
+      await captures.discard(draft);
+      recoveryDrafts.removeWhere((d) => d.id == draft.id);
+      if (!_closed) {
+        changed();
+      }
+    });
+  }
 
   Future<void> _recover() async {
     for (final name in ['imports', 'exports']) {
@@ -426,7 +603,10 @@ class Notebook extends ChangeNotifier {
         }
         final id = j['id'] as String;
         final native = j['nativeCaptureVersion'] == 1;
-        if (native) validateCaptureId(id);
+        if (native) {
+          validateCaptureId(id);
+          if (await nativeCaptureDiscarded(id)) continue;
+        }
         if (!RegExp(r'^[a-f0-9-]{36}$').hasMatch(id)) {
           continue;
         }
@@ -443,6 +623,10 @@ class Notebook extends ChangeNotifier {
           parentId: j['parentId'] as String?,
           nativePcmBytes: native ? j['pcmBytes'] as int : null,
         );
+        if (native && j['nativeRecoveryFailed'] == true) {
+          recoveryDrafts.add(draft);
+          continue;
+        }
         if (!native && await get(id) != null) {
           await file.delete();
           continue;
@@ -464,47 +648,55 @@ class Notebook extends ChangeNotifier {
 
   /// Optional full scan runs after startup. Every move shares capture's lock
   /// and a media barrier; reference checks are fresh, never an old snapshot.
-  Future<void> runMaintenance() => _maintenance ??= _operation(() async {
-    if (_mediaLeases > 0 || captureActive) return;
-    if (!await repository.completeReferencedMediaDeletions()) {
-      recoveryWarnings++;
-    }
-    await _drainMediaDeletions();
-    await for (final file in Directory(p.join(home.path, 'audio')).list()) {
-      if (_closed) break;
-      if (file is! File) continue;
-      final id = p.basenameWithoutExtension(file.path);
-      await _withCapture(id, () async {
-        if (_closed || _mediaLeases > 0 || captureActive) return;
-        final previous = _mediaMutation;
-        final complete = Completer<void>();
-        _mediaMutation = complete.future;
-        try {
-          await previous;
-          if (_closed ||
-              _mediaLeases > 0 ||
-              captureActive ||
-              await repository.audioProtected(p.basename(file.path)) ||
-              await captures.marker(id).exists()) {
-            return;
-          }
-          try {
-            final quarantine = await Directory(
-              p.join(home.path, 'quarantine', const Uuid().v4()),
-            ).create(recursive: true);
-            await file.rename(p.join(quarantine.path, p.basename(file.path)));
-          } on FileSystemException {
-            /* Preserve original if isolation fails. */
-          }
+  Future<void> runMaintenance() => _maintenance ??=
+      _operation(() async {
+        if (_mediaLeases > 0 || captureActive) return;
+        if (!await repository.completeReferencedMediaDeletions()) {
           recoveryWarnings++;
-        } finally {
-          complete.complete();
-          if (identical(_mediaMutation, complete.future)) _mediaMutation = null;
         }
+        await _drainMediaDeletions();
+        await for (final file in Directory(p.join(home.path, 'audio')).list()) {
+          if (_closed) break;
+          if (file is! File) continue;
+          final id = p.basenameWithoutExtension(file.path);
+          await _withCapture(id, () async {
+            if (_closed || _mediaLeases > 0 || captureActive) return;
+            final previous = _mediaMutation;
+            final complete = Completer<void>();
+            _mediaMutation = complete.future;
+            try {
+              await previous;
+              if (_closed ||
+                  _mediaLeases > 0 ||
+                  captureActive ||
+                  await repository.audioProtected(p.basename(file.path)) ||
+                  await captures.marker(id).exists()) {
+                return;
+              }
+              try {
+                final quarantine = await Directory(
+                  p.join(home.path, 'quarantine', const Uuid().v4()),
+                ).create(recursive: true);
+                await file.rename(
+                  p.join(quarantine.path, p.basename(file.path)),
+                );
+              } on FileSystemException {
+                /* Preserve original if isolation fails. */
+              }
+              recoveryWarnings++;
+            } finally {
+              complete.complete();
+              if (identical(_mediaMutation, complete.future)) {
+                _mediaMutation = null;
+              }
+            }
+          });
+          await Future<void>.delayed(Duration.zero);
+        }
+      }).whenComplete(() {
+        _maintenance = null;
+        changed(content: false);
       });
-      await Future<void>.delayed(Duration.zero);
-    }
-  }).whenComplete(() => _maintenance = null);
 
   int recoveryWarnings = 0;
   Future<void>? _mediaCleanup;

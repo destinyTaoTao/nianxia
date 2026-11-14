@@ -97,7 +97,7 @@ void main() {
     await launch(tester);
     await openRestore(tester);
     await tester.pump(const Duration(milliseconds: 400));
-    for (final label in ['恢复备份', '导出备份']) {
+    for (final label in ['恢复备份', '完整备份（未加密）']) {
       expect(
         tester
             .widget<OutlinedButton>(find.widgetWithText(OutlinedButton, label))

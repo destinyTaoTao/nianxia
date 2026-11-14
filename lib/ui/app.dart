@@ -3,18 +3,28 @@ import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
 import '../app/notebook.dart';
+import '../app/backup.dart';
+import '../app/diagnostics.dart';
+import '../app/capture_session_controller.dart';
 import '../platform/local_models.dart';
 import '../platform/capture_controller.dart';
 import 'capsule.dart';
 import 'theme.dart';
 import 'home.dart';
 import 'editor.dart';
+import 'native_recorder.dart';
+
+import 'dart:async';
 
 class NianxiaApp extends StatefulWidget {
   const NianxiaApp({
     super.key,
     required this.book,
     this.models,
+    this.captureSession,
+    this.backupService,
+    this.diagnostics,
+    this.startupNotice,
     this.shortcut,
     this.fontFamily,
     this.initialTheme = ThemeMode.dark,
@@ -23,6 +33,10 @@ class NianxiaApp extends StatefulWidget {
   });
   final Notebook book;
   final LocalModels? models;
+  final CaptureSessionController? captureSession;
+  final BackupService? backupService;
+  final LocalDiagnostics? diagnostics;
+  final String? startupNotice;
   final ValueNotifier<String?>? shortcut;
   final String? fontFamily;
   final ThemeMode initialTheme;
@@ -58,6 +72,18 @@ class _NianxiaAppState extends State<NianxiaApp> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     if (capsule) widget.shortcut!.value = null;
     widget.shortcut?.addListener(externalAction);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    final capture = widget.captureSession;
+    if (state == AppLifecycleState.resumed && capture != null) {
+      unawaited(
+        capture.reconnect().catchError((Object _) {
+          /* Pending data remains available for recovery. */
+        }),
+      );
+    }
   }
 
   @override
@@ -136,34 +162,42 @@ class _NianxiaAppState extends State<NianxiaApp> with WidgetsBindingObserver {
         : const Duration(milliseconds: 180),
     // Keep unsaved editors and their navigation stack while hiding the library.
     // Capsule confirmations use their own Navigator above the hidden pages.
-    builder: (context, child) => Stack(
-      children: [
-        ExcludeFocus(
-          excluding: capsule,
-          child: Offstage(offstage: capsule, child: child),
-        ),
-        if (capsule)
-          HeroControllerScope.none(
-            child: Navigator(
-              key: capsuleNavigator,
-              onGenerateRoute: (_) => PageRouteBuilder<void>(
-                opaque: false,
-                transitionDuration: Duration.zero,
-                reverseTransitionDuration: Duration.zero,
-                pageBuilder: (_, _, _) => CaptureCapsule(
-                  book: widget.book,
-                  models: widget.models,
-                  microphone: widget.captureMicrophone,
-                  onReturn: returnFromCapsule,
-                  onWrite: writeFromCapsule,
+    builder: (context, child) => NativeCaptureScope(
+      capture: widget.captureSession,
+      child: Stack(
+        children: [
+          ExcludeFocus(
+            excluding: capsule,
+            child: Offstage(offstage: capsule, child: child),
+          ),
+          if (capsule)
+            HeroControllerScope.none(
+              child: Navigator(
+                key: capsuleNavigator,
+                onGenerateRoute: (_) => PageRouteBuilder<void>(
+                  opaque: false,
+                  transitionDuration: Duration.zero,
+                  reverseTransitionDuration: Duration.zero,
+                  pageBuilder: (_, _, _) => CaptureCapsule(
+                    book: widget.book,
+                    captureSession: widget.captureSession,
+                    models: widget.models,
+                    microphone: widget.captureMicrophone,
+                    onReturn: returnFromCapsule,
+                    onWrite: writeFromCapsule,
+                  ),
                 ),
               ),
             ),
-          ),
-      ],
+        ],
+      ),
     ),
     home: HomePage(
       book: widget.book,
+      captureSession: widget.captureSession,
+      backupService: widget.backupService,
+      diagnostics: widget.diagnostics,
+      startupNotice: widget.startupNotice,
       models: widget.models,
       shortcut: widget.shortcut,
       themeMode: mode,

@@ -182,6 +182,26 @@ class NativeCaptureSessionTest {
         assertEquals(CapturePhase.cancelled,CaptureJournal(directory).read(id).phase)
     }
 
+    @Test fun explicitlyDiscardedClaimedRecoveryKeepsTombstoneUntilCleanupCompletes() {
+        owner.start(request());audio.push(byteArrayOf(1,2));owner.stop(id);owner.claim(id)
+        val recording=File(directory,"$id.wav");assertTrue(recording.delete());assertTrue(recording.mkdir());File(recording,"blocked").writeText("fixture")
+        try {owner.acknowledge(id,CaptureDisposition.discardedRecord);fail("Cleanup unexpectedly succeeded")}catch (_:CaptureFailure){}
+        assertEquals(CapturePhase.cancelled,CaptureJournal(directory).read(id).phase)
+        owner.close();owner=NativeCaptureSession(directory,{audio},{clock.get()})
+        assertTrue(owner.pending(null,32).none{it.request.sessionId==id})
+        recording.deleteRecursively()
+        owner.acknowledge(id,CaptureDisposition.discardedRecord)
+        assertFalse(File(directory,"$id.session").exists())
+    }
+
+    @Test fun cancellingAbsentSessionIsIdempotentAndDoesNotStopAnotherSession() {
+        owner.cancel(id);owner.cancel(id)
+        val other="22222222-2222-4222-8222-222222222222"
+        owner.start(request(other));owner.cancel(id)
+        assertEquals(other,owner.current()?.request?.sessionId)
+        assertTrue(audio.running)
+    }
+
     private class ManualAudio : CaptureAudioSource {
         private lateinit var accept: (ByteArray, Int) -> Unit
         private lateinit var failure: (String) -> Unit

@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:sqlite3/sqlite3.dart';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nianxia/app/background_tasks.dart';
@@ -62,6 +64,35 @@ void main() {
     }
   });
 
+  test(
+    'future job cache surfaces a recoverable notice without hiding source',
+    () async {
+      final home = await Directory.systemTemp.createTemp('nx-job-notice-');
+      final book = await Notebook.open(home);
+      final runtime = _Runtime();
+      BackgroundTasks? tasks;
+      try {
+        final saved = await book.saveText('synthetic retained source');
+        final db = sqlite3.open('${home.path}/jobs.sqlite');
+        db.execute('PRAGMA application_id=${0x4e584a42}');
+        db.execute('PRAGMA user_version=2');
+        db.close();
+        tasks = BackgroundTasks(book, runtime);
+        final until = DateTime.now().add(const Duration(seconds: 2));
+        while (book.backgroundNotice == null &&
+            DateTime.now().isBefore(until)) {
+          await Future<void>.delayed(const Duration(milliseconds: 20));
+        }
+        expect(book.backgroundNotice, isNotNull);
+        expect((await book.get(saved.id))!.body, 'synthetic retained source');
+      } finally {
+        tasks?.dispose();
+        runtime.dispose();
+        await book.close();
+        await home.delete(recursive: true);
+      }
+    },
+  );
   test('调度器可替换推理Adapter，真实SQLite落地转写与索引', () async {
     final home = await Directory.systemTemp.createTemp('nianxia-runtime-');
     final book = await Notebook.open(home);

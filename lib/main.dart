@@ -138,7 +138,13 @@ class _BootstrapState extends State<_Bootstrap> {
   @override
   Widget build(BuildContext context) {
     if (book != null) {
-      return NianxiaApp(book: book!, models: models, shortcut: shortcut);
+      return NianxiaApp(
+        book: book!,
+        models: models,
+        shortcut: shortcut,
+        diagnostics: session?.diagnostics,
+        startupNotice: session?.modelNotice,
+      );
     }
     return MaterialApp(
       debugShowCheckedModeBanner: false,

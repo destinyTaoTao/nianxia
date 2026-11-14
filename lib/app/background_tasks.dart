@@ -63,6 +63,22 @@ class BackgroundTasks {
           speechModelVersion: models.speechModelVersion ?? 'unversioned',
         );
         if (job == null) {
+          final available = await book.repository.localJobsAvailable;
+          if (!available && book.backgroundNotice == null) {
+            book.setBackgroundNotice('后台处理暂不可用，可在记录详情手动重试，重新打开应用后再检查。');
+            try {
+              diagnostics?.record(
+                DiagnosticEvent(
+                  kind: DiagnosticKind.startup,
+                  phase: DiagnosticPhase.prepare,
+                  result: DiagnosticResult.deferred,
+                  errorCode: DiagnosticErrorCode.unavailable,
+                ),
+              );
+            } catch (_) {}
+          } else if (available) {
+            book.setBackgroundNotice(null);
+          }
           retry = true;
           break;
         }

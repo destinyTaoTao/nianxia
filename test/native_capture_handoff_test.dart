@@ -1,4 +1,7 @@
 import 'dart:io';
+import 'dart:async';
+
+import 'recording_search_test.dart' show writeWave;
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter/foundation.dart';
@@ -102,6 +105,64 @@ class HandoffEndpoint implements NativeCapturePort {
   Stream<CaptureSnapshot> get events => const Stream.empty();
   @override
   Future<void> close() async {}
+}
+
+class _NullableHandoffEndpoint extends HandoffEndpoint {
+  _NullableHandoffEndpoint(super.book, super.value);
+  bool absent = false;
+  @override
+  Future<CaptureSnapshot?> current() async => absent ? null : value;
+  @override
+  Future<List<CaptureSnapshot>> pending({
+    String? after,
+    int limit = 32,
+  }) async => [];
+}
+
+class _SwitchingEndpoint extends HandoffEndpoint {
+  _SwitchingEndpoint(super.book, super.value);
+  bool started = false;
+  @override
+  Future<CaptureSnapshot?> current() async => started ? value : null;
+  @override
+  Future<CaptureSnapshot> start(CaptureRequest request) async {
+    started = true;
+    value = CaptureSnapshot.fromMap({
+      ...request.toMap(),
+      'phase': 'recording',
+      'sequence': 1,
+      'elapsedMs': 0,
+      'pcmBytes': 0,
+    });
+    return value;
+  }
+
+  @override
+  Future<CaptureSnapshot> stop(String id) async {
+    final path = '${book.home.path}/native-captures/queries/$id.wav';
+    await File(path).parent.create(recursive: true);
+    await writeWave(path);
+    value = CaptureSnapshot.fromMap({
+      ...value.request.toMap(),
+      'phase': 'finalized',
+      'sequence': 2,
+      'elapsedMs': 1000,
+      'pcmBytes': 32000,
+      'relativeAudioName': '$id.wav',
+    });
+    return value;
+  }
+}
+
+class _PendingQueryRuntime extends HandoffRuntime {
+  final entered = Completer<void>(), release = Completer<String>();
+  @override
+  Future<bool> ready(InferenceCapability capability) async => true;
+  @override
+  Future<String> transcribe(String path, {bool foreground = true}) async {
+    entered.complete();
+    return release.future;
+  }
 }
 
 class HandoffRuntime extends ChangeNotifier implements InferenceRuntime {
@@ -340,4 +401,87 @@ void main() {
       }
     },
   );
+  test('reconnecting multiple pending clips keeps saved state bound to current session', () async {
+    await wave(home);
+    const other = '22222222-2222-4222-8222-222222222222';
+    await File('${home.path}/native-captures/$id.wav')
+        .copy('${home.path}/native-captures/$other.wav');
+    final current = clip();
+    final endpoint = HandoffEndpoint(book, current.snapshot)
+      ..pendingValues = [current.snapshot, clip(sessionId: other).snapshot];
+    final runtime = HandoffRuntime();
+    final controller = CaptureSessionController(endpoint, book, runtime);
+    try {
+      await controller.reconnect();
+      expect(controller.savedId, id);
+      expect((await book.records).length, 2);
+    } finally {
+      controller.dispose();
+      runtime.dispose();
+    }
+  });
+
+  test(
+    'reconnect clears local active state when native current is absent',
+    () async {
+      final value = CaptureSnapshot.fromMap({
+        ...clip().snapshot.request.toMap(),
+        'phase': 'recording',
+        'sequence': 1,
+        'elapsedMs': 0,
+        'pcmBytes': 0,
+      });
+      final endpoint = _NullableHandoffEndpoint(book, value);
+      final runtime = HandoffRuntime();
+      final controller = CaptureSessionController(endpoint, book, runtime);
+      try {
+        await controller.reconnect();
+        expect(book.captureActive, isTrue);
+        endpoint.absent = true;
+        await controller.reconnect();
+        expect(controller.snapshot, isNull);
+        expect(book.captureActive, isFalse);
+        expect(endpoint.cancels, 0);
+      } finally {
+        controller.dispose();
+        runtime.dispose();
+      }
+    },
+  );
+  test('record start is not serialized behind query inference', () async {
+    final endpoint = _SwitchingEndpoint(book, clip().snapshot);
+    final runtime = _PendingQueryRuntime();
+    final controller = CaptureSessionController(
+      endpoint,
+      book,
+      runtime,
+      queryForeground: () async => true,
+    );
+    Future<String>? query;
+    try {
+      final oldQuery = await controller.start(mode: CaptureMode.query);
+      await controller.stop();
+      query = controller.finishQuery();
+      await runtime.entered.future;
+      final next = await controller
+          .start(mode: CaptureMode.record)
+          .timeout(const Duration(seconds: 2));
+      expect(next.request.mode, CaptureMode.record);
+      expect(runtime.release.isCompleted, isFalse);
+      await expectLater(
+        controller.stop(expectedSessionId: oldQuery.sessionId),
+        throwsA(isA<NotebookException>()),
+      );
+      expect(book.captureActive, isTrue);
+    } finally {
+      runtime.release.complete('synthetic query');
+      if (query != null) {
+        try {
+          await query;
+        } catch (_) {}
+      }
+      controller.dispose();
+      runtime.dispose();
+    }
+  });
 }

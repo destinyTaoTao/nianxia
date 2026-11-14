@@ -5,7 +5,7 @@ ThemeData notebookTheme(Brightness brightness, {String? fontFamily}) {
   final dark = brightness == Brightness.dark;
   final canvas = Color(dark ? 0xff212121 : 0xffffffff);
   final panel = Color(dark ? 0xff303030 : 0xffffffff);
-  final soft = Color(dark ? 0xff303030 : 0xfff1f1f1);
+  final soft = Color(dark ? 0xff303030 : 0xfff7f7f8);
   final raised = Color(dark ? 0xff393939 : 0xffe7e7e7);
   final list = Color(dark ? 0xff212121 : 0xfff7f7f8);
   final ink = Color(dark ? 0xfff5f5f5 : 0xff171717);
@@ -90,19 +90,19 @@ ThemeData notebookTheme(Brightness brightness, {String? fontFamily}) {
           ),
           bodyLarge: TextStyle(
             fontFamily: fontFamily,
-            fontSize: 16,
+            fontSize: 17,
             height: 1.65,
             color: ink,
           ),
           bodyMedium: TextStyle(
             fontFamily: fontFamily,
-            fontSize: 15,
+            fontSize: 17,
             height: 1.55,
             color: ink,
           ),
           bodySmall: TextStyle(
             fontFamily: fontFamily,
-            fontSize: 13,
+            fontSize: 14,
             height: 1.5,
             color: muted,
           ),

@@ -1,0 +1,14 @@
+{
+  "applicationId": "app.nianxia.nianxia.test",
+  "runId": "6fc82460-2e8c-4f91-be1b-cf7da6f6c9a2",
+  "case": "ui-flows",
+  "passed": true,
+  "metrics": {
+    "sourceRows": 3,
+    "recordedBytes": 106540,
+    "singleSessionAfterCollapse": 1,
+    "sourceCommittedBeforeSaved": 1,
+    "summarySearchResults": 1,
+    "capturedAudioTranscribed": 0
+  }
+}

@@ -5,6 +5,8 @@ import '../platform/local_models.dart';
 import '../platform/capture_controller.dart';
 import 'common.dart';
 import 'editor.dart';
+import '../app/capture_session_controller.dart';
+import 'native_recorder.dart';
 
 enum _RecorderAction { write }
 
@@ -16,7 +18,22 @@ Future<Object?> openRecorder(
   bool query = false,
   MicrophoneInput? microphone,
   VoidCallback? onSaved,
+  CaptureSessionController? captureSession,
 }) async {
+  captureSession ??= NativeCaptureScope.maybeOf(context);
+  if (captureSession != null) {
+    if (!identical(captureSession.book, book)) {
+      throw const NotebookException('录音资料库与当前页面不一致，请重新打开应用。');
+    }
+    final result = await openNativeRecorder(
+      context,
+      captureSession,
+      query: query,
+      parentId: parentId,
+    );
+    if (result is Record) onSaved?.call();
+    return result;
+  }
   if (book.captureActive) return null;
   final result = await showModalBottomSheet<Object?>(
     context: context,

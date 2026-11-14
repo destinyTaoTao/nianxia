@@ -3,9 +3,11 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../app/notebook.dart';
+import '../app/capture_session_controller.dart';
+import '../app/inference_runtime.dart';
 import '../platform/local_models.dart';
 import 'common.dart';
-import 'home.dart' show RecordRow;
+import '../domain/search_page.dart' as paging;
 import 'detail.dart';
 import 'recorder.dart';
 
@@ -14,10 +16,12 @@ class SearchPage extends StatefulWidget {
     super.key,
     required this.book,
     this.models,
+    this.captureSession,
     this.voice = false,
   });
   final Notebook book;
   final LocalModels? models;
+  final CaptureSessionController? captureSession;
   final bool voice;
   @override
   State<SearchPage> createState() => _SearchPageState();
@@ -26,7 +30,10 @@ class SearchPage extends StatefulWidget {
 class _SearchPageState extends State<SearchPage> {
   final text = TextEditingController();
   DateTimeRange? range;
-  List<SearchHit> hits = [];
+  List<paging.SearchHitSummary> hits = [];
+  paging.SearchCursor? next;
+  paging.SearchCancellation? cancellation;
+  final scroll = ScrollController();
   bool busy = false;
   bool semantic = false;
   bool approximate = false;
@@ -38,9 +45,15 @@ class _SearchPageState extends State<SearchPage> {
   @override
   void initState() {
     super.initState();
-    widget.book.addListener(changed);
+    widget.book.contentChanges.addListener(changed);
+    scroll.addListener(scrolled);
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      semantic = await widget.models?.store.ready('bge') ?? false;
+      semantic =
+          await (widget.captureSession?.runtime.ready(
+                InferenceCapability.semantic,
+              ) ??
+              widget.models?.ready(InferenceCapability.semantic) ??
+              Future.value(false));
       if (mounted) {
         setState(() {});
         if (widget.voice) {
@@ -52,7 +65,9 @@ class _SearchPageState extends State<SearchPage> {
 
   @override
   void dispose() {
-    widget.book.removeListener(changed);
+    widget.book.contentChanges.removeListener(changed);
+    scroll.dispose();
+    cancellation?.cancel();
     debounce?.cancel();
     text.dispose();
     generation++;
@@ -60,6 +75,8 @@ class _SearchPageState extends State<SearchPage> {
   }
 
   void changed() {
+    cancellation?.cancel();
+    next = null;
     debounce?.cancel();
     generation++;
     setState(() {
@@ -83,31 +100,54 @@ class _SearchPageState extends State<SearchPage> {
     await search();
   }
 
-  Future<void> search() async {
+  void scrolled() {
+    if (scroll.hasClients &&
+        scroll.position.extentAfter < 400 &&
+        next != null &&
+        !busy &&
+        error == null) {
+      search(more: true);
+    }
+  }
+
+  Future<void> search({bool more = false}) async {
+    if (more && (busy || next == null)) return;
     debounce?.cancel();
     final version = ++generation;
+    if (!more) {
+      cancellation?.cancel();
+      cancellation = paging.SearchCancellation();
+    }
     setState(() {
       reviewVoice = false;
       busy = true;
       error = null;
-      hits = [];
-      fallback = null;
+      if (!more) {
+        hits = [];
+        next = null;
+        fallback = null;
+      }
     });
     try {
-      final found = await widget.book.search(
-        text.text,
-        from: range?.start,
-        to: range?.end,
-        embedder: semantic ? widget.models : null,
+      final found = await widget.book.searchPage(
+        paging.SearchQuery(text: text.text, from: range?.start, to: range?.end),
+        after: more ? next : null,
+        embedder: semantic
+            ? (widget.captureSession?.runtime ?? widget.models)
+            : null,
+        cancellation: cancellation,
       );
-      if (mounted && generation == version) {
-        setState(() {
-          hits = found;
-          approximate = found.semanticApproximate;
-          fallback = found.fallbackReason;
-          busy = false;
-        });
-      }
+      if (!mounted || generation != version) return;
+      setState(() {
+        hits = more && !found.reset
+            ? [...hits, ...found.entries]
+            : found.entries;
+        next = found.next;
+        approximate = found.semanticApproximate;
+        fallback = found.fallbackReason;
+        busy = false;
+      });
+      if (more && found.reset) notice(context, '记录已变化，已重新查找。');
     } catch (e) {
       if (mounted && generation == version) {
         setState(() {
@@ -119,8 +159,11 @@ class _SearchPageState extends State<SearchPage> {
   }
 
   Future<void> voice() async {
-    if (widget.models == null ||
-        !await widget.models!.store.ready('sensevoice')) {
+    if (!await (widget.captureSession?.runtime.ready(
+          InferenceCapability.speech,
+        ) ??
+        widget.models?.ready(InferenceCapability.speech) ??
+        Future.value(false))) {
       if (mounted) notice(context, '语音模型未就绪，可直接输入文字查找，或在设置下载模型。');
       return;
     }
@@ -131,6 +174,7 @@ class _SearchPageState extends State<SearchPage> {
       widget.book,
       widget.models,
       query: true,
+      captureSession: widget.captureSession,
     );
     if (mounted && result is String) {
       debounce?.cancel();
@@ -163,11 +207,12 @@ class _SearchPageState extends State<SearchPage> {
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: const Text('找一下')),
-    backgroundColor: Theme.of(context).colorScheme.surfaceContainerLow,
+    backgroundColor: Theme.of(context).scaffoldBackgroundColor,
     body: SafeArea(
       top: false,
       child: ReadingWidth(
         child: CustomScrollView(
+          controller: scroll,
           keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
           slivers: [
             SliverPadding(
@@ -330,7 +375,9 @@ class _SearchPageState extends State<SearchPage> {
                     child: Semantics(
                       liveRegion: true,
                       child: Text(
-                        approximate
+                        next != null
+                            ? '已显示 ${hits.length} 条记录'
+                            : approximate
                             ? '找到 ${hits.length} 条记录，含近似语义匹配'
                             : '找到 ${hits.length} 条记录',
                         style: Theme.of(context).textTheme.bodySmall,
@@ -342,22 +389,100 @@ class _SearchPageState extends State<SearchPage> {
                 padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
                 sliver: SliverList.builder(
                   itemCount: hits.length,
-                  itemBuilder: (context, i) => RecordRow(
-                    record: hits[i].record,
-                    snippet: hits[i].snippet,
+                  itemBuilder: (context, i) => SearchSummaryRow(
+                    entry: hits[i],
                     onTap: () => openDetail(
                       context,
                       widget.book,
-                      hits[i].record.id,
+                      hits[i].id,
                       models: widget.models,
                     ),
                   ),
                 ),
               ),
+              if (next != null && !busy)
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: OutlinedButton(
+                      onPressed: () => search(more: true),
+                      child: const Text('继续加载'),
+                    ),
+                  ),
+                ),
             ],
           ],
         ),
       ),
     ),
   );
+}
+
+/// A display-only projection; opening a result reads its current full source.
+class SearchSummaryRow extends StatelessWidget {
+  const SearchSummaryRow({super.key, required this.entry, required this.onTap});
+  final paging.SearchHitSummary entry;
+  final VoidCallback onTap;
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    var preview = entry.snippet.trim();
+    if (preview.startsWith('${entry.title}\n')) {
+      preview = preview.substring(entry.title.length).trimLeft();
+    }
+    final local = entry.createdAt.toUtc().add(
+      Duration(minutes: entry.offsetMinutes),
+    );
+    final time =
+        '${local.year}年${local.month}月${local.day}日 ${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
+    return Material(
+      color: theme.scaffoldBackgroundColor,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(4, 20, 4, 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                entry.title,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.titleMedium?.copyWith(fontSize: 18),
+              ),
+              if (preview.isNotEmpty && preview != entry.title.trim()) ...[
+                const SizedBox(height: 8),
+                Text(
+                  preview,
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.bodyMedium,
+                ),
+              ],
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 12,
+                runSpacing: 8,
+                children: [
+                  Text(time, style: theme.textTheme.bodySmall),
+                  Text(
+                    entry.hasAudio
+                        ? '音频 ${durationText(entry.durationMs)}'
+                        : '文字',
+                    style: theme.textTheme.bodySmall,
+                  ),
+                  if (entry.kind == paging.MatchKind.semantic)
+                    Text('近似匹配', style: theme.textTheme.bodySmall),
+                  if (entry.parentId != null)
+                    Text('追加内容', style: theme.textTheme.bodySmall),
+                ],
+              ),
+              const SizedBox(height: 12),
+              const Divider(height: 1),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }

@@ -13,7 +13,7 @@ import kotlin.math.sqrt
 
 enum class CaptureMode { record, query }
 enum class CapturePhase { starting, recording, finalizing, finalized, failed, cancelled }
-enum class CaptureDisposition { importedRecord, queryCompleted }
+enum class CaptureDisposition { importedRecord, queryCompleted, discardedRecord }
 class CaptureFailure(val code: String) : Exception(code)
 
 data class CaptureRequest(
@@ -277,7 +277,11 @@ class NativeCaptureSession(
         }
     }
 
-    fun cancel(id: String) { finish(id, null, true) }
+    fun cancel(id: String) {
+        CaptureRequest.checkId(id)
+        val present = synchronized(lock) { state?.request?.sessionId == id || journal.exists(id) }
+        if (present) finish(id, null, true)
+    }
 
     fun claim(id: String): CaptureSnapshot = synchronized(lock) {
         val old = journal.read(id)
@@ -293,11 +297,22 @@ class NativeCaptureSession(
         CaptureRequest.checkId(id)
         if (!journal.exists(id)) return
         val old = journal.read(id)
-        if (!old.claimed || old.phase != CapturePhase.finalized ||
-            (old.request.mode == CaptureMode.record) != (disposition == CaptureDisposition.importedRecord)) {
+        val discarded = disposition == CaptureDisposition.discardedRecord
+        val record = old.request.mode == CaptureMode.record
+        if (!old.claimed ||
+            (old.phase != CapturePhase.finalized && !(discarded && old.phase == CapturePhase.cancelled)) ||
+            record != (disposition != CaptureDisposition.queryCompleted)) {
             throw CaptureFailure("capture_ack_invalid")
         }
-        if (disposition == CaptureDisposition.queryCompleted && !wave(old.request).delete() && wave(old.request).exists()) {
+        if (discarded) {
+            // User-confirmed discard of a claimed recovery clip is distinct
+            // from source commit. Preserve intent before any deletion.
+            val tombstone = old.copy(phase = CapturePhase.cancelled)
+            journal.save(tombstone)
+            if (state?.request?.sessionId == id) state = tombstone
+        }
+        if ((discarded || disposition == CaptureDisposition.queryCompleted) &&
+            !wave(old.request).delete() && wave(old.request).exists()) {
             throw CaptureFailure("capture_cleanup")
         }
         journal.delete(id)

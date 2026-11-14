@@ -179,7 +179,7 @@ void main() {
     await pumpStorageAndSettle(tester);
     expect(find.text('想法 1').hitTestable(), findsOneWidget);
     expect(find.text('记一下').hitTestable(), findsOneWidget);
-    expect(find.text('写文字').hitTestable(), findsOneWidget);
+    expect(find.byKey(const Key('home-search')).hitTestable(), findsNothing);
     await tester.tap(find.text('想法 1'));
     await pumpStorageAndSettle(tester);
     expect(find.byTooltip('编辑正文'), findsOneWidget);
@@ -225,8 +225,8 @@ void main() {
     await tester.pumpWidget(NianxiaApp(book: book, models: LocalModels(store)));
     await tester.runAsync(() => Future<void>.delayed(Duration.zero));
     await pumpStorageAndSettle(tester);
-    expect(find.text('离线转写尚未就绪'), findsOneWidget);
-    await tester.tap(find.text('准备语音转写'));
+    expect(find.text('准备语音转写（录音照常保存）'), findsOneWidget);
+    await tester.tap(find.text('准备语音转写（录音照常保存）'));
     await pumpStorageAndSettle(tester);
     for (
       var i = 0;
@@ -247,7 +247,7 @@ void main() {
     await tester.tap(find.byTooltip('返回'));
     await tester.runAsync(() => Future<void>.delayed(Duration.zero));
     await pumpStorageAndSettle(tester);
-    expect(find.text('离线转写尚未就绪'), findsNothing);
+    expect(find.text('准备语音转写（录音照常保存）'), findsNothing);
     expect(find.text('记一下'), findsOneWidget);
   });
   testWidgets('用户可从文字入口保存、查看、编辑并查找记录', (tester) async {

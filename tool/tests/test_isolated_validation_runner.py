@@ -20,7 +20,7 @@ class IsolatedValidationRunnerTest(unittest.TestCase):
         if RUNNER.exists():
             shutil.copyfile(RUNNER, self.root / 'tool' / RUNNER.name)
         for target in ('isolation_smoke_test.dart', 'background_capture_test.dart',
-                       'backup_crypto_test.dart', 'app_acceptance_test.dart'):
+                       'backup_crypto_test.dart', 'app_acceptance_test.dart', 'ui_flows_test.dart'):
             path = self.root / 'integration_test' / target
             path.parent.mkdir(exist_ok=True)
             path.write_text('// controlled build target\n')
@@ -116,6 +116,23 @@ elif 'read' in sys.argv and os.environ.get('FAKE_RELEASE_CASE'):
         result=self.invoke('--mode','release','--case','process-kill-active')
         self.assertNotEqual(result.returncode,0)
         self.assertFalse(any('build' in c or 'install' in c for c in self.calls()))
+
+    def test_ui_case_grants_microphone_only_after_verified_isolated_install(self):
+        self.env['FAKE_RELEASE_CASE'] = 'ui-flows'
+        result = self.invoke('--target', 'acceptance', '--mode', 'release', '--case', 'ui-flows')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        calls = self.calls()
+        inspect = next(i for i, c in enumerate(calls) if 'badging' in c)
+        install = next(i for i, c in enumerate(calls) if 'install' in c)
+        grant = next(i for i, c in enumerate(calls) if 'grant' in c)
+        self.assertLess(inspect, install)
+        self.assertLess(install, grant)
+        self.assertIn('app.nianxia.nianxia.test', calls[grant])
+        self.env['APP_ID'] = 'app.nianxia.nianxia'
+        self.log.unlink()
+        result = self.invoke('--target', 'acceptance', '--mode', 'release', '--case', 'ui-flows')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertFalse(any('install' in c or 'grant' in c for c in self.calls()))
 
     def test_ios_uses_actual_bundle_identifier_and_isolated_flavor(self):
         result = self.invoke('--platform', 'ios', '--device', 'ios-test-id')
