@@ -11,6 +11,8 @@ import '../data/backup_codec.dart';
 import '../data/readable_export.dart';
 import '../domain/backup_operation.dart';
 import '../platform/backup_cipher.dart';
+import 'diagnostics.dart';
+import '../domain/diagnostic_event.dart';
 
 export '../domain/restore_report.dart';
 import '../domain/restore_report.dart';
@@ -19,10 +21,12 @@ class BackupService {
   BackupService(
     this.book, {
     this.cipher,
+    this.diagnostics,
     Future<int?> Function(String path)? availableBytes,
   }) : availableBytes = availableBytes ?? _availableStorage;
   final Notebook book;
   final BackupCipher? cipher;
+  final LocalDiagnostics? diagnostics;
   final Future<int?> Function(String path) availableBytes;
   bool _cancelled = false;
   String? _work;
@@ -67,7 +71,10 @@ class BackupService {
     }
   }
 
-  Future<T> _exclusive<T>(Future<T> Function() work) async {
+  Future<T> _exclusive<T>(
+    Future<T> Function() work, {
+    DiagnosticKind kind = DiagnosticKind.backup,
+  }) async {
     if (_busy[book] == true) throw const NotebookException('已有备份操作正在执行。');
     _busy[book] = true;
     _cancelled = false;
@@ -75,7 +82,8 @@ class BackupService {
       if (cancelled) _signalCancel();
     });
     try {
-      return await book.withMediaLease(work);
+      Future<T> action() => book.withMediaLease(work);
+      return await (diagnostics?.trace(kind, action) ?? action());
     } on NotebookException {
       rethrow;
     } on BackupCipherFailure {
@@ -331,7 +339,7 @@ class BackupService {
       }
       await _cleanWork(work);
     }
-  });
+  }, kind: DiagnosticKind.restore);
   Future<void> _cleanWork(Directory work) async {
     try {
       await work.delete(recursive: true);

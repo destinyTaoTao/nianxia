@@ -3,15 +3,18 @@ import 'dart:async';
 import '../domain/ports.dart';
 import 'inference_runtime.dart';
 import 'notebook.dart';
+import 'diagnostics.dart';
+import '../domain/diagnostic_event.dart';
 
 class BackgroundTasks {
-  BackgroundTasks(this.book, this.models) {
+  BackgroundTasks(this.book, this.models, {this.diagnostics}) {
     book.addListener(schedule);
     models.addListener(schedule);
     schedule();
   }
   final Notebook book;
   final InferenceRuntime models;
+  final LocalDiagnostics? diagnostics;
   bool _running = false, _disposed = false, _again = false;
   Timer? _timer;
   final Map<String, (int, String)> _failedIndex = {};
@@ -47,7 +50,14 @@ class BackgroundTasks {
           for (final r in batch) {
             if (_disposed || book.isClosed) return;
             try {
-              await book.transcribe(r.id, _BackgroundTranscriber(models));
+              Future<bool> action() =>
+                  book.transcribe(r.id, _BackgroundTranscriber(models));
+              await (diagnostics?.trace(
+                    DiagnosticKind.transcription,
+                    action,
+                    sourceRevision: r.revision,
+                  ) ??
+                  action());
             } catch (_) {
               /* Failure state is persisted in the record. */
             }
@@ -70,7 +80,13 @@ class BackgroundTasks {
             if (_disposed || book.isClosed) return;
             if (_failedIndex[r.id] == (r.revision, version)) continue;
             try {
-              await book.index(r.id, models);
+              Future<bool> action() => book.index(r.id, models);
+              await (diagnostics?.trace(
+                    DiagnosticKind.embedding,
+                    action,
+                    sourceRevision: r.revision,
+                  ) ??
+                  action());
             } catch (_) {
               // Retry suppression is ephemeral and bounded, never a full copy
               // of the notebook or a permanent ban on a future model version.

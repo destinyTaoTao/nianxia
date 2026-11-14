@@ -1,0 +1,18 @@
+{
+  "applicationId": "app.nianxia.nianxia.test",
+  "case": "diagnostics",
+  "passed": true,
+  "metrics": {
+    "diagnosticBytes": 6144,
+    "previewBytes": 2285,
+    "diagnosticEntries": 9,
+    "dropped": 1744,
+    "retainedSourceRows": 2,
+    "futureStoreUnchanged": 1,
+    "contentSentinelsExported": 0
+  },
+  "executionDate": "2026-11-14",
+  "platform": "Android emulator API36 ARM64",
+  "mode": "profile AOT isolated target",
+  "scope": "real optional diagnostics writer/retention/export; source unchanged on failures; no physical-device verdict"
+}
