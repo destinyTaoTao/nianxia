@@ -1,3 +1,5 @@
+import 'platform_controls.dart';
+
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -36,6 +38,7 @@ Future<Object?> openNativeRecorder(
     }
     return await showModalBottomSheet<Object?>(
       context: context,
+      sheetAnimationStyle: PlatformControls.animationStyle(context),
       isDismissible: false,
       enableDrag: false,
       isScrollControlled: true,

@@ -1,3 +1,5 @@
+import 'platform_controls.dart';
+
 import 'dart:async';
 import 'dart:io';
 
@@ -134,6 +136,7 @@ class _RecoveryScreenState extends State<RecoveryScreen> {
       if (!mounted) return;
       await showModalBottomSheet<void>(
         context: context,
+        sheetAnimationStyle: PlatformControls.animationStyle(context),
         useSafeArea: true,
         isScrollControlled: true,
         builder: (_) => SingleChildScrollView(

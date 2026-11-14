@@ -1,0 +1,18 @@
+{
+  "applicationId": "app.nianxia.nianxia.test",
+  "runId": "0b659338-67e5-4fe0-9da7-1df2fd212a49",
+  "case": "ui-flows",
+  "passed": true,
+  "metrics": {
+    "sourceRows": 4,
+    "recordedBytes": 81964,
+    "singleSessionAfterCollapse": 1,
+    "sourceCommittedBeforeSaved": 1,
+    "summarySearchResults": 1,
+    "capturedAudioTranscribed": 0,
+    "largeTextScale": 2,
+    "largeTextStopMinHeight": 48,
+    "actualKeyboardInsetsObserved": 1,
+    "lightAndDarkScreens": 1
+  }
+}

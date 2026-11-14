@@ -1,3 +1,5 @@
+import 'platform_controls.dart';
+
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -234,6 +236,7 @@ class _DetailPageState extends State<DetailPage> {
   Future<void> append(Record record) async {
     final action = await showModalBottomSheet<String>(
       context: context,
+      sheetAnimationStyle: PlatformControls.animationStyle(context),
       useSafeArea: true,
       isScrollControlled: true,
       builder: (context) => SingleChildScrollView(

@@ -1,3 +1,5 @@
+import 'platform_controls.dart';
+
 import 'package:flutter/material.dart';
 
 import '../app/notebook.dart';
@@ -37,6 +39,7 @@ Future<Object?> openRecorder(
   if (book.captureActive) return null;
   final result = await showModalBottomSheet<Object?>(
     context: context,
+    sheetAnimationStyle: PlatformControls.animationStyle(context),
     isDismissible: false,
     enableDrag: false,
     isScrollControlled: true,

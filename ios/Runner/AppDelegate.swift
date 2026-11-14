@@ -7,6 +7,44 @@ import EventKitUI
 @objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate, EKEventEditViewDelegate {
   private var pendingCalendar: FlutterResult?
   private var eventStore: EKEventStore?
+  private var appearanceChannel: FlutterMethodChannel?
+  private var appearanceObservers: [NSObjectProtocol] = []
+
+  private func appearanceSnapshot() -> [String: Bool] {
+    return ["reduceMotion": UIAccessibility.isReduceMotionEnabled,
+            "reduceTransparency": UIAccessibility.isReduceTransparencyEnabled,
+            "increaseContrast": UIAccessibility.isDarkerSystemColorsEnabled,
+            // No full iOS26 SDK/device prototype has passed the glass gate.
+            "glassSupported": false]
+  }
+
+  private func configureAppearance(_ messenger: FlutterBinaryMessenger) {
+    appearanceObservers.forEach { NotificationCenter.default.removeObserver($0) }
+    appearanceObservers.removeAll()
+    appearanceChannel?.setMethodCallHandler(nil)
+    let channel = FlutterMethodChannel(name: "app.nianxia/appearance", binaryMessenger: messenger)
+    appearanceChannel = channel
+    channel.setMethodCallHandler { [weak self] call, result in
+      guard let self = self else { result(nil); return }
+      if call.method == "current" { result(self.appearanceSnapshot()) }
+      else { result(FlutterMethodNotImplemented) }
+    }
+    let names: [Notification.Name] = [UIAccessibility.reduceMotionStatusDidChangeNotification,
+      UIAccessibility.reduceTransparencyStatusDidChangeNotification,
+      UIAccessibility.darkerSystemColorsStatusDidChangeNotification,
+      UIApplication.didBecomeActiveNotification]
+    for name in names {
+      appearanceObservers.append(NotificationCenter.default.addObserver(
+        forName: name, object: nil, queue: .main) { [weak self] _ in
+          guard let self = self else { return }
+          self.appearanceChannel?.invokeMethod("changed", arguments: self.appearanceSnapshot())
+        })
+    }
+  }
+
+  deinit {
+    appearanceObservers.forEach { NotificationCenter.default.removeObserver($0) }
+  }
 
   override func application(
     _ application: UIApplication,
@@ -18,6 +56,7 @@ import EventKitUI
   func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
     guard let registrar = engineBridge.pluginRegistry.registrar(forPlugin: "NianxiaSystem") else { return }
+    configureAppearance(registrar.messenger())
     let channel = FlutterMethodChannel(name: "app.nianxia/system", binaryMessenger: registrar.messenger())
     LaunchActions.channel = channel
     LaunchActions.ready = false

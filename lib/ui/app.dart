@@ -13,6 +13,8 @@ import 'theme.dart';
 import 'home.dart';
 import 'editor.dart';
 import 'native_recorder.dart';
+import '../platform/appearance.dart';
+import 'platform_controls.dart';
 
 import 'dart:async';
 
@@ -22,6 +24,7 @@ class NianxiaApp extends StatefulWidget {
     required this.book,
     this.models,
     this.captureSession,
+    this.appearanceAdapter,
     this.backupService,
     this.diagnostics,
     this.startupNotice,
@@ -34,6 +37,7 @@ class NianxiaApp extends StatefulWidget {
   final Notebook book;
   final LocalModels? models;
   final CaptureSessionController? captureSession;
+  final PlatformAppearanceAdapter? appearanceAdapter;
   final BackupService? backupService;
   final LocalDiagnostics? diagnostics;
   final String? startupNotice;
@@ -53,6 +57,12 @@ class _NianxiaAppState extends State<NianxiaApp> with WidgetsBindingObserver {
           .firstOrNull ??
       widget.initialTheme;
   late bool capsule = widget.shortcut?.value == 'capsule';
+  late final appearance =
+      widget.appearanceAdapter ?? PlatformAppearanceAdapter();
+  void appearanceChanged() {
+    if (mounted) setState(() {});
+  }
+
   final navigator = GlobalKey<NavigatorState>();
   final capsuleNavigator = GlobalKey<NavigatorState>();
   Future<bool> changeTheme(ThemeMode value) async {
@@ -69,6 +79,8 @@ class _NianxiaAppState extends State<NianxiaApp> with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
+    appearance.addListener(appearanceChanged);
+    unawaited(appearance.start());
     WidgetsBinding.instance.addObserver(this);
     if (capsule) widget.shortcut!.value = null;
     widget.shortcut?.addListener(externalAction);
@@ -133,6 +145,8 @@ class _NianxiaAppState extends State<NianxiaApp> with WidgetsBindingObserver {
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    appearance.removeListener(appearanceChanged);
+    if (widget.appearanceAdapter == null) appearance.dispose();
     widget.shortcut?.removeListener(externalAction);
     super.dispose();
   }
@@ -153,43 +167,71 @@ class _NianxiaAppState extends State<NianxiaApp> with WidgetsBindingObserver {
     locale: const Locale('zh', 'CN'),
     supportedLocales: const [Locale('zh', 'CN')],
     localizationsDelegates: GlobalMaterialLocalizations.delegates,
-    theme: notebookTheme(Brightness.light, fontFamily: widget.fontFamily),
-    darkTheme: notebookTheme(Brightness.dark, fontFamily: widget.fontFamily),
+    theme: notebookTheme(
+      Brightness.light,
+      fontFamily: widget.fontFamily,
+      reduceMotion: appearance.value.reduceMotion,
+      highContrast: appearance.value.increaseContrast,
+    ),
+    darkTheme: notebookTheme(
+      Brightness.dark,
+      fontFamily: widget.fontFamily,
+      reduceMotion: appearance.value.reduceMotion,
+      highContrast: appearance.value.increaseContrast,
+    ),
     themeMode: mode,
     themeAnimationDuration:
-        MediaQuery.maybeOf(context)?.disableAnimations == true
+        appearance.value.reduceMotion ||
+            WidgetsBinding
+                .instance
+                .platformDispatcher
+                .accessibilityFeatures
+                .disableAnimations
         ? Duration.zero
         : const Duration(milliseconds: 180),
     // Keep unsaved editors and their navigation stack while hiding the library.
     // Capsule confirmations use their own Navigator above the hidden pages.
-    builder: (context, child) => NativeCaptureScope(
-      capture: widget.captureSession,
-      child: Stack(
-        children: [
-          ExcludeFocus(
-            excluding: capsule,
-            child: Offstage(offstage: capsule, child: child),
-          ),
-          if (capsule)
-            HeroControllerScope.none(
-              child: Navigator(
-                key: capsuleNavigator,
-                onGenerateRoute: (_) => PageRouteBuilder<void>(
-                  opaque: false,
-                  transitionDuration: Duration.zero,
-                  reverseTransitionDuration: Duration.zero,
-                  pageBuilder: (_, _, _) => CaptureCapsule(
-                    book: widget.book,
-                    captureSession: widget.captureSession,
-                    models: widget.models,
-                    microphone: widget.captureMicrophone,
-                    onReturn: returnFromCapsule,
-                    onWrite: writeFromCapsule,
+    builder: (context, child) => AppearanceScope(
+      appearance: appearance.value,
+      child: MediaQuery(
+        data: MediaQuery.of(context).copyWith(
+          disableAnimations:
+              MediaQuery.of(context).disableAnimations ||
+              appearance.value.reduceMotion,
+          highContrast:
+              MediaQuery.of(context).highContrast ||
+              appearance.value.increaseContrast,
+        ),
+        child: NativeCaptureScope(
+          capture: widget.captureSession,
+          child: Stack(
+            children: [
+              ExcludeFocus(
+                excluding: capsule,
+                child: Offstage(offstage: capsule, child: child),
+              ),
+              if (capsule)
+                HeroControllerScope.none(
+                  child: Navigator(
+                    key: capsuleNavigator,
+                    onGenerateRoute: (_) => PageRouteBuilder<void>(
+                      opaque: false,
+                      transitionDuration: Duration.zero,
+                      reverseTransitionDuration: Duration.zero,
+                      pageBuilder: (_, _, _) => CaptureCapsule(
+                        book: widget.book,
+                        captureSession: widget.captureSession,
+                        models: widget.models,
+                        microphone: widget.captureMicrophone,
+                        onReturn: returnFromCapsule,
+                        onWrite: writeFromCapsule,
+                      ),
+                    ),
                   ),
                 ),
-              ),
-            ),
-        ],
+            ],
+          ),
+        ),
       ),
     ),
     home: HomePage(

@@ -1,3 +1,5 @@
+import 'platform_controls.dart';
+
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -9,6 +11,7 @@ Future<Uint8List?> requestBackupPassword(
 }) async {
   final value = await showDialog<String>(
     context: context,
+    animationStyle: PlatformControls.animationStyle(context),
     barrierDismissible: false,
     builder: (_) => _PasswordDialog(creating: creating),
   );

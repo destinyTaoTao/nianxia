@@ -1,7 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-ThemeData notebookTheme(Brightness brightness, {String? fontFamily}) {
+import 'platform_controls.dart';
+
+ThemeData notebookTheme(
+  Brightness brightness, {
+  String? fontFamily,
+  bool highContrast = false,
+  bool reduceMotion = false,
+}) {
   final dark = brightness == Brightness.dark;
   final canvas = Color(dark ? 0xff212121 : 0xffffffff);
   final panel = Color(dark ? 0xff303030 : 0xffffffff);
@@ -9,7 +16,11 @@ ThemeData notebookTheme(Brightness brightness, {String? fontFamily}) {
   final raised = Color(dark ? 0xff393939 : 0xffe7e7e7);
   final list = Color(dark ? 0xff212121 : 0xfff7f7f8);
   final ink = Color(dark ? 0xfff5f5f5 : 0xff171717);
-  final muted = Color(dark ? 0xffb4b4b4 : 0xff666666);
+  final muted = Color(
+    highContrast
+        ? (dark ? 0xffd4d4d4 : 0xff404040)
+        : (dark ? 0xffb4b4b4 : 0xff666666),
+  );
   final line = Color(dark ? 0xff4a4a4a : 0xffe5e5e5);
   final inverse = Color(dark ? 0xff171717 : 0xffffffff);
   final scheme =
@@ -48,6 +59,14 @@ ThemeData notebookTheme(Brightness brightness, {String? fontFamily}) {
         borderSide: BorderSide(color: color, width: width),
       );
   return base.copyWith(
+    pageTransitionsTheme: reduceMotion
+        ? PageTransitionsTheme(
+            builders: {
+              for (final platform in TargetPlatform.values)
+                platform: const NoPageTransitionsBuilder(),
+            },
+          )
+        : base.pageTransitionsTheme,
     scaffoldBackgroundColor: canvas,
     iconTheme: IconThemeData(color: ink, size: 22),
     sliderTheme: SliderThemeData(

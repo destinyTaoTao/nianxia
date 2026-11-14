@@ -147,6 +147,55 @@ void main() {
       await waitFor(() => find.text('周末散步').evaluate().isNotEmpty);
       await screenshot('search-dark');
       expect(find.text('找到 1 条记录'), findsOneWidget);
+      // Exercise the actual theme and large-text layout on the running engine.
+      await tester.tap(find.byType(BackButton));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('切换浅色主题'));
+      await waitFor(
+        () =>
+            Theme.of(tester.element(find.text('记一下'))).brightness ==
+            Brightness.light,
+      );
+      await screenshot('home-light');
+      tester.platformDispatcher.textScaleFactorTestValue = 2;
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      await tester.pumpAndSettle();
+      await screenshot('home-large-text');
+      await tester.tap(find.text('记一下'));
+      await waitFor(
+        () =>
+            capture!.snapshot?.phase == NativeCapturePhase.recording &&
+            find.text('收起').evaluate().isNotEmpty,
+      );
+      ownedId = capture.snapshot!.sessionId;
+      await tester.pump(const Duration(milliseconds: 1000));
+      await tester.ensureVisible(find.text('停止并保存'));
+      await screenshot('recorder-large-text');
+      final stop = find.widgetWithText(FilledButton, '停止并保存');
+      expect(tester.getSize(stop).height, greaterThanOrEqualTo(48));
+      await tester.tap(stop);
+      await waitFor(
+        () => capture!.savedId == ownedId && find.text('收起').evaluate().isEmpty,
+      );
+      tester.platformDispatcher.clearTextScaleFactorTestValue();
+      await tester.pumpAndSettle();
+      // A new field after unregistering uses the real Android IME connection.
+      tester.testTextInput.unregister();
+      await tester.tap(find.text('找一下'));
+      await tester.pumpAndSettle();
+      await tester.showKeyboard(find.byKey(const Key('search-input')));
+      await waitFor(() => tester.view.viewInsets.bottom > 0);
+      final keyboardTop =
+          (tester.view.physicalSize.height - tester.view.viewInsets.bottom) /
+          tester.view.devicePixelRatio;
+      expect(
+        tester.getBottomRight(find.byKey(const Key('search-input'))).dy,
+        lessThan(keyboardTop),
+      );
+      await screenshot('search-keyboard');
+      FocusScope.of(tester.element(find.byKey(const Key('search-input'))))
+          .unfocus();
+      await waitFor(() => tester.view.viewInsets.bottom == 0);
       binding.reportData = await writeValidationResult(
         passed: true,
         metrics: {
@@ -156,6 +205,10 @@ void main() {
           'sourceCommittedBeforeSaved': 1,
           'summarySearchResults': 1,
           'capturedAudioTranscribed': 0,
+          'largeTextScale': 2,
+          'largeTextStopMinHeight': 48,
+          'actualKeyboardInsetsObserved': 1,
+          'lightAndDarkScreens': 1,
         },
       );
     } catch (_) {

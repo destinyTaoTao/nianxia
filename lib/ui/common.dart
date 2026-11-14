@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../domain/record.dart';
+import 'platform_controls.dart';
 
 void notice(BuildContext context, String text) {
   if (context.mounted) {
@@ -59,9 +60,9 @@ class BottomActions extends StatelessWidget {
   final Widget? secondary;
 
   @override
-  Widget build(BuildContext context) => ColoredBox(
-    color: Theme.of(context).scaffoldBackgroundColor,
-    child: SafeArea(
+  Widget build(BuildContext context) => PlatformControls.operationSurface(
+    context,
+    SafeArea(
       top: false,
       minimum: const EdgeInsets.fromLTRB(16, 12, 16, 12),
       child: ReadingWidth(
@@ -141,6 +142,7 @@ Future<bool> confirm(
 }) async =>
     await showDialog<bool>(
       context: context,
+      animationStyle: PlatformControls.animationStyle(context),
       builder: (context) => AlertDialog(
         title: Text(title),
         content: Text(body),
