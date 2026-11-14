@@ -1,6 +1,6 @@
 # 架构与 UI 执行验收
 
-2026-11-14。范围：用户批准的自用/小范围试用方案，以及当前环境能独立完成的实现和验证。当前处于最终审查/主分支整合前；本文件会在完成后更新状态。目标主分支实际名为`main`，不另建或改名为`master`。
+2026-11-14。范围：用户批准的自用/小范围试用方案，以及当前环境能独立完成的实现和验证。独立审查与当前环境可独立完成的开发验证均已结束；交付提交与主分支整合以仓库Git记录为准。目标主分支实际名为`main`，不另建或改名为`master`。
 
 ## 交付状态与默认行为
 
@@ -31,7 +31,7 @@ Android采用中性Material3；iOS减少动态/透明度和高对比偏好桥已
 
 首次fresh-context reviewer因额度中断，未给出整体结论。其搜索游标候选已由真实SQLite/widget回归复现并修复：失效后重新请求首屏，而非误报无结果，继续失效时明确要求重试。
 
-替代的完整只读审查已完成，确认一项Important/P2：native最终journal失败后永久finalizing。已修复为冻结最终快照并可重试，任何中间写失败也释放麦克风，删除仍需先持久化tombstone。三项新增原生回归先失败后通过；原生事件传递与实际UI明确显示“保存未完成，请重试”，对应widget回归也先失败后通过。最终主机314/35、native17通过。完整结论、未判定范围及成本见 [独立审查](independent-review.md) 和 [全部裁决](decisions.md)。按计划一次修复后由回归/完整门禁验证，未再派发复审。最新Android Release复验与主分支整合尚在进行。
+替代的完整只读审查已完成，确认一项Important/P2：native最终journal失败后永久finalizing。已修复为冻结最终快照并可重试，任何中间写失败也释放麦克风，删除仍需先持久化tombstone。三项新增原生回归先失败后通过；原生事件传递与实际UI明确显示“保存未完成，请重试”，对应widget回归也先失败后通过。最终主机314/35、native17通过。完整结论、未判定范围及成本见 [独立审查](independent-review.md) 和 [全部裁决](decisions.md)。按计划一次修复后由回归/完整门禁验证，未再派发复审。最新Android Release的实际引擎重建、UI完整链路和文件故障重试均已通过；普通Release已重新构建并核验隔离边界。
 
 ## 最终自动门禁
 
@@ -56,3 +56,5 @@ Android API36 ARM64模拟器、非调试Release、10000条长正文/512D重复�
 ## 接入硬件后保留的验收
 
 Magic8/iPhone17的实际OS/音频路由、通话/撤权/系统回收、锁屏文件保护；iOS native capture与crypto接入；真实30秒ASR与万条查找P95、峰值内存/热量/电池；50条口述/30条独立人工标注查询的Top3与否定/改口；系统日历保存/取消/提醒；TalkBack/VoiceOver自然体验；iOS26原生玻璃叠层/键盘/触控/性能。上述项目按用户“暂时不方便接入”决定保留，不以模拟或编译结果代替。
+
+最后追加：`ui/android-reviewed-release.json`在实际Android非调试Release中阻塞自有`.session.partial`路径，确认WAV已关闭但source尚未新增，UI显示明确失败，移除故障并重试后恰好新增一条（总5条合成记录）；`capture/android-engine-reconnect-release.json`已按最终native实现重跑。普通APK来源代码提交为`ee15736`，仅构建不安装。所有实施裁决及保留成本汇总于`decisions.md`；未报告需延期的minor。

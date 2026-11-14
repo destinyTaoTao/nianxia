@@ -42,7 +42,7 @@
     "androidScreenOffSmoke": "passed",
     "androidProfileCryptoResources": "passed",
     "androidReleaseBackupChain": "passed",
-    "normalReleaseArtifactBoundary": "passed build-only, no crypto library or validation provider",
+    "normalReleaseArtifactBoundary": "passed final build-only, formal ID/nondebug/no crypto lib/no test provider",
     "isolatedRustToolchain": "1.91.1",
     "androidCaptureProcessFaults": "four cases passed debug",
     "androidNativeDeadline": "passed actual 120 seconds",
@@ -61,9 +61,10 @@
     "androidEngineRecreateRelease": "passed same process/new engine/same native owner",
     "androidOfflineAcceptanceRelease": "passed airplane on/wifi off/no default network; restored original settings",
     "androidPerformanceRelease": "passed 10000 synthetic rows/512D; see report",
-    "independentReview": "completed risk-focused read-only; one Important fixed RED-GREEN; no re-review"
+    "independentReview": "completed risk-focused read-only; one Important fixed RED-GREEN; no re-review",
+    "androidNativeJournalFaultRelease": "passed real filesystem fault, WAV closed before retry, one source commit"
   },
   "committed": true,
   "pushed": true,
-  "deliveryStatus": "review completed; host/native fix verified; final release refresh and main integration pending"
+  "deliveryStatus": "independent development and validation complete; review fix verified; approved main fast-forward delivery"
 }

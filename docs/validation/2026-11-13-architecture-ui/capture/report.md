@@ -17,3 +17,5 @@
 仍未执行：完整Xcode/iOS原生采集/锁屏文件保护、Magic8/iPhone17真机来电/蓝牙与有线路由/权限撤回/系统停止、真机engine/系统回收矩阵和20样本P95。因此Gate-C整体尚未通过；模拟器熄屏不是安全锁屏与真机通话验收，也不代表自然语音质量。硬件项按用户要求保留；debug故障编排不冒充release故障验收，CLI对未提供编排的release故障case提前拒绝。
 
 追加实际引擎销毁（2026-11-14）：隔离非debug Release使用Activity.recreate，Dart/OS进程PID保持，Java FlutterEngine标识改变且transport detach计数增加，native owner标识与session保持，PCM继续增长；停止验证有效WAV、source导入/确认/重开恰好一条。见 `android-engine-reconnect-release.json`。这与进程强杀是两个不同场景，均未触及正式应用。
+
+最终独立审查的journal故障修复：native17项JVM测试通过。最终Release另以实际文件路径阻塞证明stop仍关闭麦克风/WAV、错误可见、恢复IO后一次重试提交；source不在日志失败时被标记保存成功。

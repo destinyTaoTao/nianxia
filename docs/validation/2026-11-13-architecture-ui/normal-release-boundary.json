@@ -9,5 +9,6 @@
   "validationProviderDeclared": false,
   "trialDebugSignatureVerified": true,
   "apkBytes": 51401181,
-  "sha256": "78295ceec52afed77a2edfd56b100a821b9007774ebb6b4d79129c5f3baed49f"
+  "sha256": "980112e86daaf5fa4ddb39ad7b2826b9346af6d09916c0bcd1ba750ce11a78a3",
+  "sourceCommit": "ee157365997bcdd0ac1408c027e9e3329e4f3040"
 }

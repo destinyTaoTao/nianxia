@@ -1,6 +1,6 @@
 {
   "applicationId": "app.nianxia.nianxia.test",
-  "runId": "220efd53-f455-4a47-b1cd-da65eb505671",
+  "runId": "a6852ad5-683a-49ed-8f6a-293d04be3cc2",
   "case": "engine-reconnect",
   "passed": true,
   "metrics": {
@@ -9,7 +9,7 @@
     "sameNativeOwner": 1,
     "transportDetachObserved": 1,
     "pcmContinued": 1,
-    "recordedBytes": 53292,
+    "recordedBytes": 61484,
     "sourceRowsAfterReopen": 1
   }
 }
