@@ -27,9 +27,13 @@ Android采用中性Material3；iOS减少动态/透明度和高对比偏好桥已
 | R6性能 | Android一万条/512D合成负载、20次关键词首屏P95、真实BGE查询、进程RSS与空间采样 | `acceptance/performance-release.json`。重复向量是规模夹具，不能当人类中文检索质量或真机P95 |
 | 日历/云整理 | host受控transport验证单条确认、否定依据、并发删除/编辑及unknown不误报保存 | 双平台真实日历保存/取消/提醒未执行；真实付费云Key/预算未授权，不发真实付费请求 |
 
+## 独立审查状态
+
+首次fresh-context reviewer因模型额度中断，未给出整体结论，不能视为通过。其已定位的搜索游标问题已由真实SQLite/widget回归复现：模型代际变化后继续加载，reset空页误显示无结果。现改为重新请求首屏，继续失效则明确要求重试；回归RED→GREEN，完整313项Flutter测试通过。替代的完整只读审查仍待完成；完成前不合入主分支。
+
 ## 最终自动门禁
 
-`bash tool/check.sh`：35项Python工具测试、静态分析无问题、312项Flutter测试通过。原生14项JVM回归最终通过；正常ARM64 release构建通过（51,401,181字节），AAPT确认正式包ID、非debuggable、未声明测试provider，ZIP确认不含实验age库；apksigner验证为试用Android Debug签名。未安装正式包，详见`normal-release-boundary.json`。完整iOS构建、XCTest、签名及真机未执行。标准age/Rust/Go和FFI测试详见备份报告，其结论不扩大为完整产品安全认证。
+`bash tool/check.sh`：35项Python工具测试、静态分析无问题、313项Flutter测试通过。原生14项JVM回归最终通过；正常ARM64 release构建通过（51,401,181字节），AAPT确认正式包ID、非debuggable、未声明测试provider，ZIP确认不含实验age库；apksigner验证为试用Android Debug签名。未安装正式包，详见`normal-release-boundary.json`。完整iOS构建、XCTest、签名及真机未执行。标准age/Rust/Go和FFI测试详见备份报告，其结论不扩大为完整产品安全认证。
 
 Android真实引擎重连和断网测试的中间失败包括：新增测试方法尚不存在、窗口尚未获得焦点、测试读取已消费的Scaffold inset、测试键盘注册时机。已分别保留安全门禁/修正夹具后重测，不通过削弱产品断言制造通过。并发主机门禁期间部分APK构建失败，直接构建可通过；根因未证实，最终Android构建与测试按串行完成，不能归因产品缺陷或宣称并行构建稳定。
 

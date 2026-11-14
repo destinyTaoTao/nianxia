@@ -129,8 +129,13 @@ class _SearchPageState extends State<SearchPage> {
       }
     });
     try {
-      final found = await widget.book.searchPage(
-        paging.SearchQuery(text: text.text, from: range?.start, to: range?.end),
+      final query = paging.SearchQuery(
+        text: text.text,
+        from: range?.start,
+        to: range?.end,
+      );
+      var found = await widget.book.searchPage(
+        query,
         after: more ? next : null,
         embedder: semantic
             ? (widget.captureSession?.runtime ?? widget.models)
@@ -138,16 +143,27 @@ class _SearchPageState extends State<SearchPage> {
         cancellation: cancellation,
       );
       if (!mounted || generation != version) return;
+      final restarted = found.reset;
+      if (restarted) {
+        // A reset is an invalid cursor, never evidence of zero matching rows.
+        found = await widget.book.searchPage(
+          query,
+          embedder: semantic
+              ? (widget.captureSession?.runtime ?? widget.models)
+              : null,
+          cancellation: cancellation,
+        );
+        if (!mounted || generation != version) return;
+        if (found.reset) throw const NotebookException('记录正在变化，请再查找一次。');
+      }
       setState(() {
-        hits = more && !found.reset
-            ? [...hits, ...found.entries]
-            : found.entries;
+        hits = more && !restarted ? [...hits, ...found.entries] : found.entries;
         next = found.next;
         approximate = found.semanticApproximate;
         fallback = found.fallbackReason;
         busy = false;
       });
-      if (more && found.reset) notice(context, '记录已变化，已重新查找。');
+      if (restarted) notice(context, '记录已变化，已重新查找。');
     } catch (e) {
       if (mounted && generation == version) {
         setState(() {

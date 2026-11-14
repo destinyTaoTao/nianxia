@@ -1,0 +1,13 @@
+{
+  "baselineFiles": 354,
+  "remainingPreExistingUntrackedFilesVerified": 41,
+  "remainingPreExistingUntrackedFilesChanged": 0,
+  "frozenAndDependencyFilesMatchBaseline": [
+    "test/fixtures/schema_v1.dart",
+    "test/fixtures/schema_v1.sql",
+    "pubspec.yaml",
+    "pubspec.lock",
+    "assets/models.json"
+  ],
+  "formalDataRead": false
+}

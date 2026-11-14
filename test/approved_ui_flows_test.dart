@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nianxia/app/notebook.dart';
 import 'package:nianxia/ui/app.dart';
+import 'package:nianxia/ui/search.dart';
 import 'package:nianxia/app/capture_session_controller.dart';
 import 'package:nianxia/domain/capture_session.dart';
 
@@ -78,6 +79,40 @@ void main() {
       book.changed(content: false);
       await pumpStorageAndSettle(tester);
       expect(find.text('已显示 40 条记录'), findsOneWidget);
+    },
+  );
+  testWidgets(
+    'expired search cursor reloads actual first page instead of showing no results',
+    (tester) async {
+      await storageRead(tester, () async {
+        for (var i = 0; i < 91; i++) {
+          await book.saveText('cursor-match-$i\n正文保持可查找');
+        }
+      });
+      await tester.pumpWidget(NianxiaApp(book: book));
+      await pumpStorageAndSettle(tester);
+      await tester.tap(find.text('找一下'));
+      await pumpStorageAndSettle(tester);
+      await tester.enterText(
+        find.byKey(const Key('search-input')),
+        'cursor-match',
+      );
+      await tester.pump(const Duration(milliseconds: 400));
+      await pumpStorageAndSettle(tester);
+      expect(find.text('已显示 40 条记录'), findsOneWidget);
+      await storageRead(
+        tester,
+        () => book.setSearchModelVersion('cursor-model-v2'),
+      );
+      await pumpStorageAndSettle(tester);
+      expect(find.text('已显示 40 条记录'), findsOneWidget);
+      final scroll = tester
+          .widget<CustomScrollView>(find.byType(CustomScrollView))
+          .controller!;
+      scroll.jumpTo(scroll.position.maxScrollExtent);
+      await pumpStorageAndSettle(tester);
+      expect(find.text('没有找到相关记录'), findsNothing);
+      expect(find.byType(SearchSummaryRow), findsWidgets);
     },
   );
   testWidgets(

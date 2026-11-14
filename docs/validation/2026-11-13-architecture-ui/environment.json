@@ -33,7 +33,7 @@
     "iosBuild": "not-executed-missing-Xcode",
     "formalDataFingerprint": "unavailable-run-as-denied",
     "formalInstallation": "unchanged",
-    "hostFlutterTests": 312,
+    "hostFlutterTests": 313,
     "hostPythonTests": 35,
     "analyzer": "passed",
     "nativeCaptureJvmTests": 14,
@@ -50,7 +50,7 @@
     "androidSummaryPagingRelease": "passed isolated non-debuggable AOT",
     "androidDiagnosticsProfile": "passed",
     "androidDiagnosticsRelease": "passed isolated AOT",
-    "flutterTests": 312,
+    "flutterTests": 313,
     "pythonTests": 35,
     "androidLocalJobsRelease": "passed isolated non-debuggable AOT",
     "androidNativeUiProfile": "passed real microphone and source commit",
@@ -64,5 +64,5 @@
   },
   "committed": true,
   "pushed": true,
-  "deliveryStatus": "verified incremental batches pushed; final merge pending"
+  "deliveryStatus": "verified feature batches pushed; completed independent review and final merge pending"
 }
