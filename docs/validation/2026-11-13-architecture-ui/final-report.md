@@ -29,11 +29,13 @@ Android采用中性Material3；iOS减少动态/透明度和高对比偏好桥已
 
 ## 独立审查状态
 
-首次fresh-context reviewer因模型额度中断，未给出整体结论，不能视为通过。其已定位的搜索游标问题已由真实SQLite/widget回归复现：模型代际变化后继续加载，reset空页误显示无结果。现改为重新请求首屏，继续失效则明确要求重试；回归RED→GREEN，完整313项Flutter测试通过。替代的完整只读审查仍待完成；完成前不合入主分支。
+首次fresh-context reviewer因额度中断，未给出整体结论。其搜索游标候选已由真实SQLite/widget回归复现并修复：失效后重新请求首屏，而非误报无结果，继续失效时明确要求重试。
+
+替代的完整只读审查已完成，确认一项Important/P2：native最终journal失败后永久finalizing。已修复为冻结最终快照并可重试，任何中间写失败也释放麦克风，删除仍需先持久化tombstone。三项新增原生回归先失败后通过；原生事件传递与实际UI明确显示“保存未完成，请重试”，对应widget回归也先失败后通过。最终主机314/35、native17通过。完整结论、未判定范围及成本见 [独立审查](independent-review.md) 和 [全部裁决](decisions.md)。按计划一次修复后由回归/完整门禁验证，未再派发复审。最新Android Release复验与主分支整合尚在进行。
 
 ## 最终自动门禁
 
-`bash tool/check.sh`：35项Python工具测试、静态分析无问题、313项Flutter测试通过。原生14项JVM回归最终通过；正常ARM64 release构建通过（51,401,181字节），AAPT确认正式包ID、非debuggable、未声明测试provider，ZIP确认不含实验age库；apksigner验证为试用Android Debug签名。未安装正式包，详见`normal-release-boundary.json`。完整iOS构建、XCTest、签名及真机未执行。标准age/Rust/Go和FFI测试详见备份报告，其结论不扩大为完整产品安全认证。
+`bash tool/check.sh`：35项Python工具测试、静态分析无问题、314项Flutter测试通过。原生17项JVM回归最终通过；正常ARM64 release构建通过（51,401,181字节），AAPT确认正式包ID、非debuggable、未声明测试provider，ZIP确认不含实验age库；apksigner验证为试用Android Debug签名。未安装正式包，详见`normal-release-boundary.json`。完整iOS构建、XCTest、签名及真机未执行。标准age/Rust/Go和FFI测试详见备份报告，其结论不扩大为完整产品安全认证。
 
 Android真实引擎重连和断网测试的中间失败包括：新增测试方法尚不存在、窗口尚未获得焦点、测试读取已消费的Scaffold inset、测试键盘注册时机。已分别保留安全门禁/修正夹具后重测，不通过削弱产品断言制造通过。并发主机门禁期间部分APK构建失败，直接构建可通过；根因未证实，最终Android构建与测试按串行完成，不能归因产品缺陷或宣称并行构建稳定。
 

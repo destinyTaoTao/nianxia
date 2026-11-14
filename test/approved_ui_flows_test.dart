@@ -116,6 +116,42 @@ void main() {
     },
   );
   testWidgets(
+    'native journal failure shows retry instead of an endless saving state',
+    (tester) async {
+      final endpoint = UiCaptureEndpoint(book);
+      final runtime = UiCaptureRuntime();
+      final capture = CaptureSessionController(endpoint, book, runtime);
+      addTearDown(() {
+        capture.dispose();
+        runtime.dispose();
+      });
+      await tester.pumpWidget(NianxiaApp(book: book, captureSession: capture));
+      await pumpStorageAndSettle(tester);
+      await tester.tap(find.text('记一下'));
+      await pumpStorageAndSettle(tester);
+      final old = capture.snapshot!;
+      endpoint.value = CaptureSnapshot.fromMap({
+        ...old.request.toMap(),
+        'phase': 'finalizing',
+        'sequence': old.sequence + 1,
+        'elapsedMs': 1000,
+        'pcmBytes': 32000,
+        'level': 0.0,
+        'errorCode': 'capture_journal',
+      });
+      endpoint.updates.add(endpoint.value!);
+      await pumpStorageAndSettle(tester);
+      expect(find.text('保存未完成，请重试'), findsOneWidget);
+      expect(find.text('重试保存'), findsOneWidget);
+      expect(capture.savedId, isNull);
+      await tester.tap(find.text('重试保存'));
+      for (var i = 0; i < 100 && capture.savedId == null; i++) {
+        await pumpStorageAndSettle(tester);
+      }
+      expect(capture.savedId, old.sessionId);
+    },
+  );
+  testWidgets(
     'collapseDoesNotDiscardRecording and returns to the same session',
     (tester) async {
       final endpoint = UiCaptureEndpoint(book);

@@ -33,10 +33,10 @@
     "iosBuild": "not-executed-missing-Xcode",
     "formalDataFingerprint": "unavailable-run-as-denied",
     "formalInstallation": "unchanged",
-    "hostFlutterTests": 313,
+    "hostFlutterTests": 314,
     "hostPythonTests": 35,
     "analyzer": "passed",
-    "nativeCaptureJvmTests": 14,
+    "nativeCaptureJvmTests": 17,
     "cryptoRustTests": 5,
     "cryptoHostFfiTests": 3,
     "androidScreenOffSmoke": "passed",
@@ -50,7 +50,7 @@
     "androidSummaryPagingRelease": "passed isolated non-debuggable AOT",
     "androidDiagnosticsProfile": "passed",
     "androidDiagnosticsRelease": "passed isolated AOT",
-    "flutterTests": 313,
+    "flutterTests": 314,
     "pythonTests": 35,
     "androidLocalJobsRelease": "passed isolated non-debuggable AOT",
     "androidNativeUiProfile": "passed real microphone and source commit",
@@ -60,9 +60,10 @@
     "iosAppearance": "source and syntax only; no SDK compile/runtime",
     "androidEngineRecreateRelease": "passed same process/new engine/same native owner",
     "androidOfflineAcceptanceRelease": "passed airplane on/wifi off/no default network; restored original settings",
-    "androidPerformanceRelease": "passed 10000 synthetic rows/512D; see report"
+    "androidPerformanceRelease": "passed 10000 synthetic rows/512D; see report",
+    "independentReview": "completed risk-focused read-only; one Important fixed RED-GREEN; no re-review"
   },
   "committed": true,
   "pushed": true,
-  "deliveryStatus": "verified feature batches pushed; completed independent review and final merge pending"
+  "deliveryStatus": "review completed; host/native fix verified; final release refresh and main integration pending"
 }

@@ -202,6 +202,54 @@ class NativeCaptureSessionTest {
         assertTrue(audio.running)
     }
 
+    @Test fun failedFinalJournalCanRetryAfterIoRecoversAndStartAnotherRecording() {
+        owner.start(request())
+        audio.push(byteArrayOf(1, 2, 3, 4))
+        clock.set(1234)
+        val blocked = File(directory, "$id.session.partial")
+        audio.beforeStop = { assertTrue(blocked.mkdir()) }
+        try { owner.stop(id); fail("Expected journal failure") } catch (_: CaptureFailure) { }
+        assertFalse(audio.running)
+        assertEquals("capture_journal", owner.current()?.errorCode)
+        val failedSequence = owner.current()!!.sequence
+        val wav = File(directory, "$id.wav").readBytes()
+        assertEquals(48, wav.size)
+        assertTrue(blocked.delete())
+        audio.beforeStop = null
+        clock.set(9000)
+        val retried = owner.stop(id)
+        assertEquals(CapturePhase.finalized, retried.phase)
+        assertTrue(retried.sequence > failedSequence)
+        assertEquals(1234L, retried.elapsedMs)
+        assertEquals(4L, retried.pcmBytes)
+        assertArrayEquals(wav, File(directory, "$id.wav").readBytes())
+        assertEquals(retried, CaptureJournal(directory).read(id))
+        val other = "22222222-2222-4222-8222-222222222222"
+        assertEquals(other, owner.start(request(other)).request.sessionId)
+    }
+
+    @Test fun failedFinalJournalCanBeExplicitlyDiscardedAfterIoRecovers() {
+        owner.start(request()); audio.push(byteArrayOf(1, 2))
+        val blocked = File(directory, "$id.session.partial")
+        audio.beforeStop = { assertTrue(blocked.mkdir()) }
+        try { owner.stop(id); fail("Expected journal failure") } catch (_: CaptureFailure) { }
+        assertTrue(blocked.delete()); audio.beforeStop = null
+        owner.cancel(id)
+        assertFalse(File(directory, "$id.wav").exists())
+        assertFalse(File(directory, "$id.session").exists())
+        assertFalse(audio.running)
+    }
+
+    @Test fun unavailableJournalCannotPreventMicrophoneRelease() {
+        owner.start(request()); audio.push(byteArrayOf(1, 2))
+        val blocked = File(directory, "$id.session.partial")
+        assertTrue(blocked.mkdir())
+        try { owner.stop(id); fail("Expected journal failure") } catch (_: CaptureFailure) { }
+        assertFalse("Storage failure left microphone running", audio.running)
+        assertTrue(blocked.delete())
+        assertEquals(CapturePhase.finalized, owner.stop(id).phase)
+    }
+
     private class ManualAudio : CaptureAudioSource {
         private lateinit var accept: (ByteArray, Int) -> Unit
         private lateinit var failure: (String) -> Unit

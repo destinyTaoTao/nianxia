@@ -39,3 +39,11 @@
 
 
 - Final: Ruling: First independent reviewer was quota-interrupted before a verdict; replace it for the one completed whole-branch review rather than claim approval. Cost: fallback model differs; incomplete review remains a merge gate.
+
+## 最终独立审查的保留项
+
+- Final: Ruling: 目标真机锁屏/通话/撤权/路由/功耗按设备不可用保留；成本：不能据模拟器承诺目标手机体验。
+- Final: Ruling: iOS native capture/crypto与原生玻璃按SDK/真机门禁保留；成本：普通应用暂不启用这些能力。
+- Final: Ruling: 自然中文质量/真实日历/付费云不以合成或受控结果替代；成本：公开发布前仍需实际业务验收。
+- Final: Ruling: 历史静态benchmark不逐项重算，保留冻结证据与实现对应；成本：本次审查不重新担保全部历史数值。
+- Final: Ruling: 正式数据按授权不读取/安装/操作，用身份与命名空间隔离保护；成本：无法提供内容散列核验。

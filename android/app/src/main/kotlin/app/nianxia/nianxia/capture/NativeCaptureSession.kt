@@ -96,6 +96,7 @@ class NativeCaptureSession(
     private var lastEvent = 0L
     private var stopRequested = false
     private var finishing: CompletableFuture<CaptureSnapshot>? = null
+    private var pendingFinal: CaptureSnapshot? = null
     private var closed = false
     var recoveryWarnings = 0
         private set
@@ -128,6 +129,7 @@ class NativeCaptureSession(
         lastEvent = started
         stopRequested = false
         finishing = null
+        pendingFinal = null
         try {
             sink = PcmWaveSink(wave(request))
             val input = createAudio()
@@ -224,6 +226,7 @@ class NativeCaptureSession(
         var input: CaptureAudioSource? = null
         var output: PcmWaveSink? = null
         var ownsFinish = false
+        var retryFinal: CaptureSnapshot? = null
         val completion: CompletableFuture<CaptureSnapshot>
         synchronized(lock) {
             val old = state?.takeIf { it.request.sessionId == id } ?: journal.read(id)
@@ -233,16 +236,27 @@ class NativeCaptureSession(
                 return if (discard) old.copy(phase = CapturePhase.cancelled) else old
             }
             if (old.phase == CapturePhase.finalizing) {
-                if (discard) throw CaptureFailure("capture_busy")
-                completion = finishing ?: throw CaptureFailure("capture_busy")
+                val pending = pendingFinal
+                if (pending != null && finishing?.isDone == true) {
+                    // Audio is already closed. Retry only the frozen final
+                    // snapshot, keeping its actual stop time and PCM count.
+                    retryFinal = if (discard) pending.copy(phase = CapturePhase.cancelled) else pending
+                    completion = CompletableFuture()
+                    finishing = completion
+                    ownsFinish = true
+                } else {
+                    if (discard) throw CaptureFailure("capture_busy")
+                    completion = finishing ?: throw CaptureFailure("capture_busy")
+                }
             } else {
                 completion = CompletableFuture()
                 finishing = completion
                 ownsFinish = true
                 val next = old.copy(phase = CapturePhase.finalizing, sequence = old.sequence + 1)
-                // Disk gets a tombstone first; the live owner stays busy until
-                // the microphone and writer are actually released.
-                journal.save(if (discard) next.copy(phase = CapturePhase.cancelled) else next)
+                // Best effort intermediate journal; failed storage must never
+                // keep the microphone open. Final publication/deletion below
+                // still requires a durable final snapshot/tombstone.
+                runCatching { journal.save(if (discard) next.copy(phase = CapturePhase.cancelled) else next) }
                 state = next
                 observe(next)
                 input = audio
@@ -258,18 +272,28 @@ class NativeCaptureSession(
         synchronized(lock) {
             val old = state ?: throw CaptureFailure("capture_missing")
             val bytes = output?.pcmBytes ?: old.pcmBytes
-            val final = old.copy(
+            val final = retryFinal ?: old.copy(
                 phase = if (discard) CapturePhase.cancelled else if (bytes > 0) CapturePhase.finalized else CapturePhase.failed,
                 sequence = old.sequence + 1, elapsedMs = (monotonicMillis() - started).coerceIn(0L, 120000L),
                 pcmBytes = bytes, level = 0.0, errorCode = failure ?: if (bytes == 0L && !discard) "audio_empty" else null
             )
+            pendingFinal = final
             try {
                 journal.save(final)
-                if (discard) discardFiles(final)
                 state = final
+                pendingFinal = null
+                if (discard) discardFiles(final)
                 observe(final)
                 completion.complete(final)
             } catch (error: Exception) {
+                pendingFinal?.let { pending ->
+                    val retryable = pending.copy(phase = CapturePhase.finalizing,
+                        sequence = maxOf(old.sequence, pending.sequence) + 1,
+                        level = 0.0, errorCode = "capture_journal")
+                    state = retryable
+                    pendingFinal = pending.copy(sequence = retryable.sequence + 1)
+                    runCatching { observe(retryable) }
+                }
                 completion.completeExceptionally(CaptureFailure("capture_journal"))
                 throw CaptureFailure("capture_journal")
             }

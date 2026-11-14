@@ -247,8 +247,13 @@ class _NativeRecorderPanelState extends State<NativeRecorderPanel>
     final phase = current?.phase;
     final recording = phase == NativeCapturePhase.recording;
     final finalized = phase == NativeCapturePhase.finalized;
+    final journalFailure =
+        phase == NativeCapturePhase.finalizing &&
+        current?.errorCode == 'capture_journal';
     final status = widget.capture.savedId == widget.sessionId
         ? '音频已保存'
+        : !busy && journalFailure
+        ? '保存未完成，请重试'
         : busy || phase == NativeCapturePhase.finalizing
         ? (widget.query ? '正在本地识别查询' : '正在保存音频')
         : recording
@@ -283,7 +288,7 @@ class _NativeRecorderPanelState extends State<NativeRecorderPanel>
                       child: Semantics(
                         liveRegion: true,
                         child: Text(
-                          widget.query ? '说出要找的内容' : status,
+                          widget.query && !journalFailure ? '说出要找的内容' : status,
                           style: Theme.of(context).textTheme.titleLarge,
                         ),
                       ),
@@ -359,7 +364,7 @@ class _NativeRecorderPanelState extends State<NativeRecorderPanel>
                         ? (widget.query ? '识别中' : '保存中')
                         : widget.query
                         ? (finalized ? '识别查询' : '结束并识别')
-                        : finalized
+                        : finalized || journalFailure
                         ? '重试保存'
                         : '停止并保存',
                   ),
@@ -430,7 +435,11 @@ class _NativeCaptureBarState extends State<NativeCaptureBar> {
                   onPressed: busy ? null : widget.onOpen,
                   icon: const Icon(Icons.mic_none_rounded),
                   label: Text(
-                    '${widget.capture.book.captureActive ? '录音中' : '尚未保存'} ${durationText(value?.elapsedMs ?? 0)}',
+                    '${value?.errorCode == 'capture_journal'
+                        ? '保存未完成'
+                        : widget.capture.book.captureActive
+                        ? '录音中'
+                        : '尚未保存'} ${durationText(value?.elapsedMs ?? 0)}',
                   ),
                 ),
               ),

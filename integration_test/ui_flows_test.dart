@@ -8,6 +8,7 @@ import 'package:nianxia/app/capture_session_controller.dart';
 import 'package:nianxia/app/inference_runtime.dart';
 import 'package:nianxia/app/notebook.dart';
 import 'package:nianxia/domain/capture_session.dart';
+import 'package:nianxia/data/capture_store.dart' show validateWave;
 import 'package:nianxia/platform/native_capture.dart';
 import 'package:nianxia/ui/app.dart';
 import 'package:path/path.dart' as p;
@@ -55,6 +56,7 @@ void main() {
     final runtime = _UnavailableRuntime();
     var configured = false;
     String? ownedId;
+    Directory? blockedJournal;
     try {
       await expectLater(
         channel.invokeMethod<void>('setValidationWorkspace', {
@@ -179,6 +181,42 @@ void main() {
       );
       tester.platformDispatcher.clearTextScaleFactorTestValue();
       await tester.pumpAndSettle();
+      // Real filesystem failure on this nonce's native journal. The mic/WAV
+      // must close even before storage recovers; then UI retries exactly once.
+      await tester.tap(find.text('记一下'));
+      await waitFor(
+        () =>
+            capture!.snapshot?.phase == NativeCapturePhase.recording &&
+            find.text('收起').evaluate().isNotEmpty,
+      );
+      ownedId = capture.snapshot!.sessionId;
+      await tester.pump(const Duration(milliseconds: 1200));
+      blockedJournal = Directory(
+        p.join(
+          root.path,
+          'nianxia',
+          'native-captures',
+          '$ownedId.session.partial',
+        ),
+      );
+      await blockedJournal.create();
+      await tester.tap(find.text('停止并保存'));
+      await waitFor(() => find.text('保存未完成，请重试').evaluate().isNotEmpty);
+      expect(capture.snapshot!.errorCode, 'capture_journal');
+      expect((await book.records).length, 4);
+      expect(
+        await validateWave(
+          File(p.join(root.path, 'nianxia', 'native-captures', '$ownedId.wav')),
+        ),
+        greaterThan(0),
+      );
+      await blockedJournal.delete();
+      blockedJournal = null;
+      await tester.tap(find.text('重试保存'));
+      await waitFor(
+        () => capture!.savedId == ownedId && find.text('收起').evaluate().isEmpty,
+      );
+      expect((await book.records).length, 5);
       // A new field after unregistering uses the real Android IME connection.
       tester.testTextInput.unregister();
       await tester.tap(find.text('找一下'));
@@ -209,6 +247,8 @@ void main() {
           'largeTextStopMinHeight': 48,
           'actualKeyboardInsetsObserved': 1,
           'lightAndDarkScreens': 1,
+          'nativeJournalFaultRetried': 1,
+          'closedWaveBeforeJournalRecovery': 1,
         },
       );
     } catch (_) {
@@ -216,6 +256,9 @@ void main() {
       rethrow;
     } finally {
       await tester.pumpWidget(const SizedBox());
+      if (blockedJournal != null && await blockedJournal.exists()) {
+        await blockedJournal.delete();
+      }
       if (capture != null && ownedId != null && capture.savedId != ownedId) {
         try {
           await capture.discard(sessionId: ownedId);
