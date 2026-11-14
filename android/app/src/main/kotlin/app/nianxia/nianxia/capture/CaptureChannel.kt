@@ -8,14 +8,16 @@ import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodChannel
 
 /** Engine-scoped transport only. Detaching never disposes the process owner. */
-class CaptureChannel(private val activity: Activity, messenger: BinaryMessenger) {
+class CaptureChannel(private val activity: Activity, messenger: BinaryMessenger, engineIdentity: Int) {
     private val main = Handler(Looper.getMainLooper())
     private val methods = MethodChannel(messenger, "app.nianxia/capture")
     private val events = EventChannel(messenger, "app.nianxia/capture_events")
     private var sink: EventChannel.EventSink? = null
     private val listener: (CaptureSnapshot) -> Unit = { sink?.success(it.wire()) }
 
+    private var detached = false
     init {
+        CaptureOwners.engineAttached(engineIdentity)
         CaptureOwners.listeners.add(listener)
         events.setStreamHandler(object : EventChannel.StreamHandler {
             override fun onListen(arguments: Any?, eventSink: EventChannel.EventSink) { sink = eventSink }
@@ -29,6 +31,20 @@ class CaptureChannel(private val activity: Activity, messenger: BinaryMessenger)
                         CaptureOwners.validationWorkspace(activity, args["runId"] as? String
                             ?: throw CaptureFailure("capture_validation"), call.method == "endValidationWorkspace")
                         main.post { reply.success(null) }
+                    } catch (error: Exception) { main.post { fail(reply, error) } }
+                }
+                return@setMethodCallHandler
+            }
+            if (call.method == "validationEngineState" || call.method == "recreateValidationEngine") {
+                CaptureOwners.commands.execute {
+                    try {
+                        val args = call.arguments as? Map<*, *> ?: throw CaptureFailure("capture_validation")
+                        val state = CaptureOwners.validationEngineState(activity, args["runId"] as? String
+                            ?: throw CaptureFailure("capture_validation"))
+                        main.post {
+                            reply.success(if (call.method == "validationEngineState") state else null)
+                            if (call.method == "recreateValidationEngine") main.postDelayed({ activity.recreate() }, 200)
+                        }
                     } catch (error: Exception) { main.post { fail(reply, error) } }
                 }
                 return@setMethodCallHandler
@@ -82,6 +98,9 @@ class CaptureChannel(private val activity: Activity, messenger: BinaryMessenger)
     }
 
     fun detach() {
+        if (detached) return
+        detached = true
+        CaptureOwners.engineDetached()
         sink = null
         CaptureOwners.listeners.remove(listener)
         methods.setMethodCallHandler(null)

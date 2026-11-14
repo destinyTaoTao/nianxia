@@ -1,0 +1,21 @@
+{
+  "applicationId": "app.nianxia.nianxia.test",
+  "runId": "be50a45a-a8a7-4e02-9ac3-2be785ef1116",
+  "case": "offline-end-to-end",
+  "passed": true,
+  "metrics": {
+    "fixtureAsrMs": 782,
+    "fixtureRecordingSaved": 1,
+    "nativeAsr": 1,
+    "nativeSemanticSearch": 1,
+    "nativePlaybackCompleted": 1,
+    "lateEditPreserved": 1,
+    "lateDeleteNotResurrected": 1,
+    "microphoneIsPublicFixture": 1,
+    "sampledFullProcessRssBytes": 532369408,
+    "verifiedModelBytes": 263562669,
+    "sourceDiskBytes": 304384,
+    "derivedAndTemporaryDiskBytes": 415921,
+    "dartNetworkAttempts": 0
+  }
+}

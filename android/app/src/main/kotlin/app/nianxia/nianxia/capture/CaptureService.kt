@@ -46,6 +46,20 @@ object CaptureOwners {
         validationRunId = if (end) null else runId
         validationRoot = if (end) null else root
     }
+    private var engineIdentity = 0
+    private var attachCount = 0
+    private var detachCount = 0
+    @Synchronized fun engineAttached(identity: Int) { engineIdentity = identity; attachCount++ }
+    @Synchronized fun engineDetached() { detachCount++ }
+    @Synchronized fun validationEngineState(context: Context, runId: String): Map<String, Int> {
+        if (context.packageName != "app.nianxia.nianxia.test" || validationRunId != runId) {
+            throw CaptureFailure("capture_validation")
+        }
+        CaptureRequest.checkId(runId)
+        return mapOf("engineIdentity" to engineIdentity, "ownerIdentity" to System.identityHashCode(get(context)),
+            "attachCount" to attachCount, "detachCount" to detachCount,
+            "foreground" to if (visible && (context as? android.app.Activity)?.hasWindowFocus() == true) 1 else 0)
+    }
     val commands = Executors.newSingleThreadExecutor()
     val listeners = CopyOnWriteArrayList<(CaptureSnapshot) -> Unit>()
     @Volatile var visible = false

@@ -1,0 +1,19 @@
+{
+  "applicationId": "app.nianxia.nianxia.test",
+  "runId": "cb51e41c-fd0b-4887-9afa-32edfb2dea71",
+  "case": "performance",
+  "passed": true,
+  "metrics": {
+    "indexBuildMs": 21456,
+    "keywordFirstPageP95Us": 336824,
+    "modelQueryFirstPageMs": 67,
+    "sampledProcessRssBytes": 245211136,
+    "sourceRows": 10000,
+    "samples": 20,
+    "sampledFullProcessRssBytes": 245211136,
+    "verifiedModelBytes": 263562669,
+    "sourceDiskBytes": 169142248,
+    "derivedAndTemporaryDiskBytes": 87628921,
+    "dartNetworkAttempts": 0
+  }
+}

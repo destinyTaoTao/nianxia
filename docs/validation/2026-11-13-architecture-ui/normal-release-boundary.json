@@ -7,6 +7,7 @@
   "debuggable": false,
   "experimentalCryptoLibraryIncluded": false,
   "validationProviderDeclared": false,
-  "apkBytes": 51269649,
-  "sha256": "61807a2c23cd003d92045a9e91bdd335285f78126dd707357da7998ee0cceb07"
+  "trialDebugSignatureVerified": true,
+  "apkBytes": 51401181,
+  "sha256": "78295ceec52afed77a2edfd56b100a821b9007774ebb6b4d79129c5f3baed49f"
 }

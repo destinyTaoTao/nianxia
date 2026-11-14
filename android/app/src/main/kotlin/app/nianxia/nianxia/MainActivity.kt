@@ -81,7 +81,7 @@ class MainActivity : FlutterActivity() {
         super.configureFlutterEngine(flutterEngine)
         // Prototype remains restricted to the disposable test application.
         if (applicationContext.packageName == "app.nianxia.nianxia.test") {
-            captureChannel = CaptureChannel(this, flutterEngine.dartExecutor.binaryMessenger)
+            captureChannel = CaptureChannel(this, flutterEngine.dartExecutor.binaryMessenger, System.identityHashCode(flutterEngine))
         }
         systemChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "app.nianxia/system")
         systemChannel!!.setMethodCallHandler { call, result ->

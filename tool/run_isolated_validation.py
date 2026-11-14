@@ -19,7 +19,7 @@ TEST_ID = 'app.nianxia.nianxia.test'
 FORMAL_ID = 'app.nianxia.nianxia'
 CASES = {
     'capture': ('isolation-smoke', 'background-smoke', 'capture-matrix', 'deadline-auto-finalize',
-                'process-kill-active', 'process-kill-query', 'kill-after-finalize', 'kill-after-source-commit'),
+                'process-kill-active', 'process-kill-query', 'kill-after-finalize', 'kill-after-source-commit', 'engine-reconnect'),
     'backup': ('isolation-smoke', 'cipher-smoke', 'cipher-resources', 'backup-matrix'),
     'acceptance': ('isolation-smoke', 'offline-end-to-end', 'performance', 'search-paging', 'diagnostics', 'local-jobs', 'ui-flows'),
 }
@@ -142,6 +142,50 @@ def drive_with_process_kill(drive, adb, run_id, case):
         drive()  # Same binary/nonce; persistent checkpoint chooses recovery stage.
 
 
+def validation_network_snapshot(adb):
+    airplane = run([*adb, 'shell', 'settings', 'get', 'global', 'airplane_mode_on']).stdout.strip()
+    wifi = run([*adb, 'shell', 'cmd', 'wifi', 'status']).stdout
+    match = re.match(r'Wifi is (enabled|disabled)\b', wifi)
+    if airplane not in ('0', '1') or match is None:
+        raise ValidationError('Cannot safely snapshot emulator network settings')
+    return airplane, match.group(1)
+
+
+def restore_validation_network(adb, snapshot):
+    airplane, wifi = snapshot
+    try:
+        run([*adb, 'shell', 'cmd', 'connectivity', 'airplane-mode',
+             'enable' if airplane == '1' else 'disable'])
+    finally:
+        run([*adb, 'shell', 'svc', 'wifi', 'enable' if wifi == 'enabled' else 'disable'])
+    deadline = time.monotonic() + 10
+    while validation_network_snapshot(adb) != snapshot:
+        if time.monotonic() >= deadline:
+            raise ValidationError('Original emulator network settings were not restored')
+        time.sleep(.1)
+
+
+def disconnect_validation_emulator(adb):
+    if run([*adb, 'shell', 'getprop', 'ro.kernel.qemu']).stdout.strip() != '1':
+        raise ValidationError('Automatic offline validation requires an emulator')
+    snapshot = validation_network_snapshot(adb)
+    try:
+        run([*adb, 'shell', 'cmd', 'connectivity', 'airplane-mode', 'enable'])
+        run([*adb, 'shell', 'svc', 'wifi', 'disable'])
+        deadline = time.monotonic() + 15
+        while True:
+            state = run([*adb, 'shell', 'dumpsys', 'connectivity']).stdout
+            if re.search(r'^Active default network: none\s*$', state, re.MULTILINE):
+                break
+            if time.monotonic() >= deadline:
+                raise ValidationError('Emulator default network remains connected')
+            time.sleep(.1)
+        return snapshot
+    except BaseException:
+        restore_validation_network(adb, snapshot)
+        raise
+
+
 def main():
     args = parse_args()
     root = Path(__file__).resolve().parents[1]
@@ -161,7 +205,7 @@ def main():
     if args.mode == 'release' and (args.case in KILL_PHASES or args.case == 'capture-matrix'):
         raise ValidationError('Automatic capture faults require the debug/profile orchestrator; release refused')
     target = 'integration_test/' + ('isolation_smoke_test.dart' if args.case == 'isolation-smoke'
-                                    else 'deadline_capture_test.dart' if args.case == 'deadline-auto-finalize' else 'search_paging_test.dart' if args.case == 'search-paging' else 'local_jobs_test.dart' if args.case == 'local-jobs' else 'ui_flows_test.dart' if args.case == 'ui-flows' else 'diagnostics_test.dart' if args.case == 'diagnostics' else TARGETS[args.target])
+                                    else 'engine_reconnect_test.dart' if args.case == 'engine-reconnect' else 'deadline_capture_test.dart' if args.case == 'deadline-auto-finalize' else 'search_paging_test.dart' if args.case == 'search-paging' else 'local_jobs_test.dart' if args.case == 'local-jobs' else 'ui_flows_test.dart' if args.case == 'ui-flows' else 'diagnostics_test.dart' if args.case == 'diagnostics' else TARGETS[args.target])
     if not (root / target).is_file():
         raise ValidationError('Requested test entry point is not implemented')
     run_id = str(uuid.uuid4())
@@ -170,6 +214,7 @@ def main():
                    f'--dart-define=VALIDATION_CASE={args.case}']
     adb = None
     before = None
+    offline_snapshot = None
     if args.platform == 'android':
         sdk_value = os.environ.get('ANDROID_SDK_ROOT') or os.environ.get('ANDROID_HOME')
         if not sdk_value:
@@ -209,6 +254,10 @@ def main():
                 raise ValidationError('Cannot read built iOS identity; refused') from error
             if identity != TEST_ID:
                 raise ValidationError('iOS identity is not the isolated test bundle; refused')
+        if args.case == 'offline-end-to-end':
+            if not adb:
+                raise ValidationError('Automatic offline validation currently requires Android emulator')
+            offline_snapshot = disconnect_validation_emulator(adb)
         if args.mode == 'release':
             run([*adb, 'shell', 'am', 'start', '-W', '-n',
                  f'{TEST_ID}/app.nianxia.nianxia.MainActivity'])
@@ -254,10 +303,14 @@ def main():
                     raise ValidationError('Guarded test result missing') from error
                 require_result(data, run_id, args.case)
     finally:
-        if adb and before is not None:
-            after = run([*adb, 'shell', 'pm', 'path', FORMAL_ID]).stdout
-            if before != after:
-                raise ValidationError('Formal installation changed; stop and inspect')
+        try:
+            if offline_snapshot is not None:
+                restore_validation_network(adb, offline_snapshot)
+        finally:
+            if adb and before is not None:
+                after = run([*adb, 'shell', 'pm', 'path', FORMAL_ID]).stdout
+                if before != after:
+                    raise ValidationError('Formal installation changed; stop and inspect')
     print(f'Passed isolated validation: {args.target}/{args.case} ({args.mode}); formal data not read.')
 
 
