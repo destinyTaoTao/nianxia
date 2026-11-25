@@ -16,8 +16,9 @@ class LocalJobStore {
   final RecordRepository source;
   final Directory home;
   Database? _db, _owner;
-  bool _attempted = false, _failed = false;
-  bool get available => _open() != null;
+  String _pruneAfter = '';
+  bool _attempted = false, _failed = false, _spaceBlocked = false;
+  bool get available => _open() != null && !_spaceBlocked;
   Database? _open() {
     if (_failed) return null;
     if (_attempted) return _db;
@@ -116,135 +117,246 @@ class LocalJobStore {
         r.vectorRevision != r.revision;
   }
 
+  // Reclaim completed and obsolete metadata, never a current failure marker
+  // or a running lease. Only source identity/revision is read, not user bodies
+  // or vectors. Each turn examines at most 256 rows and holds no transaction
+  // while yielding to foreground storage requests.
+  String _pruneBatch(Database db, String after, String? speech) {
+    final rows = db.select(
+      "SELECT key,kind,source_id,source_revision,model_generation,state FROM jobs WHERE key>? AND state!='running' ORDER BY key LIMIT 256",
+      [after],
+    );
+    final generation = source.indexModelVersion;
+    db.execute('SAVEPOINT prune_jobs');
+    try {
+      for (final row in rows) {
+        final current = source.db.select(
+          'SELECT revision FROM records WHERE id=?',
+          [row['source_id']],
+        );
+        final obsolete =
+            row['state'] == 'succeeded' ||
+            current.isEmpty ||
+            current.single['revision'] != row['source_revision'] ||
+            (row['kind'] == 'embedding' &&
+                row['model_generation'] != generation) ||
+            (row['kind'] == 'transcription' &&
+                speech != null &&
+                row['model_generation'] != speech);
+        if (obsolete) {
+          db.execute("DELETE FROM jobs WHERE key=? AND state!='running'", [
+            row['key'],
+          ]);
+        }
+      }
+      db.execute('RELEASE prune_jobs');
+    } catch (_) {
+      db.execute('ROLLBACK TO prune_jobs');
+      db.execute('RELEASE prune_jobs');
+      rethrow;
+    }
+    return rows.length < 256 ? '' : rows.last['key'] as String;
+  }
+
+  Future<void> _reclaimSpace(Database db, String? speech) async {
+    var after = '';
+    do {
+      after = _pruneBatch(db, after, speech);
+      await Future<void>.delayed(Duration.zero);
+    } while (after.isNotEmpty);
+  }
+
   Future<LocalJob?> claim(Set<JobKind> kinds, String speech) async {
     final db = _open();
     if (db == null || kinds.isEmpty || speech.length > 256) return null;
-    try {
-      for (final kind in kinds) {
-        var after = '';
-        while (true) {
-          final batch = source.pendingJobs(
-            transcription: kind == JobKind.transcription,
-            after: after,
-          );
-          for (final r in batch) {
-            final generation = kind == JobKind.transcription
-                ? speech
-                : source.indexModelVersion;
-            final key = sha256
-                .convert(
-                  utf8.encode(
-                    jsonEncode([kind.name, r.id, r.revision, generation]),
-                  ),
-                )
-                .toString();
-            db.execute(
-              'INSERT OR IGNORE INTO jobs VALUES (?,?,?,?,?,?,?,?,?,?)',
-              [
-                key,
-                kind.name,
-                r.id,
-                r.revision,
-                generation,
-                'pending',
-                0,
-                0,
-                '',
-                null,
-              ],
-            );
-          }
-          final ready = db.select(
-            "SELECT * FROM jobs WHERE state='pending' AND kind=? AND next_attempt_at<=? ORDER BY next_attempt_at,key LIMIT 32",
-            [kind.name, DateTime.now().toUtc().millisecondsSinceEpoch],
-          );
-          for (final row in ready) {
-            final job = _read(row);
-            if (!_needed(job, speech)) {
-              db.execute(
-                "UPDATE jobs SET state='stale',lease_token='' WHERE key=?",
-                [job.key],
-              );
-              continue;
-            }
-            final lease = const Uuid().v4();
-            db.execute(
-              "UPDATE jobs SET state='running',attempt=attempt+1,lease_token=? WHERE key=? AND state='pending'",
-              [lease, job.key],
-            );
-            return _read(
-              db.select('SELECT * FROM jobs WHERE key=?', [job.key]).single,
-            );
-          }
-          if (batch.isEmpty && ready.length < 32) break;
-          if (batch.isNotEmpty) after = batch.last.id;
-          // At most 32 source rows per turn; source mutations and foreground
-          // requests can run between turns, without holding either transaction.
-          await Future<void>.delayed(Duration.zero);
+    final speechGeneration = kinds.contains(JobKind.transcription)
+        ? speech
+        : null;
+    for (var attempt = 0; attempt < 2; attempt++) {
+      try {
+        _pruneAfter = _pruneBatch(db, _pruneAfter, speechGeneration);
+        final claimed = await _claim(db, kinds, speech);
+        _spaceBlocked = false;
+        return claimed;
+      } on SqliteException catch (error) {
+        if (error.resultCode != 13) {
+          _failed = true;
+          return null;
         }
+        _spaceBlocked = true;
+        // SQLITE_FULL is recoverable. Keep valid attempt limits and leases;
+        // do not permanently disable this process or recreate the sidecar.
+        if (attempt == 0) {
+          try {
+            await _reclaimSpace(db, speechGeneration);
+          } catch (_) {
+            return null;
+          }
+        }
+      } catch (_) {
+        _failed = true;
+        return null;
       }
-    } catch (_) {
-      _failed = true;
-      /* Optional queue failure leaves source and manual retry intact. */
     }
     return null;
   }
 
-  void finish(LocalJob job, JobOutcome outcome) {
+  Future<LocalJob?> _claim(
+    Database db,
+    Set<JobKind> kinds,
+    String speech,
+  ) async {
+    for (final kind in kinds) {
+      var after = '';
+      while (true) {
+        final batch = source.pendingJobs(
+          transcription: kind == JobKind.transcription,
+          after: after,
+        );
+        for (final r in batch) {
+          final generation = kind == JobKind.transcription
+              ? speech
+              : source.indexModelVersion;
+          final key = sha256
+              .convert(
+                utf8.encode(
+                  jsonEncode([kind.name, r.id, r.revision, generation]),
+                ),
+              )
+              .toString();
+          db.execute(
+            'INSERT OR IGNORE INTO jobs VALUES (?,?,?,?,?,?,?,?,?,?)',
+            [
+              key,
+              kind.name,
+              r.id,
+              r.revision,
+              generation,
+              'pending',
+              0,
+              0,
+              '',
+              null,
+            ],
+          );
+        }
+        final ready = db.select(
+          "SELECT * FROM jobs WHERE state='pending' AND kind=? AND next_attempt_at<=? ORDER BY next_attempt_at,key LIMIT 32",
+          [kind.name, DateTime.now().toUtc().millisecondsSinceEpoch],
+        );
+        for (final row in ready) {
+          final job = _read(row);
+          if (!_needed(job, speech)) {
+            db.execute(
+              "UPDATE jobs SET state='stale',lease_token='' WHERE key=?",
+              [job.key],
+            );
+            continue;
+          }
+          final lease = const Uuid().v4();
+          db.execute(
+            "UPDATE jobs SET state='running',attempt=attempt+1,lease_token=? WHERE key=? AND state='pending'",
+            [lease, job.key],
+          );
+          return _read(
+            db.select('SELECT * FROM jobs WHERE key=?', [job.key]).single,
+          );
+        }
+        if (batch.isEmpty && ready.length < 32) break;
+        if (batch.isNotEmpty) after = batch.last.id;
+        // At most 32 source rows per turn; source mutations and foreground
+        // requests can run between turns, without holding either transaction.
+        await Future<void>.delayed(Duration.zero);
+      }
+    }
+    return null;
+  }
+
+  Future<void> finish(LocalJob job, JobOutcome outcome) async {
     final db = _open();
     if (db == null) return;
-    try {
-      final rows = db.select(
-        "SELECT * FROM jobs WHERE key=? AND state='running' AND lease_token=?",
-        [job.key, job.leaseToken],
-      );
-      if (rows.isEmpty) return;
-      final actual = _read(rows.single);
-      final r = source.get(actual.sourceId);
-      var state = switch (outcome) {
-        JobOutcome.succeeded => 'succeeded',
-        JobOutcome.failedTransient => actual.attempt < 3 ? 'pending' : 'failed',
-        JobOutcome.failedPermanent => 'failed',
-        JobOutcome.stale => 'stale',
-        JobOutcome.cancelled => 'cancelled',
-      };
-      // Transcription commit itself increments revision. Success is accepted
-      // only when the source result exists; all other late leases are stale.
-      final committed =
-          r != null &&
-          (actual.kind == JobKind.transcription
-              ? r.transcription == 'done' &&
-                    r.revision == actual.sourceRevision + 1
-              : r.revision == actual.sourceRevision &&
-                    r.vectorRevision == r.revision &&
-                    actual.modelGeneration == source.indexModelVersion);
-      if (committed) {
-        state = 'succeeded';
-      } else if (r == null ||
-          r.revision != actual.sourceRevision ||
-          outcome == JobOutcome.succeeded) {
-        state = 'stale';
+    for (var attempt = 0; attempt < 2; attempt++) {
+      try {
+        _finish(db, job, outcome);
+        _spaceBlocked = false;
+        return;
+      } on SqliteException catch (error) {
+        if (error.resultCode != 13) {
+          _failed = true;
+          return;
+        }
+        _spaceBlocked = true;
+        if (attempt == 0) {
+          try {
+            await _reclaimSpace(db, null);
+          } catch (_) {
+            return;
+          }
+        }
+      } catch (_) {
+        _failed = true;
+        return;
       }
-      final delay = actual.attempt == 1 ? 1000 : 5000;
-      db.execute(
-        'UPDATE jobs SET state=?,next_attempt_at=?,lease_token=?,error_code=? WHERE key=? AND lease_token=?',
-        [
-          state,
-          DateTime.now().toUtc().millisecondsSinceEpoch + delay,
-          '',
-          outcome == JobOutcome.failedTransient
-              ? 'transient'
-              : outcome == JobOutcome.failedPermanent
-              ? 'permanent'
-              : null,
-          actual.key,
-          actual.leaseToken,
-        ],
-      );
-    } catch (_) {
-      _failed = true;
-      /* Source is authoritative on next reconciliation. */
     }
+    // An unacknowledged lease remains intact for source reconciliation on
+    // restart. A full optional cache never affects the already committed source.
+  }
+
+  void _finish(Database db, LocalJob job, JobOutcome outcome) {
+    final rows = db.select(
+      "SELECT * FROM jobs WHERE key=? AND state='running' AND lease_token=?",
+      [job.key, job.leaseToken],
+    );
+    if (rows.isEmpty) return;
+    final actual = _read(rows.single);
+    final r = source.get(actual.sourceId);
+    var state = switch (outcome) {
+      JobOutcome.succeeded => 'succeeded',
+      JobOutcome.failedTransient => actual.attempt < 3 ? 'pending' : 'failed',
+      JobOutcome.failedPermanent => 'failed',
+      JobOutcome.stale => 'stale',
+      JobOutcome.cancelled => 'cancelled',
+    };
+    // Transcription commit itself increments revision. Success is accepted
+    // only when the source result exists; all other late leases are stale.
+    final committed =
+        r != null &&
+        (actual.kind == JobKind.transcription
+            ? r.transcription == 'done' &&
+                  r.revision == actual.sourceRevision + 1
+            : r.revision == actual.sourceRevision &&
+                  r.vectorRevision == r.revision &&
+                  actual.modelGeneration == source.indexModelVersion);
+    if (committed) {
+      state = 'succeeded';
+    } else if (r == null ||
+        r.revision != actual.sourceRevision ||
+        outcome == JobOutcome.succeeded) {
+      state = 'stale';
+    }
+    if (state == 'succeeded') {
+      db.execute('DELETE FROM jobs WHERE key=? AND lease_token=?', [
+        actual.key,
+        actual.leaseToken,
+      ]);
+      return;
+    }
+    final delay = actual.attempt == 1 ? 1000 : 5000;
+    db.execute(
+      'UPDATE jobs SET state=?,next_attempt_at=?,lease_token=?,error_code=? WHERE key=? AND lease_token=?',
+      [
+        state,
+        DateTime.now().toUtc().millisecondsSinceEpoch + delay,
+        '',
+        outcome == JobOutcome.failedTransient
+            ? 'transient'
+            : outcome == JobOutcome.failedPermanent
+            ? 'permanent'
+            : null,
+        actual.key,
+        actual.leaseToken,
+      ],
+    );
   }
 
   DateTime? nextAttempt(Set<JobKind> kinds) {

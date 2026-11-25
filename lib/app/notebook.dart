@@ -9,6 +9,8 @@ import '../domain/local_job.dart';
 import '../domain/recovery_entry.dart';
 import '../data/recovery_catalog.dart';
 import '../domain/search_page.dart';
+import '../domain/deletion_scope.dart';
+export '../domain/deletion_scope.dart';
 
 import '../domain/ports.dart';
 import '../data/capture_store.dart';
@@ -25,14 +27,29 @@ import '../domain/record.dart';
 import '../domain/semantic_vector.dart';
 import '../domain/organization.dart';
 import 'record_search.dart';
+import 'diagnostics.dart';
+import '../domain/diagnostic_event.dart';
 export '../domain/record.dart';
 
+/// A single local text-save intention. Its immutable identity survives retries;
+/// successful results remain settled even if the record is later deleted.
+class TextSubmission {
+  TextSubmission._(this._book, this._record);
+  final Notebook _book;
+  final Record _record;
+  String get id => _record.id;
+  String get text => _record.body;
+  Future<Record>? _pending;
+  Record? _saved;
+}
+
 class Notebook extends ChangeNotifier {
-  Notebook._(this.home, this.repository, this.clock);
+  Notebook._(this.home, this.repository, this.clock, this.diagnostics);
   static Future<Notebook> open(
     Directory home, {
     DateTime Function()? clock,
     bool deferMaintenance = false,
+    LocalDiagnostics? diagnostics,
   }) async {
     await home.create(recursive: true);
     await Directory(p.join(home.path, 'audio')).create();
@@ -41,6 +58,7 @@ class Notebook extends ChangeNotifier {
       home,
       await Storage.open(home),
       clock ?? DateTime.now,
+      diagnostics,
     );
     try {
       book._themeMode = await book.repository.themeMode;
@@ -55,6 +73,7 @@ class Notebook extends ChangeNotifier {
 
   final Directory home;
   final Storage repository;
+  final LocalDiagnostics? diagnostics;
   final DateTime Function() clock;
   String? _backgroundNotice;
   String? get backgroundNotice => _backgroundNotice;
@@ -93,52 +112,96 @@ class Notebook extends ChangeNotifier {
   Future<RecordDetail?> detail(
     String id, {
     RecordCursor? after,
+    RecordCursor? before,
+    String? aroundId,
     int? generation,
-  }) => repository.detail(id, after: after, generation: generation);
+  }) => repository.detail(
+    id,
+    after: after,
+    before: before,
+    aroundId: aroundId,
+    generation: generation,
+  );
   Future<int> childCount(String id) => repository.childCount(id);
   Future<List<Record>> children(String id) => repository.children(id);
-  Future<Record> saveText(String text, {String? parentId}) =>
-      _operation(() async {
-        if (text.trim().isEmpty || text.length > 100000) {
-          throw const NotebookException('请输入 1–100,000 字的正文。');
-        }
-        if (parentId != null && (await get(parentId))?.parentId != null) {
-          throw const NotebookException('请追加到原记录。');
-        }
-        final now = clock();
-        final r = Record(
-          id: const Uuid().v4(),
-          body: text.trim(),
-          parentId: parentId,
-          createdAt: now.toUtc(),
-          timezone: now.timeZoneName,
-          offsetMinutes: now.timeZoneOffset.inMinutes,
-        );
-        await repository.insert(r);
-        changed();
-        return r;
-      });
+  TextSubmission prepareText(String text, {String? parentId}) {
+    if (text.trim().isEmpty || text.length > 100000) {
+      throw const NotebookException('请输入 1–100,000 字的正文。');
+    }
+    final now = clock();
+    return TextSubmission._(
+      this,
+      Record(
+        id: const Uuid().v4(),
+        body: text.trim(),
+        parentId: parentId,
+        createdAt: now.toUtc(),
+        timezone: now.timeZoneName,
+        offsetMinutes: now.timeZoneOffset.inMinutes,
+      ),
+    );
+  }
+
+  Future<Record> saveText(String text, {String? parentId}) async =>
+      saveTextSubmission(prepareText(text, parentId: parentId));
+
+  Future<Record> saveTextSubmission(
+    TextSubmission submission, {
+    bool standalone = false,
+  }) {
+    if (!identical(submission._book, this)) {
+      return Future.error(const NotebookException('保存意图不属于当前资料库。'));
+    }
+    final saved = submission._saved;
+    if (saved != null) return Future.value(saved);
+    final pending = submission._pending;
+    if (pending != null) return pending;
+    final work = _write(() async {
+      final record = await repository.insertText(
+        submission._record,
+        standalone: standalone,
+      );
+      submission._saved = record;
+      changed();
+      return record;
+    }, sourceRevision: submission._record.revision);
+    submission._pending = work;
+    void settled() {
+      if (identical(submission._pending, work)) submission._pending = null;
+    }
+
+    unawaited(
+      work.then<void>(
+        (_) => settled(),
+        onError: (Object _, StackTrace _) => settled(),
+      ),
+    );
+    return work;
+  }
 
   Future<void> edit(String id, String text, {required int expectedRevision}) =>
-      _operation(() async {
+      _write(() async {
         if (text.trim().isEmpty || text.length > 100000) {
           throw const NotebookException('请输入 1–100,000 字的正文。');
         }
         await repository.edit(id, text.trim(), expectedRevision);
         changed();
-      });
+      }, sourceRevision: expectedRevision + 1);
 
-  Future<void> favorite(String id, bool value) => _operation(() async {
+  Future<void> favorite(String id, bool value) => _write(() async {
     await repository.favorite(id, value);
     changed();
   });
 
-  Future<void> delete(String id) {
-    final deletion = _operation(() async {
+  Future<DeletionScope> deletionScope(String id) =>
+      _operation(() => repository.deletionScope(id));
+
+  Future<void> delete(String id, {DeletionScope? scope}) {
+    final deletion = _write(() async {
       if (_mediaLeases > 0) {
         throw const NotebookException('正在备份或恢复，请完成后再删除记录。');
       }
-      await repository.delete(id);
+      await repository.delete(id, scope: scope);
       changed();
       await _drainMediaDeletions();
     });
@@ -283,6 +346,22 @@ class Notebook extends ChangeNotifier {
     return File(p.join(home.path, 'drafts', '$id.discard'));
   }
 
+  /// Durable cancellation intent shared with recovery and native handoff.
+  Future<void> requestNativeDiscard(String id) => _withCapture(id, () async {
+    if (await get(id) != null) {
+      throw const NotebookException('录音已经保存，请从记录详情删除。');
+    }
+    if (await nativeCaptureDiscarded(id)) return;
+    final flag = _nativeDiscardFlag(id);
+    final stage = File('${flag.path}.${const Uuid().v4()}.partial');
+    try {
+      await stage.writeAsString('v1', flush: true);
+      await stage.rename(flag.path);
+    } finally {
+      if (await stage.exists()) await stage.delete();
+    }
+  });
+
   Future<bool> nativeCaptureDiscarded(String id) async {
     final file = _nativeDiscardFlag(id);
     final type = await FileSystemEntity.type(file.path, followLinks: false);
@@ -351,8 +430,11 @@ class Notebook extends ChangeNotifier {
     return ids;
   }
 
-  Future<bool> nativeDiscardRequiresCancel(String id) async =>
-      (await _recoveryCatalog.resolve('d:$id')).nativeFailure;
+  Future<bool> nativeDiscardRequiresCancel(String id) async {
+    if (!await captures.marker(id).exists()) return true;
+    return (await _recoveryCatalog.resolve('d:$id')).nativeFailure;
+  }
+
   Future<void> retainFailedNative(CaptureSnapshot value) =>
       _withCapture(value.sessionId, () async {
         if (value.request.mode != CaptureMode.record ||
@@ -502,7 +584,7 @@ class Notebook extends ChangeNotifier {
       durationMs: duration,
       transcription: 'pending',
     );
-    await repository.insert(r);
+    await _traceWrite(() => repository.insert(r), sourceRevision: r.revision);
     final journal = captures.marker(draft.id);
     // The SQLite commit is the save boundary. A cleanup failure must not turn
     // a committed recording into an apparent draft that can be discarded.
@@ -549,7 +631,7 @@ class Notebook extends ChangeNotifier {
       await captures.discard(draft);
       recoveryDrafts.removeWhere((d) => d.id == draft.id);
       if (!_closed) {
-        changed();
+        changed(content: !draft.query);
       }
     });
   }
@@ -749,9 +831,9 @@ class Notebook extends ChangeNotifier {
         if (r == null || r.audio == null || !_transcribing.add(id)) {
           return false;
         }
-        await repository.transcriptionState(id, 'running');
-        changed();
         try {
+          await repository.transcriptionState(id, 'running');
+          changed();
           if (_closed) return false;
           final result = await _untilClosed(engine.transcribe(audioPath(r)));
           final text = result?.trim() ?? '';
@@ -772,8 +854,13 @@ class Notebook extends ChangeNotifier {
           return accepted;
         } catch (_) {
           if (!_closed) {
-            await repository.transcriptionState(id, 'failed');
-            changed();
+            try {
+              await repository.transcriptionState(id, 'failed');
+              changed();
+            } catch (_) {
+              // Reporting failure is best effort; the original operation error
+              // and the retry guard must survive an unavailable status store.
+            }
           }
           rethrow;
         } finally {
@@ -798,25 +885,60 @@ class Notebook extends ChangeNotifier {
       });
 
   static String normalize(String text) => RecordSearch.normalize(text);
+  Future<T> _traceSearch<T>(
+    Future<T> Function() action, {
+    SearchCancellation? cancellation,
+  }) {
+    Future<T> trace() =>
+        diagnostics?.trace(
+          DiagnosticKind.search,
+          action,
+          resultOf: (value) => _closed || value is SearchPage && value.reset
+              ? DiagnosticResult.stale
+              : DiagnosticResult.succeeded,
+          failureResultOf: (_) => cancellation?.requested == true
+              ? DiagnosticResult.cancelled
+              : _closed
+              ? DiagnosticResult.stale
+              : DiagnosticResult.failed,
+        ) ??
+        action();
+    return _closed ? trace() : _operation(trace);
+  }
+
   Future<SearchPage> searchPage(
     SearchQuery query, {
     SearchCursor? after,
     Embedder? embedder,
     SearchCancellation? cancellation,
     int limit = 40,
-  }) => _search.searchPage(
-    query,
-    after: after,
-    embedder: embedder,
+  }) => _traceSearch(
+    () async =>
+        await _untilClosed(
+          _search.searchPage(
+            query,
+            after: after,
+            embedder: embedder,
+            cancellation: cancellation,
+            limit: limit,
+          ),
+        ) ??
+        SearchPage([]),
     cancellation: cancellation,
-    limit: limit,
   );
+
   Future<SearchResults> search(
     String query, {
     DateTime? from,
     DateTime? to,
     Embedder? embedder,
-  }) => _search.search(query, from: from, to: to, embedder: embedder);
+  }) => _traceSearch(
+    () async =>
+        await _untilClosed(
+          _search.search(query, from: from, to: to, embedder: embedder),
+        ) ??
+        SearchResults([]),
+  );
 
   Future<bool> index(String id, Embedder embedder) => _operation(() async {
     final modelVersion = await repository.indexModelVersion;
@@ -889,11 +1011,26 @@ class Notebook extends ChangeNotifier {
         }
       });
 
-  final _closingSignal = Completer<void>();
+  final _closeWaiters = <void Function()>{};
   int _operations = 0;
   Completer<void>? _idle, _mediaIdle;
   Future<void>? _closeFuture;
   bool _notifierDisposed = false;
+
+  Future<T> _traceWrite<T>(
+    Future<T> Function() action, {
+    int? sourceRevision,
+  }) =>
+      diagnostics?.trace(
+        DiagnosticKind.sourceWrite,
+        action,
+        phase: DiagnosticPhase.commit,
+        sourceRevision: sourceRevision,
+      ) ??
+      action();
+
+  Future<T> _write<T>(Future<T> Function() action, {int? sourceRevision}) =>
+      _operation(() => _traceWrite(action, sourceRevision: sourceRevision));
 
   Future<T> _operation<T>(Future<T> Function() action) async {
     if (_closed) throw const NotebookException('本地资料库已关闭。');
@@ -908,15 +1045,41 @@ class Notebook extends ChangeNotifier {
     }
   }
 
-  Future<T?> _untilClosed<T>(Future<T> work) => Future.any<T?>([
-    work.then<T?>((value) => value),
-    _closingSignal.future.then<T?>((_) => null),
-  ]);
+  Future<T?> _untilClosed<T>(Future<T> work) {
+    // A completed operation must detach from the long-lived notebook. Racing
+    // every result against one closing Future retains those results until close.
+    final result = Completer<T?>();
+    void closed() {
+      if (!result.isCompleted) result.complete(null);
+    }
+
+    if (_closed) {
+      closed();
+    } else {
+      _closeWaiters.add(closed);
+    }
+    unawaited(
+      work.then<void>(
+        (value) {
+          _closeWaiters.remove(closed);
+          if (!result.isCompleted) result.complete(value);
+        },
+        onError: (Object error, StackTrace stack) {
+          _closeWaiters.remove(closed);
+          if (!result.isCompleted) result.completeError(error, stack);
+        },
+      ),
+    );
+    return result.future;
+  }
 
   Future<void> close() {
     if (_closeFuture != null) return _closeFuture!;
     _closed = true;
-    _closingSignal.complete();
+    for (final listener in _closeWaiters.toList(growable: false)) {
+      listener();
+    }
+    _closeWaiters.clear();
     _closeFuture = _finishClose();
     dispose();
     return _closeFuture!;

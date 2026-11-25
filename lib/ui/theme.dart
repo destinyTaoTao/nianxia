@@ -10,19 +10,19 @@ ThemeData notebookTheme(
   bool reduceMotion = false,
 }) {
   final dark = brightness == Brightness.dark;
-  final canvas = Color(dark ? 0xff212121 : 0xffffffff);
+  final canvas = Color(dark ? 0xff282828 : 0xffffffff);
   final panel = Color(dark ? 0xff303030 : 0xffffffff);
-  final soft = Color(dark ? 0xff303030 : 0xfff7f7f8);
+  final soft = Color(dark ? 0xff303030 : 0xfff4f4f4);
   final raised = Color(dark ? 0xff393939 : 0xffe7e7e7);
-  final list = Color(dark ? 0xff212121 : 0xfff7f7f8);
-  final ink = Color(dark ? 0xfff5f5f5 : 0xff171717);
+  final list = Color(dark ? 0xff282828 : 0xfff4f4f4);
+  final ink = Color(dark ? 0xfff2f2f2 : 0xff181818);
   final muted = Color(
     highContrast
         ? (dark ? 0xffd4d4d4 : 0xff404040)
-        : (dark ? 0xffb4b4b4 : 0xff666666),
+        : (dark ? 0xffb8b8b8 : 0xff686868),
   );
   final line = Color(dark ? 0xff4a4a4a : 0xffe5e5e5);
-  final inverse = Color(dark ? 0xff171717 : 0xffffffff);
+  final inverse = Color(dark ? 0xff181818 : 0xffffffff);
   final scheme =
       ColorScheme.fromSeed(
         seedColor: ink,
@@ -319,4 +319,20 @@ class _MarkPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _MarkPainter old) => old.color != color;
+}
+
+/// The committed preference, independent of effective system brightness.
+/// Routes can stay mounted while light -> system leaves ThemeData unchanged.
+class ThemePreferenceScope extends InheritedWidget {
+  const ThemePreferenceScope({
+    super.key,
+    required this.mode,
+    required super.child,
+  });
+  final ThemeMode mode;
+  static ThemeMode? maybeOf(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<ThemePreferenceScope>()?.mode;
+  @override
+  bool updateShouldNotify(ThemePreferenceScope oldWidget) =>
+      mode != oldWidget.mode;
 }

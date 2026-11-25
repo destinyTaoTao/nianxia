@@ -9,6 +9,26 @@ void notice(BuildContext context, String text) {
   }
 }
 
+/// Completes the route that accepted an operation. A page or dialog opened
+/// above it while the operation was pending must stay open.
+void completeOwnedRoute<T>(
+  NavigatorState navigator,
+  Route<T>? route, [
+  T? result,
+]) {
+  if (!navigator.mounted ||
+      route == null ||
+      !route.isActive ||
+      route.navigator != navigator) {
+    return;
+  }
+  if (route.isCurrent) {
+    navigator.pop<T>(result);
+  } else {
+    navigator.removeRoute<T>(route, result);
+  }
+}
+
 String userError(Object error) =>
     error is NotebookException ? error.message : '操作失败，请检查权限、可用空间后重试。原有内容保持不变。';
 String recordDate(Record r) {
@@ -19,6 +39,29 @@ String recordDate(Record r) {
 String durationText(int ms) {
   final s = ms ~/ 1000;
   return '${(s ~/ 60).toString().padLeft(2, '0')}:${(s % 60).toString().padLeft(2, '0')}';
+}
+
+/// One quiet, accessible deadline warning for both recording owners and all
+/// entry gestures. It never claims that a pending save has completed.
+class CaptureLimitHint extends StatelessWidget {
+  const CaptureLimitHint({
+    super.key,
+    required this.elapsedMs,
+    required this.recording,
+  });
+  final int elapsedMs;
+  final bool recording;
+  @override
+  Widget build(BuildContext context) {
+    if (!recording || elapsedMs < 105000) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: Semantics(
+        liveRegion: true,
+        child: const Text('即将达到两分钟，录音将自动结束。', textAlign: TextAlign.center),
+      ),
+    );
+  }
 }
 
 class ReadingWidth extends StatelessWidget {
@@ -46,6 +89,8 @@ class PaperSurface extends StatelessWidget {
   final EdgeInsetsGeometry padding;
   @override
   Widget build(BuildContext context) => Material(
+    // Match the immediate app theme, including inherited body text colors.
+    animationDuration: Duration.zero,
     color: Theme.of(context).colorScheme.surface,
     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
     clipBehavior: Clip.antiAlias,
@@ -139,23 +184,28 @@ Future<bool> confirm(
   String title,
   String body, {
   String action = '确认',
+  ValueChanged<ModalRoute<bool>>? onRoute,
 }) async =>
     await showDialog<bool>(
       context: context,
       animationStyle: PlatformControls.animationStyle(context),
-      builder: (context) => AlertDialog(
-        title: Text(title),
-        content: Text(body),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: Text(action),
-          ),
-        ],
-      ),
+      builder: (context) {
+        final route = ModalRoute.of<bool>(context);
+        if (route != null) onRoute?.call(route);
+        return AlertDialog(
+          title: Text(title),
+          content: Text(body),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('取消'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: Text(action),
+            ),
+          ],
+        );
+      },
     ) ??
     false;

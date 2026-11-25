@@ -178,7 +178,7 @@ void main() {
     await pumpStorageAndSettle(tester);
     expect(find.text('确认丢弃'), findsOneWidget);
     await tester.tap(find.text('确认丢弃'));
-    await untilVisible(tester, '记一下');
+    await untilVisible(tester, '按住说话');
     expect((await storageRead(tester, () => book.records)), isEmpty);
     await tester.runAsync(() async {
       expect(await Directory('${home.path}/audio').list().isEmpty, isTrue);

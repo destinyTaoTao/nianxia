@@ -1,9 +1,13 @@
 import 'dart:io';
+import 'dart:convert';
+
+import 'package:crypto/crypto.dart';
 
 import 'package:path/path.dart' as p;
 import 'package:sqlite3/sqlite3.dart';
 
 import '../domain/record.dart';
+import '../domain/deletion_scope.dart';
 import '../domain/record_page.dart';
 import 'derived_store.dart';
 import 'schema_migrations.dart';
@@ -68,15 +72,24 @@ class RecordRepository {
 
   RecordPage page({
     RecordCursor? after,
+    RecordCursor? before,
     int? generation,
     bool favorites = false,
     String? parentId,
     int limit = 40,
   }) {
     if (limit < 1 || limit > 100) throw ArgumentError.value(limit, 'limit');
+    if (before != null && (after != null || parentId == null)) {
+      throw ArgumentError('Previous windows require a parent and one cursor.');
+    }
     final reset =
-        after != null && generation != null && generation != contentGeneration;
-    if (reset) after = null;
+        (after != null || before != null) &&
+        generation != null &&
+        generation != contentGeneration;
+    if (reset) {
+      after = null;
+      before = null;
+    }
     final where = <String>[];
     final args = <Object?>[];
     if (parentId != null) {
@@ -87,11 +100,13 @@ class RecordRepository {
     }
     if (favorites) where.add('r.favorite=1');
     final ascending = parentId != null;
-    if (after != null) {
+    final cursor = before ?? after;
+    if (cursor != null) {
+      final comparison = before != null || !ascending ? '<' : '>';
       where.add(
-        '(r.created_at ${ascending ? '>' : '<'} ? OR (r.created_at=? AND r.id>?))',
+        '(r.created_at $comparison ? OR (r.created_at=? AND r.id${before != null ? '<' : '>'}?))',
       );
-      args.addAll([after.createdAt, after.createdAt, after.id]);
+      args.addAll([cursor.createdAt, cursor.createdAt, cursor.id]);
     }
     final columns = SchemaMigrations.rawColumns
         .split(',')
@@ -107,23 +122,36 @@ class RecordRepository {
       '''SELECT $columns,
       (SELECT count(*) FROM records c WHERE c.parent_id=r.id) AS append_count
       FROM records r ${where.isEmpty ? '' : 'WHERE ${where.join(' AND ')}'}
-      ORDER BY r.created_at ${ascending ? 'ASC' : 'DESC'},r.id LIMIT ?''',
+      ORDER BY r.created_at ${ascending && before == null ? 'ASC' : 'DESC'},r.id ${before != null ? 'DESC' : 'ASC'} LIMIT ?''',
       [...args, limit + 1],
     );
-    final visible = rows.take(limit).toList();
+    final visible = before == null
+        ? rows.take(limit).toList()
+        : rows.take(limit).toList().reversed.toList();
     final entries = visible
         .map(
           (row) => RecordListEntry(_rawRecord(row), row['append_count'] as int),
         )
         .toList();
     final last = visible.lastOrNull;
+    final first = visible.firstOrNull;
+    bool exists(String direction, Row row) => db.select(
+      'SELECT 1 FROM records WHERE parent_id=? AND (created_at $direction ? OR (created_at=? AND id $direction ?)) LIMIT 1',
+      [parentId, row['created_at'], row['created_at'], row['id']],
+    ).isNotEmpty;
+    final hasNext =
+        last != null &&
+        (before != null ? exists('>', last) : rows.length > limit);
     return RecordPage(
       entries,
-      rows.length > limit && last != null
+      hasNext
           ? RecordCursor(last['created_at'] as String, last['id'] as String)
           : null,
       contentGeneration,
       reset: reset,
+      previous: parentId != null && first != null && exists('<', first)
+          ? RecordCursor(first['created_at'] as String, first['id'] as String)
+          : null,
     );
   }
 
@@ -147,13 +175,47 @@ class RecordRepository {
             id,
           ]).single['n']
           as int;
-  RecordDetail? detail(String id, {RecordCursor? after, int? generation}) {
+  RecordDetail? detail(
+    String id, {
+    RecordCursor? after,
+    RecordCursor? before,
+    String? aroundId,
+    int? generation,
+  }) {
     final record = get(id);
+    if (aroundId != null) {
+      if (after != null || before != null) {
+        throw ArgumentError('One window selector is allowed.');
+      }
+      final anchor = db.select(
+        'SELECT created_at,id FROM records WHERE id=? AND parent_id=? LIMIT 1',
+        [aroundId, id],
+      );
+      if (anchor.isNotEmpty) {
+        final row = anchor.single;
+        final earlier = db.select(
+          'SELECT created_at,id FROM records WHERE parent_id=? AND (created_at<? OR (created_at=? AND id<=?)) ORDER BY created_at DESC,id DESC LIMIT 21',
+          [id, row['created_at'], row['created_at'], row['id']],
+        );
+        if (earlier.length == 21) {
+          final start = earlier.last;
+          after = RecordCursor(
+            start['created_at'] as String,
+            start['id'] as String,
+          );
+        }
+      }
+    }
     return record == null
         ? null
         : RecordDetail(
             record,
-            page(parentId: id, after: after, generation: generation),
+            page(
+              parentId: id,
+              after: after,
+              before: before,
+              generation: generation,
+            ),
             childCount(id),
           );
   }
@@ -397,6 +459,43 @@ class RecordRepository {
     }
   }
 
+  Record insertText(Record value, {bool standalone = false}) {
+    db.execute('SAVEPOINT submit_text');
+    try {
+      final existing = get(value.id);
+      if (existing != null) {
+        db.execute('RELEASE submit_text');
+        return existing;
+      }
+      final parentId = standalone ? null : value.parentId;
+      if (parentId != null) {
+        final parents = db.select(
+          'SELECT parent_id FROM records WHERE id=? LIMIT 1',
+          [parentId],
+        );
+        if (parents.isEmpty) throw const NotebookException('原记录已删除，追加内容仍保留。');
+        if (parents.single['parent_id'] != null) {
+          throw const NotebookException('请追加到原记录。');
+        }
+      }
+      final saved = Record(
+        id: value.id,
+        body: value.body,
+        parentId: parentId,
+        createdAt: value.createdAt,
+        timezone: value.timezone,
+        offsetMinutes: value.offsetMinutes,
+      );
+      insert(saved);
+      db.execute('RELEASE submit_text');
+      return saved;
+    } catch (_) {
+      db.execute('ROLLBACK TO submit_text');
+      db.execute('RELEASE submit_text');
+      rethrow;
+    }
+  }
+
   void edit(String id, String text, int expectedRevision) {
     db.execute(
       'UPDATE records SET body = ?, revision = revision + 1 WHERE id = ? AND revision = ?',
@@ -418,11 +517,52 @@ class RecordRepository {
     _contentGeneration++;
   }
 
-  void delete(String id) {
+  DeletionScope deletionScope(String id) {
+    final statement = db.prepare('''WITH RECURSIVE doomed(id) AS (
+      SELECT id FROM records WHERE id=?
+      UNION SELECT r.id FROM records r JOIN doomed d ON r.parent_id=d.id
+    ) SELECT r.* FROM records r WHERE r.id IN doomed ORDER BY r.id''');
+    final digest = _ScopeDigest();
+    final hash = sha256.startChunkedConversion(digest);
+    var count = 0;
+    String? parent;
+    try {
+      final rows = statement.selectCursor([id]);
+      while (rows.moveNext()) {
+        final row = rows.current;
+        if (row['id'] == id) parent = row['parent_id'] as String?;
+        // One source row at a time; IDs, raw text and source versions participate
+        // so equal counts or an imported same-ID replacement cannot reuse consent.
+        hash.add(utf8.encode(jsonEncode(row.values.toList())));
+        count++;
+      }
+      hash.close();
+      if (count == 0) throw const NotebookException('这条记录已删除，请返回查找。');
+      return DeletionScope(
+        id: id,
+        parentId: parent,
+        count: count,
+        digest: digest.value!,
+      );
+    } finally {
+      statement.close();
+    }
+  }
+
+  void delete(String id, {DeletionScope? scope}) {
     // A savepoint also keeps deletion atomic when called inside restore/test
     // transactions. Queue only audio whose last owning record is being removed.
     db.execute('SAVEPOINT delete_records');
     try {
+      if (scope != null) {
+        final current = deletionScope(id);
+        if (scope.id != id ||
+            scope.count != current.count ||
+            scope.parentId != current.parentId ||
+            scope.digest != current.digest) {
+          throw const NotebookException('记录或追加已变化，请重新确认删除范围。');
+        }
+      }
       db.execute(
         '''WITH RECURSIVE doomed(id) AS (
         SELECT id FROM records WHERE id=?
@@ -585,4 +725,12 @@ class RecordRepository {
   }
 
   void close() => db.close();
+}
+
+class _ScopeDigest implements Sink<Digest> {
+  String? value;
+  @override
+  void add(Digest data) => value = data.toString();
+  @override
+  void close() {}
 }

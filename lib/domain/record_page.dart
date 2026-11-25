@@ -19,9 +19,11 @@ class RecordPage {
     this.next,
     this.generation, {
     this.reset = false,
+    this.previous,
   });
   final List<RecordListEntry> entries;
   final RecordCursor? next;
+  final RecordCursor? previous;
   final int generation;
   final bool reset;
 }

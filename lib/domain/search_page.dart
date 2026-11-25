@@ -62,12 +62,14 @@ class SearchHitSummary {
     required this.durationMs,
     required this.kind,
     this.parentId,
+    this.parentTitle,
   });
   final String id, title, snippet, timezone;
   final DateTime createdAt;
   final int offsetMinutes, durationMs;
   final bool hasAudio;
   final String? parentId;
+  final String? parentTitle;
   final MatchKind kind;
   Map<String, Object?> toMap() => {
     'id': id,
@@ -77,6 +79,7 @@ class SearchHitSummary {
     'timezone': timezone,
     'offsetMinutes': offsetMinutes,
     'parentId': parentId,
+    'parentTitle': parentTitle,
     'hasAudio': hasAudio,
     'durationMs': durationMs,
     'kind': kind.name,

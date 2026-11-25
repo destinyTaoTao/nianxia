@@ -72,7 +72,13 @@ void main() {
       await book.saveText('离线记录的想法\n先可靠保存，再慢慢整理。');
       await book.saveText('周末散步\n带上相机，看看街边的树。');
       capture = CaptureSessionController(NativeCaptureBridge(), book, runtime);
-      await tester.pumpWidget(NianxiaApp(book: book, captureSession: capture));
+      await tester.pumpWidget(
+        NianxiaApp(
+          book: book,
+          captureSession: capture,
+          initialTheme: ThemeMode.dark,
+        ),
+      );
       await tester.pumpAndSettle();
       Future<void> waitFor(bool Function() condition) async {
         final deadline = DateTime.now().add(const Duration(seconds: 20));
@@ -100,7 +106,7 @@ void main() {
         await tester.pump();
       }
       await screenshot('home-dark');
-      await tester.tap(find.text('记一下'));
+      await tester.tap(find.text('点按录音'));
       await waitFor(
         () => capture!.snapshot?.phase == NativeCapturePhase.recording,
       );
@@ -152,10 +158,14 @@ void main() {
       // Exercise the actual theme and large-text layout on the running engine.
       await tester.tap(find.byType(BackButton));
       await tester.pumpAndSettle();
-      await tester.tap(find.byTooltip('切换浅色主题'));
+      await tester.tap(find.byTooltip('设置'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('theme-choice-light')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byType(BackButton));
       await waitFor(
         () =>
-            Theme.of(tester.element(find.text('记一下'))).brightness ==
+            Theme.of(tester.element(find.text('按住说话'))).brightness ==
             Brightness.light,
       );
       await screenshot('home-light');
@@ -163,7 +173,7 @@ void main() {
       addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
       await tester.pumpAndSettle();
       await screenshot('home-large-text');
-      await tester.tap(find.text('记一下'));
+      await tester.tap(find.text('点按录音'));
       await waitFor(
         () =>
             capture!.snapshot?.phase == NativeCapturePhase.recording &&
@@ -183,7 +193,7 @@ void main() {
       await tester.pumpAndSettle();
       // Real filesystem failure on this nonce's native journal. The mic/WAV
       // must close even before storage recovers; then UI retries exactly once.
-      await tester.tap(find.text('记一下'));
+      await tester.tap(find.text('点按录音'));
       await waitFor(
         () =>
             capture!.snapshot?.phase == NativeCapturePhase.recording &&

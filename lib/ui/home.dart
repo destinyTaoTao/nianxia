@@ -11,13 +11,15 @@ import '../domain/capture_session.dart';
 import 'native_recorder.dart';
 import 'recovery.dart';
 import '../platform/local_models.dart';
+import '../platform/capture_device_fence.dart';
 import 'common.dart';
 import 'theme.dart';
-import 'editor.dart';
+import 'home_notebook.dart';
 import 'detail.dart';
 import 'search.dart';
 import 'settings.dart';
 import 'recorder.dart';
+import '../platform/capture_controller.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({
@@ -25,6 +27,7 @@ class HomePage extends StatefulWidget {
     required this.book,
     this.models,
     this.captureSession,
+    this.captureMicrophone,
     this.backupService,
     this.diagnostics,
     this.startupNotice,
@@ -35,6 +38,7 @@ class HomePage extends StatefulWidget {
   final Notebook book;
   final LocalModels? models;
   final CaptureSessionController? captureSession;
+  final MicrophoneInput? captureMicrophone;
   final BackupService? backupService;
   final LocalDiagnostics? diagnostics;
   final String? startupNotice;
@@ -48,7 +52,10 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   final scroll = ScrollController();
   bool capturing = false;
-  bool themeBusy = false;
+  Record? pendingAppend;
+  Notebook? pendingAppendBook;
+  bool appendNavigationScheduled = false;
+  bool holding = false;
   bool favorites = false;
   bool? speechReady;
   int modelCheck = 0;
@@ -63,6 +70,34 @@ class _HomePageState extends State<HomePage> {
   int recoveryCheck = 0;
   int? seenWarnings;
   String? seenNotice;
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (ModalRoute.of(context)?.isCurrent ?? false) showPendingAppend();
+  }
+
+  void showPendingAppend() {
+    if (pendingAppend == null || appendNavigationScheduled) return;
+    appendNavigationScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      appendNavigationScheduled = false;
+      if (!mounted || !(ModalRoute.of(context)?.isCurrent ?? false)) return;
+      final record = pendingAppend;
+      if (record == null) return;
+      pendingAppend = null;
+      if (!identical(pendingAppendBook, widget.book)) return;
+      unawaited(
+        openDetail(
+          context,
+          widget.book,
+          record.parentId ?? record.id,
+          models: widget.models,
+          focusAppendId: record.parentId != null ? record.id : null,
+        ),
+      );
+    });
+  }
+
   Future<void> loadRecoveryState() async {
     if (!mounted) return;
     final version = ++recoveryCheck;
@@ -253,7 +288,9 @@ class _HomePageState extends State<HomePage> {
       return;
     }
     widget.shortcut!.value = null;
+    if (holding) return;
     if (widget.book.captureActive &&
+        !CaptureDeviceFence.canRetryRelease &&
         (widget.captureSession == null || action == 'search')) {
       notice(context, '正在录音，请先停止保存或丢弃。');
       return;
@@ -266,29 +303,35 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> record() async {
-    if (capturing) {
+    if (capturing || holding) {
       return;
     }
     capturing = true;
     try {
+      final parentId =
+          widget.captureSession?.snapshot?.request.mode == CaptureMode.record &&
+              widget.captureSession?.savedId !=
+                  widget.captureSession?.snapshot?.sessionId &&
+              widget.captureSession?.snapshot?.phase !=
+                  NativeCapturePhase.cancelled
+          ? widget.captureSession?.snapshot?.request.parentId
+          : null;
       final r = await openRecorder(
         context,
         widget.book,
         widget.models,
         onSaved: showSavedRecord,
         captureSession: widget.captureSession,
-        parentId:
-            widget.captureSession?.snapshot?.request.mode ==
-                    CaptureMode.record &&
-                widget.captureSession?.savedId !=
-                    widget.captureSession?.snapshot?.sessionId &&
-                widget.captureSession?.snapshot?.phase !=
-                    NativeCapturePhase.cancelled
-            ? widget.captureSession?.snapshot?.request.parentId
-            : null,
+        microphone: widget.captureMicrophone,
+        parentId: parentId,
       );
-      if (mounted && r is Record) {
+      if (mounted && r is Record && r.audio != null) {
         notice(context, '音频已保存，转写稍后完成');
+        if (parentId != null) {
+          pendingAppend = r;
+          pendingAppendBook = widget.book;
+          showPendingAppend();
+        }
       }
     } finally {
       capturing = false;
@@ -304,6 +347,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   void find({bool voice = false}) {
+    if (holding) return;
     Navigator.push(
       context,
       MaterialPageRoute<void>(
@@ -312,12 +356,14 @@ class _HomePageState extends State<HomePage> {
           models: widget.models,
           voice: voice,
           captureSession: widget.captureSession,
+          microphone: widget.captureMicrophone,
         ),
       ),
     );
   }
 
   Future<void> settings({bool modelsFirst = false}) async {
+    if (holding) return;
     await Navigator.push<void>(
       context,
       MaterialPageRoute<void>(
@@ -336,20 +382,6 @@ class _HomePageState extends State<HomePage> {
     );
     await loadSpeechStatus();
     await loadRecoveryState();
-  }
-
-  Future<void> changeTheme(ThemeMode mode) async {
-    if (themeBusy) return;
-    setState(() => themeBusy = true);
-    var saved = false;
-    try {
-      saved = await widget.onTheme(mode);
-    } catch (_) {
-      // Preserve the active theme when persistence fails.
-    }
-    if (!mounted) return;
-    setState(() => themeBusy = false);
-    if (!saved) notice(context, '主题设置未保存，请重试。');
   }
 
   Future<void> toggleFavorite(Record record) async {
@@ -372,149 +404,144 @@ class _HomePageState extends State<HomePage> {
           builder: (_, _) {
             final capture = widget.captureSession;
             final value = capture?.snapshot;
-            if (capture != null &&
+            final activeNative =
+                !holding &&
+                capture != null &&
                 value?.request.mode == CaptureMode.record &&
                 capture.savedId != value!.sessionId &&
-                value.phase != NativeCapturePhase.cancelled) {
-              return NativeCaptureBar(capture: capture, onOpen: record);
-            }
-            return BottomActions(
-              primary: FilledButton.icon(
-                onPressed: record,
-                icon: const Icon(Icons.mic_none_rounded),
-                label: const Text('记一下'),
-              ),
+                value.phase != NativeCapturePhase.cancelled;
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ExcludeFocus(
+                  excluding: activeNative,
+                  child: Offstage(
+                    offstage: activeNative,
+                    child: HomeComposer(
+                      book: widget.book,
+                      onRecord: record,
+                      onSaved: showSavedRecord,
+                      onHoldActive: (value) => setState(() => holding = value),
+                      onRecovery: recovery,
+                      models: widget.models,
+                      captureSession: widget.captureSession,
+                      microphone: widget.captureMicrophone,
+                    ),
+                  ),
+                ),
+                if (activeNative)
+                  NativeCaptureBar(capture: capture, onOpen: record),
+              ],
             );
           },
         ),
-        body: SafeArea(
-          bottom: false,
-          child: ColoredBox(
-            color: theme.scaffoldBackgroundColor,
-            child: CustomScrollView(
-              controller: scroll,
-              slivers: [
-                SliverToBoxAdapter(
-                  child: ColoredBox(
-                    color: theme.scaffoldBackgroundColor,
-                    child: ReadingWidth(
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(24, 8, 24, 18),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Wrap(
-                              alignment: WrapAlignment.spaceBetween,
-                              crossAxisAlignment: WrapCrossAlignment.center,
-                              runSpacing: 8,
+        body: ExcludeFocus(
+          excluding: holding,
+          child: IgnorePointer(
+            ignoring: holding,
+            child: SafeArea(
+              bottom: false,
+              child: ColoredBox(
+                color: theme.scaffoldBackgroundColor,
+                child: CustomScrollView(
+                  controller: scroll,
+                  slivers: [
+                    SliverToBoxAdapter(
+                      child: ColoredBox(
+                        color: theme.scaffoldBackgroundColor,
+                        child: ReadingWidth(
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const NoteMark(size: 26),
-                                    const SizedBox(width: 10),
-                                    Text(
-                                      '念下',
-                                      style: theme.textTheme.titleLarge,
-                                    ),
-                                  ],
-                                ),
-                                Wrap(
-                                  crossAxisAlignment: WrapCrossAlignment.center,
-                                  children: [
-                                    TextButton.icon(
-                                      onPressed: () => openEditor(
-                                        context,
-                                        widget.book,
-                                        onSaved: showSavedRecord,
-                                      ),
-                                      icon: const Icon(Icons.edit_outlined),
-                                      label: const Text('写文字'),
-                                    ),
-                                    IconButton(
-                                      tooltip:
-                                          theme.brightness == Brightness.dark
-                                          ? '切换浅色主题'
-                                          : '切换深色主题',
-                                      onPressed: themeBusy
-                                          ? null
-                                          : () => changeTheme(
-                                              theme.brightness ==
-                                                      Brightness.dark
-                                                  ? ThemeMode.light
-                                                  : ThemeMode.dark,
-                                            ),
-                                      icon: Icon(
-                                        theme.brightness == Brightness.dark
-                                            ? Icons.light_mode_outlined
-                                            : Icons.dark_mode_outlined,
-                                      ),
-                                    ),
-                                    IconButton(
-                                      tooltip: '设置',
-                                      onPressed: () => settings(),
-                                      icon: const Icon(Icons.settings_outlined),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 20),
-                            Material(
-                              key: const Key('home-search'),
-                              color: colors.surfaceContainer,
-                              borderRadius: BorderRadius.circular(18),
-                              clipBehavior: Clip.antiAlias,
-                              child: InkWell(
-                                onTap: find,
-                                child: Padding(
-                                  padding: const EdgeInsets.only(
-                                    left: 16,
-                                    top: 8,
-                                    bottom: 8,
-                                    right: 4,
-                                  ),
-                                  child: Row(
+                                SizedBox(
+                                  width: double.infinity,
+                                  child: Wrap(
+                                    alignment: WrapAlignment.spaceBetween,
+                                    crossAxisAlignment:
+                                        WrapCrossAlignment.center,
+                                    runSpacing: 8,
                                     children: [
-                                      const Icon(Icons.search_rounded),
-                                      const SizedBox(width: 12),
-                                      const Text('找一下'),
-                                      Expanded(
-                                        child: Text(
-                                          '，输入关键词',
-                                          overflow: TextOverflow.ellipsis,
-                                          style: TextStyle(
-                                            color: colors.onSurfaceVariant,
+                                      Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          const NoteMark(size: 26),
+                                          const SizedBox(width: 10),
+                                          Text(
+                                            '念下',
+                                            style: theme.textTheme.titleLarge,
                                           ),
-                                        ),
+                                        ],
                                       ),
-                                      IconButton(
-                                        tooltip: '语音查找',
-                                        onPressed: () => find(voice: true),
-                                        icon: const Icon(
-                                          Icons.mic_none_rounded,
-                                        ),
+                                      Wrap(
+                                        crossAxisAlignment:
+                                            WrapCrossAlignment.center,
+                                        children: [
+                                          IconButton(
+                                            tooltip: '设置',
+                                            onPressed: () => settings(),
+                                            icon: const Icon(
+                                              Icons.settings_outlined,
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                     ],
                                   ),
                                 ),
-                              ),
-                            ),
-                            const SizedBox(height: 20),
-                            SizedBox(
-                              width: double.infinity,
-                              child: Wrap(
-                                alignment: WrapAlignment.spaceBetween,
-                                crossAxisAlignment: WrapCrossAlignment.center,
-                                spacing: 12,
-                                runSpacing: 8,
-                                children: [
-                                  Material(
-                                    color: colors.surfaceContainerHighest,
-                                    shape: const StadiumBorder(),
+                                const SizedBox(height: 8),
+                                Material(
+                                  key: const Key('home-search'),
+                                  color: colors.surfaceContainer,
+                                  borderRadius: BorderRadius.circular(18),
+                                  clipBehavior: Clip.antiAlias,
+                                  child: InkWell(
+                                    onTap: find,
                                     child: Padding(
-                                      padding: const EdgeInsets.all(3),
+                                      padding: const EdgeInsets.only(
+                                        left: 16,
+                                        top: 0,
+                                        bottom: 0,
+                                        right: 4,
+                                      ),
                                       child: Row(
+                                        children: [
+                                          const Icon(Icons.search_rounded),
+                                          const SizedBox(width: 12),
+                                          const Text('找一下'),
+                                          Expanded(
+                                            child: Text(
+                                              '，输入关键词',
+                                              overflow: TextOverflow.ellipsis,
+                                              style: TextStyle(
+                                                color: colors.onSurfaceVariant,
+                                              ),
+                                            ),
+                                          ),
+                                          IconButton(
+                                            tooltip: '语音查找',
+                                            onPressed: () => find(voice: true),
+                                            icon: const Icon(
+                                              Icons.mic_none_rounded,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                SizedBox(
+                                  width: double.infinity,
+                                  child: Wrap(
+                                    alignment: WrapAlignment.spaceBetween,
+                                    crossAxisAlignment:
+                                        WrapCrossAlignment.center,
+                                    spacing: 12,
+                                    runSpacing: 8,
+                                    children: [
+                                      Row(
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
                                           for (final value in [false, true])
@@ -525,140 +552,154 @@ class _HomePageState extends State<HomePage> {
                                                     filterRecords(value),
                                                 style: TextButton.styleFrom(
                                                   minimumSize: const Size(
-                                                    72,
+                                                    64,
                                                     48,
                                                   ),
-                                                  backgroundColor:
-                                                      favorites == value
-                                                      ? colors
-                                                            .surfaceContainerHigh
-                                                      : Colors.transparent,
-                                                  foregroundColor:
-                                                      favorites == value
-                                                      ? colors.onSurface
-                                                      : colors.onSurfaceVariant,
-                                                  padding:
-                                                      const EdgeInsets.symmetric(
-                                                        horizontal: 18,
-                                                        vertical: 12,
-                                                      ),
                                                 ),
                                                 child: Text(
                                                   value ? '收藏' : '全部',
+                                                  style: TextStyle(
+                                                    fontWeight:
+                                                        favorites == value
+                                                        ? FontWeight.w700
+                                                        : FontWeight.w400,
+                                                    decoration:
+                                                        favorites == value
+                                                        ? TextDecoration
+                                                              .underline
+                                                        : TextDecoration.none,
+                                                    decorationThickness: 2,
+                                                  ),
                                                 ),
                                               ),
                                             ),
                                         ],
                                       ),
+                                    ],
+                                  ),
+                                ),
+                                if (hasRecovery)
+                                  TextButton.icon(
+                                    onPressed: recovery,
+                                    icon: const Icon(
+                                      Icons.restore_rounded,
+                                      size: 18,
+                                    ),
+                                    label: const Text('核对待恢复资料'),
+                                  ),
+                                if (widget.book.backgroundNotice != null)
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 12),
+                                    child: Text(
+                                      widget.book.backgroundNotice!,
+                                      style: theme.textTheme.bodySmall,
                                     ),
                                   ),
-                                ],
-                              ),
+                                if (speechReady == false)
+                                  TextButton.icon(
+                                    onPressed: () =>
+                                        settings(modelsFirst: true),
+                                    icon: const Icon(
+                                      Icons.download_outlined,
+                                      size: 18,
+                                    ),
+                                    label: const Text('准备语音转写（录音照常保存）'),
+                                  ),
+                              ],
                             ),
-                            if (hasRecovery)
-                              TextButton.icon(
-                                onPressed: recovery,
-                                icon: const Icon(
-                                  Icons.restore_rounded,
-                                  size: 18,
-                                ),
-                                label: const Text('核对待恢复资料'),
-                              ),
-                            if (widget.book.backgroundNotice != null)
-                              Padding(
-                                padding: const EdgeInsets.only(top: 12),
-                                child: Text(
-                                  widget.book.backgroundNotice!,
-                                  style: theme.textTheme.bodySmall,
-                                ),
-                              ),
-                            if (speechReady == false)
-                              TextButton.icon(
-                                onPressed: () => settings(modelsFirst: true),
-                                icon: const Icon(
-                                  Icons.download_outlined,
-                                  size: 18,
-                                ),
-                                label: const Text('准备语音转写（录音照常保存）'),
-                              ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                if (entries.isEmpty && loading)
-                  const SliverFillRemaining(
-                    hasScrollBody: false,
-                    child: Center(child: CircularProgressIndicator()),
-                  )
-                else if (entries.isEmpty && loadError != null)
-                  SliverFillRemaining(
-                    hasScrollBody: false,
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Text('记录未能加载，请重试。'),
-                        TextButton(
-                          onPressed: () => loadRecords(reset: true),
-                          child: const Text('重试'),
-                        ),
-                      ],
-                    ),
-                  )
-                else if (entries.isEmpty)
-                  SliverFillRemaining(
-                    hasScrollBody: false,
-                    child: EmptyState(
-                      icon: favorites
-                          ? Icons.bookmark_border_rounded
-                          : Icons.notes_rounded,
-                      title: favorites ? '还没有收藏' : '还没有记录',
-                      detail: favorites
-                          ? '点击便笺右下角，留下想重看的内容。'
-                          : '点下方“记一下”或“写文字”，留下第一个想法。',
-                    ),
-                  )
-                else
-                  SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(16, 20, 16, 10),
-                    sliver: SliverList.builder(
-                      itemCount: entries.length,
-                      itemBuilder: (context, i) => ReadingWidth(
-                        child: RecordRow(
-                          record: entries[i].record,
-                          appendCount: entries[i].appendCount,
-                          onFavorite: () => toggleFavorite(entries[i].record),
-                          onTap: () => openDetail(
-                            context,
-                            widget.book,
-                            entries[i].record.id,
-                            models: widget.models,
                           ),
                         ),
                       ),
                     ),
-                  ),
-                if (entries.isNotEmpty &&
-                    (loading || next != null || loadError != null))
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.only(bottom: 24),
-                      child: Center(
-                        child: loading
-                            ? const CircularProgressIndicator()
-                            : TextButton(
-                                onPressed: () => loadRecords(
-                                  reset: loadError != null && retryRefresh,
+                    if (entries.isEmpty && loading)
+                      const SliverFillRemaining(
+                        hasScrollBody: false,
+                        child: Center(child: CircularProgressIndicator()),
+                      )
+                    else if (entries.isEmpty && loadError != null)
+                      SliverFillRemaining(
+                        hasScrollBody: false,
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Text('记录未能加载，请重试。'),
+                            TextButton(
+                              onPressed: () => loadRecords(reset: true),
+                              child: const Text('重试'),
+                            ),
+                          ],
+                        ),
+                      )
+                    else if (entries.isEmpty)
+                      SliverFillRemaining(
+                        hasScrollBody: false,
+                        child: EmptyState(
+                          icon: favorites
+                              ? Icons.bookmark_border_rounded
+                              : Icons.notes_rounded,
+                          title: favorites ? '还没有收藏' : '还没有记录',
+                          detail: favorites
+                              ? '点击便笺右下角，留下想重看的内容。'
+                              : '按住下方说话，或点“写文字”，留下第一个想法。',
+                        ),
+                      )
+                    else
+                      SliverPadding(
+                        padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+                        sliver: SliverList.builder(
+                          itemCount: entries.length,
+                          itemBuilder: (context, i) => ReadingWidth(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                if (i == 0 ||
+                                    !sameRecordedDay(
+                                      entries[i - 1].record,
+                                      entries[i].record,
+                                    ))
+                                  NotebookDayHeading(
+                                    record: entries[i].record,
+                                    now: DateTime.now(),
+                                  ),
+                                NotebookEntry(
+                                  record: entries[i].record,
+                                  appendCount: entries[i].appendCount,
+                                  onFavorite: () =>
+                                      toggleFavorite(entries[i].record),
+                                  onOpen: () => openDetail(
+                                    context,
+                                    widget.book,
+                                    entries[i].record.id,
+                                    models: widget.models,
+                                  ),
                                 ),
-                                child: Text(
-                                  loadError != null ? '加载失败，重试' : '加载更多',
-                                ),
-                              ),
+                              ],
+                            ),
+                          ),
+                        ),
                       ),
-                    ),
-                  ),
-              ],
+                    if (entries.isNotEmpty &&
+                        (loading || next != null || loadError != null))
+                      SliverToBoxAdapter(
+                        child: Padding(
+                          padding: const EdgeInsets.only(bottom: 24),
+                          child: Center(
+                            child: loading
+                                ? const CircularProgressIndicator()
+                                : TextButton(
+                                    onPressed: () => loadRecords(
+                                      reset: loadError != null && retryRefresh,
+                                    ),
+                                    child: Text(
+                                      loadError != null ? '加载失败，重试' : '加载更多',
+                                    ),
+                                  ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
             ),
           ),
         ),

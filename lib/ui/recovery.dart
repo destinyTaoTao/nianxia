@@ -142,7 +142,11 @@ class _RecoveryScreenState extends State<RecoveryScreen> {
         builder: (_) => SingleChildScrollView(
           child: Padding(
             padding: const EdgeInsets.all(24),
-            child: AudioPlayback(path: file!.path, duration: entry.durationMs!),
+            child: AudioPlayback(
+              book: widget.book,
+              path: file!.path,
+              duration: entry.durationMs!,
+            ),
           ),
         ),
       );

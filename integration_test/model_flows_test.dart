@@ -101,7 +101,7 @@ void main() {
       await binding.convertFlutterSurfaceToImage();
       await tester.pumpWidget(NianxiaApp(book: book, models: models));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('记一下'));
+      await tester.tap(find.text('点按录音'));
       await until(tester, () async => find.text('停止并保存').evaluate().isNotEmpty);
       await until(tester, () async => microphone.delivered);
       await tester.tap(find.text('停止并保存'));
@@ -161,6 +161,8 @@ void main() {
       await tester.tap(find.text('找一下'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('语音查找'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('点按说出线索'));
       await until(
         tester,
         () async => find.text('停止并查看文字').evaluate().isNotEmpty,

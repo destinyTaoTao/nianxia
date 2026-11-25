@@ -32,7 +32,32 @@ class _RankedQuery {
 /// Only IDs/scores/times survive candidate visitation. Source bodies, transcripts,
 /// organization and vectors are never accumulated as an all-results collection.
 class SearchPagingStore {
-  SearchPagingStore(this.source, this.index, this.home);
+  SearchPagingStore(this.source, this.index, this.home) {
+    // Project each source independently inside the storage worker. The SQLite
+    // result never accumulates a page of full bodies before truncation.
+    source.db.createFunction(
+      functionName: 'nianxia_search_excerpt_v1',
+      argumentCount: const AllowedArgumentCount(2),
+      deterministic: true,
+      function: (arguments) =>
+          _excerpt(arguments[0] as String, arguments[1] as String),
+    );
+  }
+
+  static String _excerpt(String body, String query) {
+    final normalized = RecordSearchStore.normalize(body);
+    final at = normalized.indexOf(query);
+    final offset = at < 0 ? 0 : normalized.substring(0, at).runes.length;
+    final trimmed = body.trim();
+    final newline = trimmed.indexOf('\n');
+    final first = newline < 0 ? trimmed : trimmed.substring(0, newline);
+    return jsonEncode([
+      String.fromCharCodes(first.runes.take(120)),
+      String.fromCharCodes(body.runes.skip(math.max(0, offset - 30)).take(150)),
+      at >= 0,
+    ]);
+  }
+
   final RecordRepository source;
   final SearchIndex index;
   final Directory home;
@@ -344,37 +369,37 @@ class SearchPagingStore {
     final selected = rows.take(limit).toList();
     final byId = <String, SearchHitSummary>{};
     if (selected.isNotEmpty) {
-      final records = source.db.select(
-        '''SELECT id,body,created_at,timezone,offset_minutes,parent_id,audio,duration_ms
-        FROM records WHERE id IN (${List.filled(selected.length, '?').join(',')})''',
-        selected.map((r) => r['id']).toList(),
-      );
       final q = RecordSearchStore.normalize(query.text);
+      final records = source.db.select(
+        '''SELECT r.id,nianxia_search_excerpt_v1(r.body,?) AS excerpt,
+        r.created_at,r.timezone,r.offset_minutes,r.parent_id,r.audio IS NOT NULL AS has_audio,r.duration_ms,
+        parent.id AS parent_exists,substr(trim(parent.body),1,120) AS parent_title
+        FROM records r LEFT JOIN records parent ON parent.id=r.parent_id
+        WHERE r.id IN (${List.filled(selected.length, '?').join(',')})''',
+        [q, ...selected.map((r) => r['id'])],
+      );
       for (final row in records) {
-        final body = row['body'] as String;
-        final normalized = RecordSearchStore.normalize(body);
-        final at = normalized.indexOf(q);
-        final offset = at < 0 ? 0 : normalized.substring(0, at).runes.length;
-        final trimmed = body.trim();
-        final firstNewline = trimmed.indexOf('\n');
-        final firstLine = firstNewline < 0
-            ? trimmed
-            : trimmed.substring(0, firstNewline);
-        final title = String.fromCharCodes(firstLine.runes.take(120));
-        final snippet = String.fromCharCodes(
-          body.runes.skip(math.max(0, offset - 30)).take(150),
-        );
+        final excerpt = jsonDecode(row['excerpt'] as String) as List<dynamic>;
+        final parentTitle = (row['parent_title'] as String?)
+            ?.trim()
+            .split('\n')
+            .first;
         byId[row['id'] as String] = SearchHitSummary(
           id: row['id'] as String,
-          title: title,
-          snippet: snippet,
+          title: excerpt[0] as String,
+          snippet: excerpt[1] as String,
           createdAt: DateTime.parse(row['created_at'] as String).toUtc(),
           timezone: row['timezone'] as String,
           offsetMinutes: row['offset_minutes'] as int,
           parentId: row['parent_id'] as String?,
-          hasAudio: row['audio'] != null,
+          parentTitle: row['parent_exists'] == null
+              ? null
+              : parentTitle == null || parentTitle.isEmpty
+              ? '语音记录'
+              : parentTitle,
+          hasAudio: row['has_audio'] == 1,
           durationMs: row['duration_ms'] as int,
-          kind: at < 0 ? MatchKind.semantic : MatchKind.keyword,
+          kind: excerpt[2] == true ? MatchKind.keyword : MatchKind.semantic,
         );
       }
     }

@@ -7,7 +7,9 @@ import 'package:path/path.dart' as p;
 import 'package:uuid/uuid.dart';
 
 import '../domain/capture_session.dart';
+import '../domain/diagnostic_event.dart';
 import '../platform/native_capture.dart';
+import '../platform/playback_coordinator.dart';
 import 'inference_runtime.dart';
 import 'notebook.dart';
 
@@ -30,13 +32,10 @@ class CaptureSessionController extends ChangeNotifier {
         if (value.phase == NativeCapturePhase.failed &&
             value.request.mode == CaptureMode.record) {
           unawaited(
-            _serial(() => book.retainFailedNative(value))
-                .catchError((Object _) {
-                  book.recoveryWarnings++;
-                }),
+            _serial(() => _retainFailed(value)).catchError((Object _) {
+              // A queued event may outlive this observer; native owns the clip.
+            }),
           );
-          lastError = '录音未能完成，原始片段已保留，可在待恢复资料中核对。';
-          _notify();
         }
         if (value.phase == NativeCapturePhase.finalized &&
             value.request.mode == CaptureMode.record) {
@@ -64,6 +63,52 @@ class CaptureSessionController extends ChangeNotifier {
   Future<void> _tail = Future.value();
   bool _disposed = false;
   final Set<String> _committed = {};
+  final Set<String> _discardIntents = {};
+  String? _diagnosticSession;
+  NativeCapturePhase? _diagnosticPhase;
+  DiagnosticTraceId? _diagnosticTrace;
+
+  void _recordCapturePhase(
+    String sessionId,
+    NativeCapturePhase phase,
+    int elapsedMs,
+  ) {
+    final diagnostics = book.diagnostics;
+    if (diagnostics == null) return;
+    if (_diagnosticSession == sessionId && _diagnosticPhase == phase) return;
+    try {
+      if (_diagnosticSession != sessionId) {
+        _diagnosticTrace = DiagnosticTraceId();
+      }
+      _diagnosticSession = sessionId;
+      _diagnosticPhase = phase;
+      diagnostics.record(
+        DiagnosticEvent(
+          kind: DiagnosticKind.capture,
+          phase: switch (phase) {
+            NativeCapturePhase.starting => DiagnosticPhase.prepare,
+            NativeCapturePhase.recording => DiagnosticPhase.run,
+            NativeCapturePhase.cancelled => DiagnosticPhase.cleanup,
+            _ => DiagnosticPhase.finalize,
+          },
+          result: switch (phase) {
+            NativeCapturePhase.cancelled => DiagnosticResult.cancelled,
+            NativeCapturePhase.failed => DiagnosticResult.failed,
+            NativeCapturePhase.finalizing => DiagnosticResult.deferred,
+            _ => DiagnosticResult.succeeded,
+          },
+          errorCode: phase == NativeCapturePhase.failed
+              ? DiagnosticErrorCode.unknown
+              : DiagnosticErrorCode.none,
+          elapsedMs: elapsedMs,
+          traceId: _diagnosticTrace,
+        ),
+      );
+    } catch (_) {
+      // No native/source identifier, state payload or error message is logged.
+    }
+  }
+
   static Future<bool> _screenAvailable() async {
     try {
       return await const MethodChannel('app.nianxia/system')
@@ -88,6 +133,7 @@ class CaptureSessionController extends ChangeNotifier {
   }
 
   void _set(CaptureSnapshot value) {
+    _recordCapturePhase(value.sessionId, value.phase, value.elapsedMs);
     snapshot = value;
     book.captureActive = {
       NativeCapturePhase.starting,
@@ -106,9 +152,22 @@ class CaptureSessionController extends ChangeNotifier {
     _notify();
   }
 
+  Future<void> _retainFailed(CaptureSnapshot value) async {
+    try {
+      await book.retainFailedNative(value);
+      lastError = '录音未能完成，恢复资料已登记，请在待恢复资料中核对。';
+    } catch (_) {
+      book.recoveryWarnings++;
+      lastError = '录音未能完成，且无法登记恢复资料，请保留现场后重试。';
+    }
+    _notify();
+  }
+
   Future<CaptureSnapshot> start({
     required CaptureMode mode,
     String? parentId,
+    bool Function()? startAllowed,
+    bool reuseCurrent = true,
   }) => _serial(() async {
     final current = await port.current();
     if (current != null &&
@@ -125,6 +184,9 @@ class CaptureSessionController extends ChangeNotifier {
                 (mode == CaptureMode.query ||
                     await book.get(current.sessionId) == null))) {
       _set(current);
+      if (!reuseCurrent) {
+        throw const NotebookException('请先处理已有录音，再开始按住说话。');
+      }
       return current;
     }
     if (mode == CaptureMode.query &&
@@ -137,6 +199,13 @@ class CaptureSessionController extends ChangeNotifier {
         throw const NotebookException('原记录不可用，请选择原记录追加。');
       }
     }
+    void requireStartAllowed() {
+      if (startAllowed != null && !startAllowed()) {
+        throw const NotebookException('录音页面已离开，未继续启动录音。');
+      }
+    }
+
+    requireStartAllowed();
     final now = book.clock();
     lastError = null;
     savedId = null;
@@ -149,19 +218,44 @@ class CaptureSessionController extends ChangeNotifier {
       parentId: parentId,
     );
     late final CaptureSnapshot value;
+    var abandonedHandled = false;
     try {
-      value = await port.start(request);
+      value = await PlaybackCoordinator.startCapture(book, () {
+        requireStartAllowed();
+        return port.start(request);
+      });
+      if (startAllowed != null && !startAllowed()) {
+        _set(value);
+        if (value.phase == NativeCapturePhase.starting ||
+            value.phase == NativeCapturePhase.recording ||
+            value.request.mode == CaptureMode.query) {
+          await port.cancel(request.sessionId);
+          _clearCurrent();
+        } else if (value.phase == NativeCapturePhase.finalized &&
+            value.request.mode == CaptureMode.record) {
+          await _import(value);
+        }
+        abandonedHandled = true;
+        throw const NotebookException('录音页面已离开，未继续启动录音。');
+      }
     } catch (error, stack) {
+      if (abandonedHandled) Error.throwWithStackTrace(error, stack);
       try {
         final actual = await port.current();
         if (actual?.sessionId == request.sessionId) {
           _set(actual!);
+          if (startAllowed != null && !startAllowed()) {
+            lastError = '录音页面已离开，结束录音未完成，请返回应用处理当前录音。';
+            _notify();
+          }
           if ({
             NativeCapturePhase.starting,
             NativeCapturePhase.recording,
             NativeCapturePhase.finalizing,
           }.contains(actual.phase)) {
-            return actual;
+            if (startAllowed == null || startAllowed()) return actual;
+            lastError = '录音页面已离开，结束录音未完成，请返回应用处理当前录音。';
+            _notify();
           }
           if (actual.request.mode == CaptureMode.record &&
               actual.phase == NativeCapturePhase.failed) {
@@ -202,15 +296,19 @@ class CaptureSessionController extends ChangeNotifier {
     await _import(value, standalone: true);
   });
   Future<void> _import(CaptureSnapshot value, {bool standalone = false}) async {
-    if (await book.nativeCaptureDiscarded(value.sessionId)) {
+    if (_discardIntents.contains(value.sessionId) ||
+        await book.nativeCaptureDiscarded(value.sessionId)) {
       if (await book.get(value.sessionId) != null) {
         throw const NotebookException('片段已成为记录，不能继续丢弃。');
       }
+      await book.requestNativeDiscard(value.sessionId);
+      await port.claim(value.sessionId);
       await port.acknowledge(
         value.sessionId,
         disposition: CaptureDisposition.discardedRecord,
       );
       await book.completeNativeDiscard(value.sessionId);
+      _discardIntents.remove(value.sessionId);
       if (snapshot?.sessionId == value.sessionId) _clearCurrent();
       return;
     }
@@ -256,6 +354,7 @@ class CaptureSessionController extends ChangeNotifier {
             );
           }
           await book.completeNativeDiscard(id);
+          _discardIntents.remove(id);
           if (snapshot?.sessionId == id) _clearCurrent();
         } catch (_) {
           book.recoveryWarnings++;
@@ -271,13 +370,7 @@ class CaptureSessionController extends ChangeNotifier {
       for (final value in pending) {
         if (value.request.mode == CaptureMode.record &&
             value.phase == NativeCapturePhase.failed) {
-          try {
-            await book.retainFailedNative(value);
-          } catch (_) {
-            book.recoveryWarnings++;
-          }
-          lastError = '部分录音未能完成，原始资料已保留，可在待恢复资料中核对。';
-          _notify();
+          await _retainFailed(value);
         }
         if (value.request.mode == CaptureMode.record &&
             value.phase == NativeCapturePhase.finalized) {
@@ -329,7 +422,8 @@ class CaptureSessionController extends ChangeNotifier {
           throw const NotebookException('请解锁并返回应用后继续语音查找。');
         }
         final value = snapshot;
-        if (expectedSessionId != null && value?.sessionId != expectedSessionId) {
+        if (expectedSessionId != null &&
+            value?.sessionId != expectedSessionId) {
           throw const NotebookException('查询会话已变化，请重新发起。');
         }
         if (value == null ||
@@ -399,7 +493,25 @@ class CaptureSessionController extends ChangeNotifier {
     if (await book.get(id) != null) {
       throw const NotebookException('录音已经保存，请从记录详情删除。');
     }
+    final record =
+        snapshot?.sessionId == id &&
+        snapshot?.request.mode == CaptureMode.record;
+    if (record) {
+      _discardIntents.add(id);
+      await book.requestNativeDiscard(id);
+    }
     await port.cancel(id);
+    if (record ||
+        _discardIntents.contains(id) ||
+        await book.nativeCaptureDiscarded(id)) {
+      await book.completeNativeDiscard(id);
+      _discardIntents.remove(id);
+    }
+    _recordCapturePhase(
+      id,
+      NativeCapturePhase.cancelled,
+      snapshot?.elapsedMs ?? 0,
+    );
     if (snapshot?.sessionId == id) _clearCurrent();
   });
   Future<void> _closePortAfterQuery() async {

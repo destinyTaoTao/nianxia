@@ -6,12 +6,17 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nianxia/app/notebook.dart';
+import 'package:nianxia/app/capture_session_controller.dart';
+import 'package:nianxia/domain/capture_session.dart';
 import 'package:nianxia/ui/app.dart';
 import 'package:nianxia/ui/recorder.dart';
+import 'package:nianxia/ui/voice_append.dart';
 
 import 'capture_controller_test.dart' show TestMicrophone;
 import 'recording_search_test.dart' show TextTranscriber, writeWave;
 import 'support/async_storage_tester.dart';
+import 'support/ui_native_capture.dart';
+import 'hold_recording_test.dart' show HoldMicrophone;
 
 const output = String.fromEnvironment('SCREENSHOT_DIR');
 const fontPath = String.fromEnvironment('SCREENSHOT_FONT');
@@ -87,6 +92,104 @@ void main() {
   }
 
   for (final mode in [ThemeMode.light, ThemeMode.dark]) {
+    testWidgets('${mode.name} 320宽双倍字体的临近截止反馈保持按住位置', (tester) async {
+      tester.view.physicalSize = const Size(320, 800);
+      tester.view.devicePixelRatio = 1;
+      tester.platformDispatcher.textScaleFactorTestValue = 2;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      final endpoint = UiCaptureEndpoint(book);
+      final runtime = UiCaptureRuntime();
+      final owner = CaptureSessionController(endpoint, book, runtime);
+      TestGesture? gesture;
+      try {
+        await tester.pumpWidget(
+          RepaintBoundary(
+            key: const Key('capture-root'),
+            child: NianxiaApp(
+              book: book,
+              captureSession: owner,
+              initialTheme: mode,
+              fontFamily: fontPath.isEmpty ? null : 'ScreenshotFont',
+            ),
+          ),
+        );
+        await pumpStorageAndSettle(tester);
+        final button = find.byKey(const Key('hold-record'));
+        final rect = tester.getRect(button);
+        gesture = await tester.startGesture(rect.center);
+        for (var i = 0; i < 100 && owner.snapshot == null; i++) {
+          await pumpStorageAndSettle(tester);
+        }
+        expect(owner.snapshot, isNotNull);
+        endpoint.value = CaptureSnapshot.fromMap({
+          ...endpoint.value!.request.toMap(),
+          'phase': 'recording',
+          'sequence': endpoint.value!.sequence + 1,
+          'elapsedMs': 105000,
+          'pcmBytes': 3360000,
+          'level': 0.1,
+        });
+        endpoint.updates.add(endpoint.value!);
+        await pumpStorageAndSettle(tester);
+        expect(find.text('即将达到两分钟，录音将自动结束。'), findsOneWidget);
+        expect(tester.getRect(button), rect);
+        expect(tester.takeException(), isNull);
+        await capture(tester, 'controlled-hold-limit-${mode.name}-320-2x');
+        await gesture.up();
+        gesture = null;
+        var finalized = false;
+        final finishing = owner.stop().then<void>((_) => finalized = true);
+        for (var i = 0; i < 100 && !finalized; i++) {
+          await pumpStorageAndSettle(tester);
+        }
+        expect(finalized, isTrue);
+        await finishing;
+      } finally {
+        await gesture?.up();
+        await tester.pumpWidget(const SizedBox.shrink());
+        await pumpStorageAndSettle(tester);
+        owner.dispose();
+        runtime.dispose();
+      }
+    });
+    testWidgets('${mode.name} 追加开始前父删除的反馈不会声称保留音频', (tester) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final microphone = HoldMicrophone();
+      final parent = await storageRead(tester, () => book.saveText('准备追加的原记录'));
+      await tester.pumpWidget(
+        RepaintBoundary(
+          key: const Key('capture-root'),
+          child: NianxiaApp(
+            book: book,
+            captureMicrophone: microphone,
+            initialTheme: mode,
+            fontFamily: fontPath.isEmpty ? null : 'ScreenshotFont',
+          ),
+        ),
+      );
+      await pumpStorageAndSettle(tester);
+      openVoiceAppend(tester.element(find.text('按住说话')), book, parent);
+      await pumpStorageAndSettle(tester);
+      await storageRead(tester, () => book.delete(parent.id));
+      final gesture = await tester.startGesture(
+        tester.getCenter(find.byKey(const Key('hold-record')).last),
+      );
+      await pumpStorageAndSettle(tester);
+      await gesture.up();
+      await pumpStorageAndSettle(tester);
+      expect(find.text('原记录已删除，本次尚未开始录音。'), findsOneWidget);
+      expect(find.text('保存为独立记录'), findsNothing);
+      expect(tester.takeException(), isNull);
+      await capture(tester, 'append-parent-missing-${mode.name}');
+      await tester.pumpWidget(const SizedBox.shrink());
+      await pumpStorageAndSettle(tester);
+      await tester.runAsync(microphone.close);
+    });
     testWidgets('${mode.name} 手机首页、查找、详情与表单布局', (tester) async {
       tester.view.physicalSize = const Size(390, 844);
       tester.view.devicePixelRatio = 1;
@@ -114,6 +217,7 @@ void main() {
       await tester.tap(find.text('找一下'));
       await pumpStorageAndSettle(tester);
       await tester.enterText(find.byKey(const Key('search-input')), 'SQLite');
+      await tester.testTextInput.receiveAction(TextInputAction.search);
       await tester.pump(const Duration(milliseconds: 400));
       await pumpStorageAndSettle(tester);
       expect(tester.takeException(), isNull);
@@ -158,7 +262,7 @@ void main() {
       await pumpStorageAndSettle(tester);
       var recorderClosed = false;
       final recorder = openRecorder(
-        tester.element(find.text('记一下')),
+        tester.element(find.text('按住说话')),
         book,
         null,
         microphone: TestMicrophone(),

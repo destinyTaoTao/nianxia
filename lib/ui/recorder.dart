@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'platform_controls.dart';
 
 import 'package:flutter/material.dart';
@@ -5,6 +7,7 @@ import 'package:flutter/material.dart';
 import '../app/notebook.dart';
 import '../platform/local_models.dart';
 import '../platform/capture_controller.dart';
+import '../platform/capture_device_fence.dart';
 import 'common.dart';
 import 'editor.dart';
 import '../app/capture_session_controller.dart';
@@ -17,10 +20,12 @@ Future<Object?> openRecorder(
   Notebook book,
   LocalModels? models, {
   String? parentId,
+  String? parentTitle,
   bool query = false,
   MicrophoneInput? microphone,
   VoidCallback? onSaved,
   CaptureSessionController? captureSession,
+  ValueChanged<Route<Object?>>? onOwnedRoute,
 }) async {
   captureSession ??= NativeCaptureScope.maybeOf(context);
   if (captureSession != null) {
@@ -32,11 +37,13 @@ Future<Object?> openRecorder(
       captureSession,
       query: query,
       parentId: parentId,
+      parentTitle: parentTitle,
+      onOwnedRoute: onOwnedRoute,
     );
     if (result is Record) onSaved?.call();
     return result;
   }
-  if (book.captureActive) return null;
+  if (book.captureActive && !CaptureDeviceFence.canRetryRelease) return null;
   final result = await showModalBottomSheet<Object?>(
     context: context,
     sheetAnimationStyle: PlatformControls.animationStyle(context),
@@ -44,17 +51,29 @@ Future<Object?> openRecorder(
     enableDrag: false,
     isScrollControlled: true,
     useSafeArea: true,
-    builder: (_) => _Recorder(
-      book: book,
-      models: models,
-      parentId: parentId,
-      query: query,
-      microphone: microphone,
-    ),
+    builder: (sheetContext) {
+      final route = ModalRoute.of<Object?>(sheetContext);
+      if (route != null) onOwnedRoute?.call(route);
+      return _Recorder(
+        book: book,
+        models: models,
+        parentId: parentId,
+        parentTitle: parentTitle,
+        query: query,
+        microphone: microphone,
+        onOwnedRoute: onOwnedRoute,
+      );
+    },
   );
   if (result == _RecorderAction.write) {
     if (context.mounted) {
-      await openEditor(context, book, parentId: parentId, onSaved: onSaved);
+      return await openEditor(
+        context,
+        book,
+        parentId: parentId,
+        parentTitle: parentTitle,
+        onSaved: onSaved,
+      );
     }
     return null;
   }
@@ -67,14 +86,18 @@ class _Recorder extends StatefulWidget {
     required this.book,
     this.models,
     this.parentId,
+    this.parentTitle,
     this.query = false,
     this.microphone,
+    this.onOwnedRoute,
   });
   final Notebook book;
   final LocalModels? models;
   final String? parentId;
+  final String? parentTitle;
   final bool query;
   final MicrophoneInput? microphone;
+  final ValueChanged<Route<Object?>>? onOwnedRoute;
   @override
   State<_Recorder> createState() => _RecorderState();
 }
@@ -88,6 +111,14 @@ class _RecorderState extends State<_Recorder> {
     microphone: widget.microphone,
   );
   bool closed = false;
+  bool confirming = false;
+  bool parentMissing = false, checkingParent = false;
+  ModalRoute<bool>? confirmationRoute;
+  void trackConfirmation(ModalRoute<bool> route) {
+    confirmationRoute = route;
+    widget.onOwnedRoute?.call(route);
+  }
+
   @override
   void initState() {
     super.initState();
@@ -100,34 +131,97 @@ class _RecorderState extends State<_Recorder> {
       return;
     }
     if (capture.state == 'done' || capture.state == 'cancelled') {
-      closed = true;
-      Navigator.pop(context, capture.queryText ?? capture.saved);
+      closeRecorder(capture.queryText ?? capture.saved);
       return;
     }
     setState(() {});
+    if (capture.state == 'failed' &&
+        widget.parentId != null &&
+        !checkingParent) {
+      checkingParent = true;
+      widget.book
+          .get(widget.parentId!)
+          .then(
+            (parent) {
+              checkingParent = false;
+              if (mounted && capture.state == 'failed') {
+                setState(() => parentMissing = parent == null);
+              }
+            },
+            onError: (Object _, StackTrace _) {
+              checkingParent = false;
+            },
+          );
+    }
+  }
+
+  void closeRecorder(Object? result) {
+    if (!mounted || closed) return;
+    closed = true;
+    final navigator = Navigator.of(context);
+    final confirmation = confirmationRoute;
+    confirmationRoute = null;
+    if (confirmation?.isActive ?? false) {
+      navigator.removeRoute<bool>(confirmation!, false);
+    }
+    final route = ModalRoute.of<Object?>(context);
+    completeOwnedRoute<Object?>(navigator, route, result);
   }
 
   @override
   void dispose() {
     capture.removeListener(update);
+    if (widget.query) {
+      final ending = capture.state == 'saving'
+          ? capture.finish()
+          : capture.discard();
+      unawaited(ending.catchError((Object _) {}));
+    }
+    // The terminal operation was accepted above. Detach input immediately;
+    // the controller retains the device fence until its real acknowledgement.
     capture.dispose();
     super.dispose();
   }
 
   Future<void> cancel() async {
-    if (capture.state == 'saving') {
+    if (confirming ||
+        capture.state == 'saving' ||
+        capture.state == 'discarding') {
       return;
     }
-    if ((capture.state == 'recording' || capture.draft != null) &&
-        !await confirm(
-          context,
-          widget.query ? '取消本次查询？' : '丢弃这段录音？',
-          widget.query ? '临时查询音频将删除，不会成为记录。' : '尚未保存的音频将删除。',
-          action: '确认丢弃',
-        )) {
-      return;
+    confirming = true;
+    try {
+      if ((capture.state == 'recording' || capture.draft != null) &&
+          !await confirm(
+            context,
+            widget.query ? '取消本次查询？' : '丢弃这段录音？',
+            widget.query ? '临时查询音频将删除，不会成为记录。' : '尚未保存的音频将删除。',
+            action: '确认丢弃',
+            onRoute: trackConfirmation,
+          )) {
+        return;
+      }
+      if (mounted && !closed) await capture.discard();
+    } finally {
+      confirming = false;
     }
-    await capture.discard();
+  }
+
+  Future<void> standalone() async {
+    if (confirming || !parentMissing || capture.state != 'failed') return;
+    confirming = true;
+    try {
+      final accepted = await confirm(
+        context,
+        '保存为独立记录？',
+        '原记录已不存在。本段音频将作为新的独立记录保留。',
+        action: '保存为独立记录',
+        onRoute: trackConfirmation,
+      );
+      if (accepted && mounted) await capture.retry(standalone: true);
+    } finally {
+      confirming = false;
+    }
   }
 
   @override
@@ -139,9 +233,20 @@ class _RecorderState extends State<_Recorder> {
       _ => '正在准备麦克风',
     };
     return PopScope(
-      canPop: !capture.active,
+      canPop: closed,
       onPopInvokedWithResult: (didPop, _) {
-        if (!didPop) notice(context, '请先停止保存或选择丢弃。');
+        if (didPop) {
+          closed = true;
+          if (widget.query) capture.discard();
+          return;
+        }
+        if (!didPop) {
+          if (capture.state == 'recording' || capture.state == 'saving') {
+            notice(context, '请先停止保存或选择丢弃。');
+          } else {
+            cancel();
+          }
+        }
       },
       child: SafeArea(
         child: SingleChildScrollView(
@@ -150,6 +255,16 @@ class _RecorderState extends State<_Recorder> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
+                if (widget.parentId != null)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Text(
+                      '追加到：${widget.parentTitle ?? '所属原记录'}',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ),
                 Row(
                   children: [
                     Expanded(
@@ -200,6 +315,7 @@ class _RecorderState extends State<_Recorder> {
                   ),
                 ),
                 if (capture.state == 'recording') ...[
+                  CaptureLimitHint(elapsedMs: capture.elapsed, recording: true),
                   const SizedBox(height: 20),
                   SizedBox(
                     width: 180,
@@ -230,7 +346,14 @@ class _RecorderState extends State<_Recorder> {
                   const SizedBox(height: 16),
                   Semantics(
                     liveRegion: true,
-                    child: Text(capture.error!, textAlign: TextAlign.center),
+                    child: Text(
+                      parentMissing
+                          ? capture.draft == null
+                                ? '原记录已删除，本次尚未开始录音。'
+                                : '原记录已删除，本次录音尚未保存。'
+                          : capture.error!,
+                      textAlign: TextAlign.center,
+                    ),
                   ),
                 ],
                 const SizedBox(height: 28),
@@ -255,10 +378,18 @@ class _RecorderState extends State<_Recorder> {
                     runSpacing: 12,
                     alignment: WrapAlignment.center,
                     children: [
+                      if (parentMissing &&
+                          capture.draft != null &&
+                          !widget.query)
+                        OutlinedButton(
+                          onPressed: standalone,
+                          child: const Text('保存为独立记录'),
+                        ),
                       if (!widget.query && capture.draft == null)
                         FilledButton.icon(
-                          onPressed: () =>
-                              Navigator.pop(context, _RecorderAction.write),
+                          onPressed: () {
+                            closeRecorder(_RecorderAction.write);
+                          },
                           icon: const Icon(Icons.edit_outlined),
                           label: Text(widget.parentId == null ? '写文字' : '追加文字'),
                         ),

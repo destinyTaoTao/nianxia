@@ -6,20 +6,26 @@ import 'package:flutter/material.dart';
 
 import '../app/capture_session_controller.dart';
 import '../domain/capture_session.dart';
+import '../platform/capture_controller.dart';
 import 'common.dart';
 
 class NativeCaptureScope extends InheritedWidget {
   const NativeCaptureScope({
     super.key,
     required this.capture,
+    this.microphone,
     required super.child,
   });
   final CaptureSessionController? capture;
+  final MicrophoneInput? microphone;
+  static MicrophoneInput? microphoneOf(BuildContext context) => context
+      .dependOnInheritedWidgetOfExactType<NativeCaptureScope>()
+      ?.microphone;
   static CaptureSessionController? maybeOf(BuildContext context) =>
       context.dependOnInheritedWidgetOfExactType<NativeCaptureScope>()?.capture;
   @override
   bool updateShouldNotify(NativeCaptureScope oldWidget) =>
-      oldWidget.capture != capture;
+      oldWidget.capture != capture || oldWidget.microphone != microphone;
 }
 
 Future<Object?> openNativeRecorder(
@@ -27,10 +33,17 @@ Future<Object?> openNativeRecorder(
   CaptureSessionController capture, {
   bool query = false,
   String? parentId,
+  String? parentTitle,
+  ValueChanged<Route<Object?>>? onOwnedRoute,
 }) async {
   try {
     final mode = query ? CaptureMode.query : CaptureMode.record;
-    final value = await capture.start(mode: mode, parentId: parentId);
+    final value = await capture.start(
+      mode: mode,
+      parentId: parentId,
+      startAllowed: () =>
+          context.mounted && (ModalRoute.of(context)?.isCurrent ?? true),
+    );
     if (!context.mounted) return null;
     if (value.request.mode != mode || value.request.parentId != parentId) {
       notice(context, '请先处理已有录音，再发起新的查询或追加。');
@@ -43,11 +56,17 @@ Future<Object?> openNativeRecorder(
       enableDrag: false,
       isScrollControlled: true,
       useSafeArea: true,
-      builder: (_) => NativeRecorderPanel(
-        capture: capture,
-        sessionId: value.sessionId,
-        query: query,
-      ),
+      builder: (sheetContext) {
+        final route = ModalRoute.of<Object?>(sheetContext);
+        if (route != null) onOwnedRoute?.call(route);
+        return NativeRecorderPanel(
+          capture: capture,
+          sessionId: value.sessionId,
+          query: query,
+          parentTitle: parentTitle,
+          onOwnedRoute: onOwnedRoute,
+        );
+      },
     );
   } catch (e) {
     if (context.mounted) notice(context, userError(e));
@@ -63,11 +82,15 @@ class NativeRecorderPanel extends StatefulWidget {
     required this.sessionId,
     this.query = false,
     this.onClose,
+    this.parentTitle,
+    this.onOwnedRoute,
   });
   final CaptureSessionController capture;
   final String sessionId;
   final bool query;
+  final String? parentTitle;
   final Future<void> Function(Object? result)? onClose;
+  final ValueChanged<Route<Object?>>? onOwnedRoute;
   @override
   State<NativeRecorderPanel> createState() => _NativeRecorderPanelState();
 }
@@ -76,6 +99,13 @@ class _NativeRecorderPanelState extends State<NativeRecorderPanel>
     with WidgetsBindingObserver {
   bool busy = false, closed = false;
   String? error;
+  late String? parentTitle = widget.parentTitle;
+  ModalRoute<bool>? confirmationRoute;
+  void trackConfirmation(ModalRoute<bool> route) {
+    confirmationRoute = route;
+    widget.onOwnedRoute?.call(route);
+  }
+
   CaptureSnapshot? get value =>
       widget.capture.snapshot?.sessionId == widget.sessionId
       ? widget.capture.snapshot
@@ -85,6 +115,21 @@ class _NativeRecorderPanelState extends State<NativeRecorderPanel>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     widget.capture.addListener(update);
+    final parentId = value?.request.parentId;
+    if (parentId != null && parentTitle == null) {
+      widget.capture.book
+          .get(parentId)
+          .then(
+            (record) {
+              if (mounted) {
+                setState(() => parentTitle = record?.title ?? '已删除的原记录');
+              }
+            },
+            onError: (Object _, StackTrace _) {
+              /* The stable parent identity remains visible. */
+            },
+          );
+    }
   }
 
   void update() {
@@ -122,10 +167,17 @@ class _NativeRecorderPanelState extends State<NativeRecorderPanel>
   Future<void> completeClose(Object? result) async {
     if (!mounted) return;
     try {
+      final navigator = Navigator.of(context);
+      final confirmation = confirmationRoute;
+      confirmationRoute = null;
+      if (confirmation?.isActive ?? false) {
+        navigator.removeRoute<bool>(confirmation!, false);
+      }
       if (widget.onClose != null) {
         await widget.onClose!(result);
       } else {
-        Navigator.pop(context, result);
+        final route = ModalRoute.of<Object?>(context);
+        completeOwnedRoute<Object?>(navigator, route, result);
       }
     } catch (_) {
       if (mounted) {
@@ -139,7 +191,8 @@ class _NativeRecorderPanelState extends State<NativeRecorderPanel>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (widget.query &&
+    if (!closed &&
+        widget.query &&
         state != AppLifecycleState.resumed &&
         value != null &&
         {
@@ -191,6 +244,7 @@ class _NativeRecorderPanelState extends State<NativeRecorderPanel>
           '保存为独立记录？',
           '此操作将保留音频，不再追加到原记录。',
           action: '保存为独立记录',
+          onRoute: trackConfirmation,
         ) ||
         !mounted) {
       return;
@@ -215,8 +269,10 @@ class _NativeRecorderPanelState extends State<NativeRecorderPanel>
               ? (busy ? '不会产生记录。本地识别结束后会清理临时音频。' : '临时查询音频将删除，不会成为记录。')
               : '尚未保存的音频将删除。',
           action: '确认丢弃',
+          onRoute: trackConfirmation,
         ) ||
-        !mounted) {
+        !mounted ||
+        closed) {
       return;
     }
     if (widget.query && busy) {
@@ -266,6 +322,17 @@ class _NativeRecorderPanelState extends State<NativeRecorderPanel>
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, result) {
+        if (didPop) {
+          closed = true;
+          if (widget.query && value != null) {
+            unawaited(
+              widget.capture
+                  .discard(sessionId: widget.sessionId)
+                  .catchError((Object _) {}),
+            );
+          }
+          return;
+        }
         if (!didPop) {
           if (widget.query) {
             discard();
@@ -282,6 +349,16 @@ class _NativeRecorderPanelState extends State<NativeRecorderPanel>
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                if (current?.request.parentId != null || parentTitle != null)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Text(
+                      '追加到：${parentTitle ?? '所属原记录'}',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ),
                 Row(
                   children: [
                     Expanded(
@@ -342,11 +419,10 @@ class _NativeRecorderPanelState extends State<NativeRecorderPanel>
                       : '收起后继续录音\n停止后先保存，再转写',
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
-                if ((current?.elapsedMs ?? 0) >= 105000)
-                  const Padding(
-                    padding: EdgeInsets.only(top: 12),
-                    child: Text('即将达到两分钟，录音将自动结束。'),
-                  ),
+                CaptureLimitHint(
+                  elapsedMs: current?.elapsedMs ?? 0,
+                  recording: recording,
+                ),
                 if (error != null || widget.capture.lastError != null)
                   Padding(
                     padding: const EdgeInsets.only(top: 16),

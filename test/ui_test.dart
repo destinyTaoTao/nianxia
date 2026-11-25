@@ -123,9 +123,15 @@ void main() {
     expect(find.widgetWithText(OutlinedButton, '下载模型'), findsNothing);
   });
   testWidgets('切换浅色后重新打开应用仍保留选择', (tester) async {
-    await tester.pumpWidget(NianxiaApp(book: book));
+    await tester.pumpWidget(
+      NianxiaApp(book: book, initialTheme: ThemeMode.dark),
+    );
     await pumpStorageAndSettle(tester);
-    await tester.tap(find.byTooltip('切换浅色主题'));
+    await tester.tap(find.byTooltip('设置'));
+    await pumpStorageAndSettle(tester);
+    await tester.tap(find.byKey(const Key('theme-choice-light')));
+    await pumpStorageAndSettle(tester);
+    await tester.tap(find.byType(BackButton));
     await pumpStorageAndSettle(tester);
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.runAsync(() async {
@@ -134,10 +140,15 @@ void main() {
     });
     await tester.pumpWidget(NianxiaApp(book: book));
     await pumpStorageAndSettle(tester);
-    expect(find.byTooltip('切换深色主题'), findsOneWidget);
+    expect(
+      tester.widget<MaterialApp>(find.byType(MaterialApp)).themeMode,
+      ThemeMode.light,
+    );
   });
   testWidgets('主题写入失败时保留设置选择并告知重试', (tester) async {
-    await tester.pumpWidget(NianxiaApp(book: book));
+    await tester.pumpWidget(
+      NianxiaApp(book: book, initialTheme: ThemeMode.dark),
+    );
     await pumpStorageAndSettle(tester);
     await tester.tap(find.byTooltip('设置'));
     await pumpStorageAndSettle(tester);
@@ -145,13 +156,17 @@ void main() {
       "CREATE TRIGGER fail_theme BEFORE INSERT ON metadata WHEN NEW.key='theme_mode' BEGIN SELECT RAISE(ABORT,'theme write failure'); END",
     );
     addTearDown(() => StorageProbe(book).execute('DROP TRIGGER fail_theme'));
-    await tester.tap(find.text('深色'));
-    await pumpStorageAndSettle(tester);
-    await tester.tap(find.text('浅色').last);
+    await tester.tap(find.byKey(const Key('theme-choice-light')));
     await pumpStorageAndSettle(tester);
     expect(find.text('主题设置未保存，请重试。'), findsOneWidget);
     expect(find.text('深色'), findsOneWidget);
-    expect(find.text('浅色'), findsNothing);
+    expect(
+      tester
+          .widget<RadioGroup<ThemeMode>>(find.byType(RadioGroup<ThemeMode>))
+          .groupValue,
+      ThemeMode.dark,
+    );
+    expect(book.themeMode, isNull);
   });
   testWidgets('首页可滚动找回所有主记录，底部记录入口始终可用', (tester) async {
     tester.view.physicalSize = const Size(390, 844);
@@ -171,14 +186,23 @@ void main() {
     });
     await tester.pumpWidget(NianxiaApp(book: book));
     await pumpStorageAndSettle(tester);
-    expect(find.text('记一下').hitTestable(), findsOneWidget);
+    expect(find.text('按住说话').hitTestable(), findsOneWidget);
     expect(find.text('写文字'), findsOneWidget);
     expect(find.text('找一下'), findsOneWidget);
     expect(find.text('想法 12'), findsOneWidget);
-    await tester.scrollUntilVisible(find.text('想法 1'), 350);
+    await tester.scrollUntilVisible(
+      find.text('想法 1'),
+      350,
+      scrollable: find
+          .descendant(
+            of: find.byType(CustomScrollView),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
     await pumpStorageAndSettle(tester);
     expect(find.text('想法 1').hitTestable(), findsOneWidget);
-    expect(find.text('记一下').hitTestable(), findsOneWidget);
+    expect(find.text('按住说话').hitTestable(), findsOneWidget);
     expect(find.byKey(const Key('home-search')).hitTestable(), findsNothing);
     await tester.tap(find.text('想法 1'));
     await pumpStorageAndSettle(tester);
@@ -248,18 +272,27 @@ void main() {
     await tester.runAsync(() => Future<void>.delayed(Duration.zero));
     await pumpStorageAndSettle(tester);
     expect(find.text('准备语音转写（录音照常保存）'), findsNothing);
-    expect(find.text('记一下'), findsOneWidget);
+    expect(find.text('按住说话'), findsOneWidget);
   });
   testWidgets('用户可从文字入口保存、查看、编辑并查找记录', (tester) async {
     await tester.pumpWidget(NianxiaApp(book: book));
-    expect(find.text('记一下'), findsOneWidget);
+    expect(find.text('按住说话'), findsOneWidget);
     expect(find.text('找一下'), findsOneWidget);
     await tester.tap(find.text('写文字'));
     await pumpStorageAndSettle(tester);
     await tester.enterText(find.byKey(const Key('body-editor')), '这是一条产品灵感');
+    await tester.pump();
     await tester.tap(find.text('保存'));
     await pumpStorageAndSettle(tester);
     expect(find.text('这是一条产品灵感'), findsOneWidget);
+    for (
+      var i = 0;
+      i < 50 && find.byTooltip('收藏：这是一条产品灵感').evaluate().isEmpty;
+      i++
+    ) {
+      await pumpStorageAndSettle(tester);
+    }
+    expect(find.byTooltip('收藏：这是一条产品灵感'), findsOneWidget);
     await tester.tap(find.text('这是一条产品灵感'));
     await pumpStorageAndSettle(tester);
     await tester.tap(find.byTooltip('编辑正文'));
@@ -268,6 +301,7 @@ void main() {
       find.byKey(const Key('body-editor')),
       '这是一条 SQLite 灵感',
     );
+    await tester.pumpAndSettle();
     await tester.tap(find.text('保存'));
     await pumpStorageAndSettle(tester);
     expect(find.text('这是一条 SQLite 灵感'), findsOneWidget);
@@ -276,6 +310,7 @@ void main() {
     await tester.tap(find.text('找一下'));
     await pumpStorageAndSettle(tester);
     await tester.enterText(find.byKey(const Key('search-input')), 'sqlite');
+    await tester.testTextInput.receiveAction(TextInputAction.search);
     await tester.pump(const Duration(milliseconds: 400));
     await pumpStorageAndSettle(tester);
     expect(find.textContaining('这是一条 SQLite 灵感'), findsOneWidget);
@@ -299,7 +334,9 @@ void main() {
   testWidgets('便笺可直接收藏，切换主题和筛选仍保留收藏结果', (tester) async {
     final keep = await storageRead(tester, () => book.saveText('值得留下'));
     await storageRead(tester, () => book.saveText('暂时不收藏'));
-    await tester.pumpWidget(NianxiaApp(book: book));
+    await tester.pumpWidget(
+      NianxiaApp(book: book, initialTheme: ThemeMode.dark),
+    );
     await pumpStorageAndSettle(tester);
     await tester.tap(find.byTooltip('收藏：值得留下'));
     await pumpStorageAndSettle(tester);
@@ -311,7 +348,11 @@ void main() {
     await pumpStorageAndSettle(tester);
     expect(find.text('值得留下'), findsOneWidget);
     expect(find.text('暂时不收藏'), findsNothing);
-    await tester.tap(find.byTooltip('切换浅色主题'));
+    await tester.tap(find.byTooltip('设置'));
+    await pumpStorageAndSettle(tester);
+    await tester.tap(find.byKey(const Key('theme-choice-light')));
+    await pumpStorageAndSettle(tester);
+    await tester.tap(find.byType(BackButton));
     await pumpStorageAndSettle(tester);
     expect(
       Theme.of(tester.element(find.text('值得留下'))).brightness,
@@ -345,6 +386,7 @@ void main() {
     await tester.tap(find.text('写文字'));
     await pumpStorageAndSettle(tester);
     await tester.enterText(find.byKey(const Key('body-editor')), '刚保存的新想法');
+    await tester.pump();
     await tester.tap(find.text('保存'));
     // Frame idleness does not imply that the storage isolate has replied.
     // The editor also contains the new text, so wait for its actual list row.
@@ -378,7 +420,7 @@ void main() {
     await pumpStorageAndSettle(tester);
     await tester.tap(find.text('收藏'));
     await pumpStorageAndSettle(tester);
-    await tester.tap(find.text('记一下'));
+    await tester.tap(find.text('点按录音'));
     await tester.pump(const Duration(milliseconds: 300));
     await tester.runAsync(
       () => Future<void>.delayed(const Duration(milliseconds: 30)),
@@ -413,6 +455,7 @@ void main() {
     await tester.tap(find.text('追加文字'));
     await pumpStorageAndSettle(tester);
     await tester.enterText(find.byKey(const Key('body-editor')), '后来补充的条件');
+    await tester.pumpAndSettle();
     await tester.tap(find.text('保存'));
     await pumpStorageAndSettle(tester);
     expect(
@@ -442,6 +485,7 @@ void main() {
     await tester.tap(find.text('找一下'));
     await pumpStorageAndSettle(tester);
     await tester.enterText(find.byKey(const Key('search-input')), '产品');
+    await tester.testTextInput.receiveAction(TextInputAction.search);
     await tester.pump(const Duration(milliseconds: 400));
     await pumpStorageAndSettle(tester);
     expect(find.textContaining('离线查找的产品灵感'), findsOneWidget);
@@ -481,6 +525,7 @@ void main() {
     await tester.tap(find.text('找一下'));
     await pumpStorageAndSettle(tester);
     await tester.enterText(find.byKey(const Key('search-input')), '缓存');
+    await tester.testTextInput.receiveAction(TextInputAction.search);
     await tester.pump(const Duration(milliseconds: 400));
     await pumpStorageAndSettle(tester);
     expect(find.textContaining('缓存方案还需要验证'), findsOneWidget);
@@ -504,7 +549,7 @@ void main() {
     await tester.tap(find.text('语音查找'));
     // Only complete the route entrance, not the native recorder's progress loop.
     await tester.pump(const Duration(milliseconds: 300));
-    Navigator.of(tester.element(find.text('说出要找的内容'))).pop('缓存');
+    Navigator.of(tester.element(find.text('说出查找线索'))).pop('缓存');
     await pumpStorageAndSettle(tester);
     expect(find.text('识别文字可以修改，确认后点“查找”。'), findsOneWidget);
     expect(find.text('缓存的一点想法'), findsNothing);
@@ -541,12 +586,12 @@ void main() {
     await pumpStorageAndSettle(tester);
     expect(find.text('找回之前的想法').hitTestable(), findsOneWidget);
     await tester.scrollUntilVisible(
-      find.text('按日期筛选'),
+      find.text('自定义'),
       -150,
       scrollable: find.byType(Scrollable).first,
     );
     await pumpStorageAndSettle(tester);
-    expect(find.text('按日期筛选').hitTestable(), findsOneWidget);
+    expect(find.text('自定义').hitTestable(), findsOneWidget);
   });
   testWidgets('日期限制无结果时，可从提示清除条件并找回记录', (tester) async {
     await storageRead(tester, () => book.saveText('日期筛选的产品灵感'));
@@ -555,10 +600,11 @@ void main() {
     await tester.tap(find.text('找一下'));
     await pumpStorageAndSettle(tester);
     await tester.enterText(find.byKey(const Key('search-input')), '产品');
+    await tester.testTextInput.receiveAction(TextInputAction.search);
     await tester.pump(const Duration(milliseconds: 400));
     await pumpStorageAndSettle(tester);
     expect(find.textContaining('日期筛选的产品灵感'), findsOneWidget);
-    await tester.tap(find.text('按日期筛选'));
+    await tester.tap(find.text('自定义'));
     await pumpStorageAndSettle(tester);
     // Exercise the selected-range boundary; Flutter owns the picker controls.
     Navigator.of(tester.element(find.byType(DateRangePickerDialog))).pop(
@@ -570,7 +616,12 @@ void main() {
     await tester.tap(find.widgetWithText(OutlinedButton, '清除日期条件'));
     await pumpStorageAndSettle(tester);
     expect(find.textContaining('日期筛选的产品灵感'), findsOneWidget);
-    expect(find.text('按日期筛选'), findsOneWidget);
+    expect(
+      tester
+          .widget<ChoiceChip>(find.byKey(const Key('search-date-all')))
+          .selected,
+      isTrue,
+    );
   });
   testWidgets('小屏两倍字体可核对日历并选择完整提醒选项', (tester) async {
     tester.view.physicalSize = const Size(360, 800);

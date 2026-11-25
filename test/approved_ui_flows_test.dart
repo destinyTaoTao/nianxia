@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -11,6 +12,26 @@ import 'package:nianxia/domain/capture_session.dart';
 import 'support/ui_native_capture.dart';
 
 import 'support/async_storage_tester.dart';
+
+class DelayedStartEndpoint extends UiCaptureEndpoint {
+  DelayedStartEndpoint(super.book);
+  final requested = Completer<void>();
+  final proceed = Completer<void>();
+  bool failCancel = false;
+  @override
+  Future<void> cancel(String id) async {
+    if (failCancel) throw const FileSystemException('cancel fault');
+    await super.cancel(id);
+  }
+
+  @override
+  Future<CaptureSnapshot> start(CaptureRequest request) async {
+    final result = await super.start(request);
+    requested.complete();
+    await proceed.future;
+    return value ?? result;
+  }
+}
 
 void main() {
   late Directory home;
@@ -25,7 +46,7 @@ void main() {
       await home.delete(recursive: true);
     });
   });
-  testWidgets('homeUsesTopSearchSingleCaptureAction', (tester) async {
+  testWidgets('homeUsesTopSearchAndBottomTextAndVoiceModes', (tester) async {
     await tester.pumpWidget(NianxiaApp(book: book));
     await pumpStorageAndSettle(tester);
     final bottom = find.byType(BottomNavigationBar);
@@ -37,13 +58,13 @@ void main() {
     );
     expect(
       tester.getTopLeft(find.text('写文字')).dy,
-      lessThan(tester.getTopLeft(find.byKey(const Key('home-search'))).dy),
+      greaterThan(tester.getTopLeft(find.byKey(const Key('home-search'))).dy),
     );
     final scaffold = tester.widget<Scaffold>(find.byType(Scaffold).first);
     expect(
       find.descendant(
         of: find.byWidget(scaffold.bottomNavigationBar!),
-        matching: find.text('记一下'),
+        matching: find.text('按住说话'),
       ),
       findsOneWidget,
     );
@@ -52,7 +73,7 @@ void main() {
         of: find.byWidget(scaffold.bottomNavigationBar!),
         matching: find.text('写文字'),
       ),
-      findsNothing,
+      findsOneWidget,
     );
   });
   testWidgets(
@@ -73,6 +94,7 @@ void main() {
         find.byKey(const Key('search-input')),
         'synthetic-match',
       );
+      await tester.testTextInput.receiveAction(TextInputAction.search);
       await tester.pump(const Duration(milliseconds: 400));
       await pumpStorageAndSettle(tester);
       expect(find.text('已显示 40 条记录'), findsOneWidget);
@@ -97,6 +119,7 @@ void main() {
         find.byKey(const Key('search-input')),
         'cursor-match',
       );
+      await tester.testTextInput.receiveAction(TextInputAction.search);
       await tester.pump(const Duration(milliseconds: 400));
       await pumpStorageAndSettle(tester);
       expect(find.text('已显示 40 条记录'), findsOneWidget);
@@ -115,6 +138,144 @@ void main() {
       expect(find.byType(SearchSummaryRow), findsWidgets);
     },
   );
+  testWidgets('native terminal recording survives an abandoned start page', (
+    tester,
+  ) async {
+    await storageRead(tester, () async {
+      final endpoint = DelayedStartEndpoint(book);
+      final runtime = UiCaptureRuntime();
+      final capture = CaptureSessionController(endpoint, book, runtime);
+      var allowed = true;
+      final work = capture.start(
+        mode: CaptureMode.record,
+        startAllowed: () => allowed,
+      );
+      await endpoint.requested.future;
+      await endpoint.stop(endpoint.value!.sessionId);
+      allowed = false;
+      final rejected = expectLater(work, throwsA(isA<NotebookException>()));
+      endpoint.proceed.complete();
+      await rejected;
+      expect(endpoint.cancels, 0);
+      final saved = (await book.records).single;
+      expect(capture.savedId, saved.id);
+      expect(await File(book.audioPath(saved)).length(), greaterThan(44));
+      capture.dispose();
+      runtime.dispose();
+    });
+  });
+  testWidgets('native abandoned terminal query is cleaned instead of reused', (
+    tester,
+  ) async {
+    await storageRead(tester, () async {
+      for (final phase in [
+        NativeCapturePhase.finalized,
+        NativeCapturePhase.failed,
+      ]) {
+        final endpoint = DelayedStartEndpoint(book);
+        final runtime = UiCaptureRuntime();
+        final capture = CaptureSessionController(endpoint, book, runtime);
+        var allowed = true;
+        final work = capture.start(
+          mode: CaptureMode.query,
+          startAllowed: () => allowed,
+        );
+        await endpoint.requested.future;
+        endpoint.value = endpoint.snapshot(
+          endpoint.value!.request,
+          phase,
+          bytes: 32000,
+        );
+        allowed = false;
+        final rejected = expectLater(work, throwsA(isA<NotebookException>()));
+        endpoint.proceed.complete();
+        await rejected;
+        expect(endpoint.cancels, 1);
+        expect(capture.snapshot, isNull);
+        expect(await book.records, isEmpty);
+        capture.dispose();
+        runtime.dispose();
+      }
+    });
+  });
+  testWidgets('native abandoned start surfaces a failed cancellation', (
+    tester,
+  ) async {
+    final endpoint = DelayedStartEndpoint(book)..failCancel = true;
+    final runtime = UiCaptureRuntime();
+    final capture = CaptureSessionController(endpoint, book, runtime);
+    await tester.pumpWidget(NianxiaApp(book: book, captureSession: capture));
+    await pumpStorageAndSettle(tester);
+    await tester.tap(find.text('点按录音'));
+    await pumpStorageAndSettle(tester);
+    expect(endpoint.requested.isCompleted, isTrue);
+    await tester.pumpWidget(const SizedBox.shrink());
+    endpoint.proceed.complete();
+    await pumpStorageAndSettle(tester);
+    expect(capture.lastError, contains('结束录音未完成'));
+    expect(capture.snapshot?.phase, NativeCapturePhase.recording);
+    endpoint.failCancel = false;
+    await storageRead(tester, () => capture.discard());
+    capture.dispose();
+    runtime.dispose();
+  });
+  testWidgets(
+    'native late start releases microphone after initiating page leaves',
+    (tester) async {
+      final endpoint = DelayedStartEndpoint(book);
+      final runtime = UiCaptureRuntime();
+      final capture = CaptureSessionController(endpoint, book, runtime);
+      await tester.pumpWidget(NianxiaApp(book: book, captureSession: capture));
+      await pumpStorageAndSettle(tester);
+      await tester.tap(find.text('点按录音'));
+      await pumpStorageAndSettle(tester);
+      expect(endpoint.requested.isCompleted, isTrue);
+      await tester.pumpWidget(const SizedBox.shrink());
+      endpoint.proceed.complete();
+      await pumpStorageAndSettle(tester);
+      expect(endpoint.cancels, 1);
+      expect(book.captureActive, isFalse);
+      expect(await storageRead(tester, () => book.records), isEmpty);
+      capture.dispose();
+      runtime.dispose();
+    },
+  );
+  testWidgets(
+    'native recovery registration failure does not claim retained audio',
+    (tester) async {
+      final endpoint = UiCaptureEndpoint(book);
+      final runtime = UiCaptureRuntime();
+      final capture = CaptureSessionController(endpoint, book, runtime);
+      await tester.pumpWidget(NianxiaApp(book: book, captureSession: capture));
+      await pumpStorageAndSettle(tester);
+      await tester.tap(find.text('点按录音'));
+      await pumpStorageAndSettle(tester);
+      final old = capture.snapshot!;
+      final drafts = book.captures.marker(old.sessionId).parent;
+      await storageRead(tester, () async {
+        await drafts.rename('${drafts.path}-held');
+        await File(drafts.path).writeAsString('fault');
+      });
+      endpoint.value = CaptureSnapshot.fromMap({
+        ...old.request.toMap(),
+        'phase': 'failed',
+        'sequence': old.sequence + 1,
+        'elapsedMs': 1000,
+        'pcmBytes': 32000,
+        'level': 0.0,
+      });
+      endpoint.updates.add(endpoint.value!);
+      for (var i = 0; i < 10; i++) {
+        await pumpStorageAndSettle(tester);
+      }
+      expect(capture.lastError, contains('无法登记恢复资料'));
+      expect(capture.lastError, isNot(contains('已保留')));
+      expect(await storageRead(tester, () => book.records), isEmpty);
+      await tester.pumpWidget(const SizedBox.shrink());
+      capture.dispose();
+      runtime.dispose();
+    },
+  );
   testWidgets(
     'native journal failure shows retry instead of an endless saving state',
     (tester) async {
@@ -127,7 +288,7 @@ void main() {
       });
       await tester.pumpWidget(NianxiaApp(book: book, captureSession: capture));
       await pumpStorageAndSettle(tester);
-      await tester.tap(find.text('记一下'));
+      await tester.tap(find.text('点按录音'));
       await pumpStorageAndSettle(tester);
       final old = capture.snapshot!;
       endpoint.value = CaptureSnapshot.fromMap({
@@ -170,7 +331,7 @@ void main() {
         NianxiaApp(book: book, captureSession: controller),
       );
       await pumpStorageAndSettle(tester);
-      await tester.tap(find.text('记一下'));
+      await tester.tap(find.text('点按录音'));
       await pumpStorageAndSettle(tester);
       final session = controller.snapshot!.sessionId;
       expect(find.text('正在录音'), findsOneWidget);
@@ -213,10 +374,16 @@ void main() {
     await pumpStorageAndSettle(tester);
     await tester.tap(find.byTooltip('语音查找'));
     await pumpStorageAndSettle(tester);
-    expect(find.text('说出要找的内容'), findsOneWidget);
+    final hold = find.byKey(const Key('hold-query'));
+    final gesture = await tester.startGesture(tester.getCenter(hold));
+    for (var i = 0; i < 60 && !book.captureActive; i++) {
+      await pumpStorageAndSettle(tester);
+    }
+    expect(book.captureActive, isTrue);
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    await gesture.up();
     for (var i = 0; i < 60 && book.captureActive; i++) {
       await pumpStorageAndSettle(tester);
     }
@@ -226,7 +393,16 @@ void main() {
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
     await pumpStorageAndSettle(tester);
-    await tester.tap(find.text('识别查询'));
+    expect(find.byKey(const Key('voice-query-panel')), findsNothing);
+    expect(find.text('识别文字可以修改，确认后点“查找”。'), findsNothing);
+    await tester.tap(find.text('语音查找'));
+    await pumpStorageAndSettle(tester);
+    final again = await tester.startGesture(tester.getCenter(hold));
+    for (var i = 0; i < 60 && !book.captureActive; i++) {
+      await pumpStorageAndSettle(tester);
+    }
+    expect(book.captureActive, isTrue);
+    await again.up();
     for (var i = 0; i < 60; i++) {
       await pumpStorageAndSettle(tester);
       if (find.text('识别文字可以修改，确认后点“查找”。').evaluate().isNotEmpty) break;

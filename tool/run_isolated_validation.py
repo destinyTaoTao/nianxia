@@ -21,7 +21,7 @@ CASES = {
     'capture': ('isolation-smoke', 'background-smoke', 'capture-matrix', 'deadline-auto-finalize',
                 'process-kill-active', 'process-kill-query', 'kill-after-finalize', 'kill-after-source-commit', 'engine-reconnect'),
     'backup': ('isolation-smoke', 'cipher-smoke', 'cipher-resources', 'backup-matrix'),
-    'acceptance': ('isolation-smoke', 'offline-end-to-end', 'performance', 'search-paging', 'diagnostics', 'local-jobs', 'ui-flows'),
+    'acceptance': ('isolation-smoke', 'offline-end-to-end', 'performance', 'search-paging', 'diagnostics', 'local-jobs', 'ui-flows', 'continuous-home', 'theme-performance', 'hold-recording', 'explicit-search', 'voice-query', 'detail-edit', 'text-append', 'voice-append', 'search-origin', 'delete-confirmation', 'continuous-workflow'),
 }
 TARGETS = {'capture': 'background_capture_test.dart', 'backup': 'backup_crypto_test.dart',
            'acceptance': 'app_acceptance_test.dart'}
@@ -44,6 +44,29 @@ def run(command, *, env=None, timeout=1200, allow_failure=False):
     return result
 
 
+def formal_installation(adb):
+    """Snapshot only package metadata, including verified absence on fresh AVDs."""
+    response = run([*adb, 'shell', 'pm', 'path', FORMAL_ID],
+                   allow_failure=True, timeout=15)
+    lines = response.stdout.splitlines()
+    if (response.returncode == 0 and not response.stderr.strip() and lines
+            and all(line.startswith('package:/') for line in lines)):
+        return response.stdout
+    # API36 returns exit 1 with empty output for an absent package. Do not
+    # mistake transport, permission or package-manager failure for absence.
+    if (response.returncode not in (0, 1) or response.stdout.strip()
+            or response.stderr.strip()):
+        raise ValidationError('Cannot verify formal installation metadata')
+    packages = run([*adb, 'shell', 'pm', 'list', 'packages', FORMAL_ID],
+                   allow_failure=True, timeout=15)
+    listed = packages.stdout.splitlines()
+    if (packages.returncode or packages.stderr.strip()
+            or any(not line.startswith('package:') for line in listed)
+            or f'package:{FORMAL_ID}' in listed):
+        raise ValidationError('Cannot verify formal installation absence')
+    return ''
+
+
 def parse_args():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--platform', required=True, choices=('android', 'ios'))
@@ -51,9 +74,14 @@ def parse_args():
     parser.add_argument('--target', required=True, choices=tuple(CASES))
     parser.add_argument('--mode', default='debug', choices=('debug', 'profile', 'release'))
     parser.add_argument('--case', required=True)
+    parser.add_argument('--theme-trace', action='store_true',
+                        help='Add bounded diagnostic timing probes to Android Profile theme sampling')
     args = parser.parse_args()
     if args.case not in CASES[args.target]:
         parser.error('case is not allowed for this target')
+    if args.theme_trace and (args.platform != 'android' or args.mode != 'profile'
+                             or args.target != 'acceptance' or args.case != 'theme-performance'):
+        parser.error('theme trace requires Android Profile theme-performance')
     if not re.fullmatch(r'[A-Za-z0-9_.:-]{1,128}', args.device) or args.device.startswith('-'):
         parser.error('invalid device identifier')
     return args
@@ -200,18 +228,22 @@ def main():
     device = next((d for d in devices if d.get('id') == args.device), None)
     if device is None or not str(device.get('targetPlatform', '')).startswith(args.platform):
         raise ValidationError('Requested device is unavailable or has a different platform')
+    if args.platform == 'ios' and args.case == 'theme-performance':
+        raise ValidationError('Theme sampling requires the guarded Android native-result runner')
     if args.platform == 'ios' and args.mode == 'release':
         raise ValidationError('iOS release installation requires a verified native-device runner; refused')
     if args.mode == 'release' and (args.case in KILL_PHASES or args.case == 'capture-matrix'):
         raise ValidationError('Automatic capture faults require the debug/profile orchestrator; release refused')
     target = 'integration_test/' + ('isolation_smoke_test.dart' if args.case == 'isolation-smoke'
-                                    else 'engine_reconnect_test.dart' if args.case == 'engine-reconnect' else 'deadline_capture_test.dart' if args.case == 'deadline-auto-finalize' else 'search_paging_test.dart' if args.case == 'search-paging' else 'local_jobs_test.dart' if args.case == 'local-jobs' else 'ui_flows_test.dart' if args.case == 'ui-flows' else 'diagnostics_test.dart' if args.case == 'diagnostics' else TARGETS[args.target])
+                                    else 'engine_reconnect_test.dart' if args.case == 'engine-reconnect' else 'deadline_capture_test.dart' if args.case == 'deadline-auto-finalize' else 'search_paging_test.dart' if args.case == 'search-paging' else 'local_jobs_test.dart' if args.case == 'local-jobs' else 'ui_flows_test.dart' if args.case == 'ui-flows' else 'continuous_home_test.dart' if args.case == 'continuous-home' else 'continuous_workflow_test.dart' if args.case == 'continuous-workflow' else 'delete_confirmation_test.dart' if args.case == 'delete-confirmation' else 'search_origin_test.dart' if args.case == 'search-origin' else 'voice_append_test.dart' if args.case == 'voice-append' else 'text_append_test.dart' if args.case == 'text-append' else 'detail_edit_test.dart' if args.case == 'detail-edit' else 'voice_query_test.dart' if args.case == 'voice-query' else 'explicit_search_test.dart' if args.case == 'explicit-search' else 'hold_recording_test.dart' if args.case == 'hold-recording' else 'theme_performance_test.dart' if args.case == 'theme-performance' else 'diagnostics_test.dart' if args.case == 'diagnostics' else TARGETS[args.target])
     if not (root / target).is_file():
         raise ValidationError('Requested test entry point is not implemented')
     run_id = str(uuid.uuid4())
     print(f'Validation run: {run_id}', flush=True)
     definitions = [f'--dart-define=VALIDATION_RUN_ID={run_id}',
                    f'--dart-define=VALIDATION_CASE={args.case}']
+    if args.theme_trace:
+        definitions.append('--dart-define=THEME_TIMING_TRACE=true')
     adb = None
     before = None
     offline_snapshot = None
@@ -225,7 +257,7 @@ def main():
                        key=lambda p: tuple(int(n) for n in re.findall(r'\d+', p.parent.name)))
         if not aapts:
             raise ValidationError('Android build-tools unavailable')
-        before = run([*adb, 'shell', 'pm', 'path', FORMAL_ID]).stdout
+        before = formal_installation(adb)
     try:
         command = [flutter, 'build', 'apk' if adb else 'ios', f'--{args.mode}',
                    '--target', target, *definitions]
@@ -243,7 +275,7 @@ def main():
             if identity is None or identity.group(1) != TEST_ID:
                 raise ValidationError('APK identity is not the isolated test package; refused')
             run([*adb, 'install', '-r', '-t', str(artifact)])
-            if args.target == 'capture' and args.case != 'isolation-smoke' or args.case == 'ui-flows':
+            if args.target == 'capture' and args.case != 'isolation-smoke' or args.case in ('ui-flows', 'hold-recording', 'voice-query', 'detail-edit', 'voice-append'):
                 run([*adb, 'shell', 'pm', 'grant', TEST_ID, 'android.permission.RECORD_AUDIO'])
         else:
             destination = 'iphonesimulator' if device.get('emulator') else 'iphoneos'
@@ -254,19 +286,22 @@ def main():
                 raise ValidationError('Cannot read built iOS identity; refused') from error
             if identity != TEST_ID:
                 raise ValidationError('iOS identity is not the isolated test bundle; refused')
-        if args.case == 'offline-end-to-end':
+        if args.case in ('offline-end-to-end', 'continuous-workflow'):
             if not adb:
                 raise ValidationError('Automatic offline validation currently requires Android emulator')
             offline_snapshot = disconnect_validation_emulator(adb)
-        if args.mode == 'release':
+        if args.mode == 'release' or args.case == 'theme-performance':
             run([*adb, 'shell', 'am', 'start', '-W', '-n',
                  f'{TEST_ID}/app.nianxia.nianxia.MainActivity'])
             deadline = time.monotonic() + 240
             data = None
             while time.monotonic() < deadline:
-                response = run([*adb, 'shell', 'content', 'read', '--uri',
-                                f'content://{TEST_ID}.validation/{run_id}'],
-                               timeout=10, allow_failure=True)
+                result_command = ([*adb, 'shell', 'content', 'read', '--uri',
+                                   f'content://{TEST_ID}.validation/{run_id}']
+                                  if args.mode == 'release' else
+                                  [*adb, 'exec-out', 'run-as', TEST_ID, 'cat',
+                                   f'cache/validation-results/{run_id}.json'])
+                response = run(result_command, timeout=10, allow_failure=True)
                 if response.returncode == 0:
                     try:
                         data = json.loads(response.stdout)
@@ -308,7 +343,7 @@ def main():
                 restore_validation_network(adb, offline_snapshot)
         finally:
             if adb and before is not None:
-                after = run([*adb, 'shell', 'pm', 'path', FORMAL_ID]).stdout
+                after = formal_installation(adb)
                 if before != after:
                     raise ValidationError('Formal installation changed; stop and inspect')
     print(f'Passed isolated validation: {args.target}/{args.case} ({args.mode}); formal data not read.')

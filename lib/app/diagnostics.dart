@@ -247,17 +247,26 @@ class LocalDiagnostics {
     int? sourceRevision,
     int modelGeneration = 0,
     int attempt = 0,
+    DiagnosticResult Function(T)? resultOf,
+    DiagnosticResult Function(Object)? failureResultOf,
   }) async {
     final watch = Stopwatch()..start();
     DiagnosticTraceId? trace;
-    void emit(DiagnosticResult result, DiagnosticErrorCode code) {
+    void emit(
+      DiagnosticResult result,
+      DiagnosticErrorCode code, {
+      DiagnosticResult Function()? classify,
+    }) {
       try {
+        result = classify?.call() ?? result;
         record(
           DiagnosticEvent(
             kind: kind,
             phase: phase,
             result: result,
-            errorCode: code,
+            errorCode: result == DiagnosticResult.cancelled
+                ? DiagnosticErrorCode.none
+                : code,
             elapsedMs: watch.elapsedMilliseconds,
             sourceRevision: sourceRevision,
             modelGeneration: modelGeneration,
@@ -272,10 +281,18 @@ class LocalDiagnostics {
 
     try {
       final result = await action();
-      emit(DiagnosticResult.succeeded, DiagnosticErrorCode.none);
+      emit(
+        DiagnosticResult.succeeded,
+        DiagnosticErrorCode.none,
+        classify: resultOf == null ? null : () => resultOf(result),
+      );
       return result;
     } catch (error) {
-      emit(DiagnosticResult.failed, _code(error));
+      emit(
+        DiagnosticResult.failed,
+        _code(error),
+        classify: failureResultOf == null ? null : () => failureResultOf(error),
+      );
       rethrow;
     }
   }

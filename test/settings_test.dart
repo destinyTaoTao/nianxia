@@ -50,6 +50,8 @@ void main() {
   });
 
   Future<void> openRestore(WidgetTester tester) async {
+    await tester.ensureVisible(find.text('恢复备份'));
+    await pumpStorageAndSettle(tester);
     await tester.tap(find.text('恢复备份'));
     await pumpStorageAndSettle(tester);
     await tester.tap(find.text('选择备份'));

@@ -8,6 +8,7 @@ import '../app/diagnostics.dart';
 import '../app/capture_session_controller.dart';
 import '../platform/local_models.dart';
 import '../platform/capture_controller.dart';
+import '../platform/capture_device_fence.dart';
 import 'capsule.dart';
 import 'theme.dart';
 import 'home.dart';
@@ -17,6 +18,8 @@ import '../platform/appearance.dart';
 import 'platform_controls.dart';
 
 import 'dart:async';
+
+import '../platform/playback_coordinator.dart';
 
 class NianxiaApp extends StatefulWidget {
   const NianxiaApp({
@@ -30,7 +33,7 @@ class NianxiaApp extends StatefulWidget {
     this.startupNotice,
     this.shortcut,
     this.fontFamily,
-    this.initialTheme = ThemeMode.dark,
+    this.initialTheme = ThemeMode.system,
     this.captureMicrophone,
     this.onCapsuleReturn,
   });
@@ -63,6 +66,7 @@ class _NianxiaAppState extends State<NianxiaApp> with WidgetsBindingObserver {
     if (mounted) setState(() {});
   }
 
+  late PlaybackCoordinator playback;
   final navigator = GlobalKey<NavigatorState>();
   final capsuleNavigator = GlobalKey<NavigatorState>();
   Future<bool> changeTheme(ThemeMode value) async {
@@ -79,6 +83,10 @@ class _NianxiaAppState extends State<NianxiaApp> with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
+    playback = PlaybackCoordinator.retain(
+      widget.book,
+      diagnostics: widget.diagnostics,
+    );
     appearance.addListener(appearanceChanged);
     unawaited(appearance.start());
     WidgetsBinding.instance.addObserver(this);
@@ -87,7 +95,24 @@ class _NianxiaAppState extends State<NianxiaApp> with WidgetsBindingObserver {
   }
 
   @override
+  void didUpdateWidget(covariant NianxiaApp oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.book != widget.book) {
+      final previous = playback;
+      unawaited(previous.stop().catchError((Object _) {}));
+      unawaited(previous.release().catchError((Object _) {}));
+      playback = PlaybackCoordinator.retain(
+        widget.book,
+        diagnostics: widget.diagnostics,
+      );
+    }
+  }
+
+  @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed) {
+      unawaited(playback.stop().catchError((Object _) {}));
+    }
     final capture = widget.captureSession;
     if (state == AppLifecycleState.resumed && capture != null) {
       unawaited(
@@ -109,7 +134,9 @@ class _NianxiaAppState extends State<NianxiaApp> with WidgetsBindingObserver {
     final action = widget.shortcut?.value;
     if (capsule && action == 'search') {
       widget.shortcut!.value = null;
-      if (widget.book.captureActive) return;
+      if (widget.book.captureActive && !CaptureDeviceFence.canRetryRelease) {
+        return;
+      }
       setState(() => capsule = false);
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) widget.shortcut!.value = 'search';
@@ -119,7 +146,10 @@ class _NianxiaAppState extends State<NianxiaApp> with WidgetsBindingObserver {
     if (action != 'capsule' && action != 'home') return;
     widget.shortcut!.value = null;
     // One notebook and one microphone session, including repeated hardware keys.
-    if (widget.book.captureActive || capsule && action == 'capsule') return;
+    if (widget.book.captureActive && !CaptureDeviceFence.canRetryRelease ||
+        capsule && action == 'capsule') {
+      return;
+    }
     setState(() => capsule = action == 'capsule');
   }
 
@@ -144,6 +174,7 @@ class _NianxiaAppState extends State<NianxiaApp> with WidgetsBindingObserver {
 
   @override
   void dispose() {
+    unawaited(playback.release().catchError((Object _) {}));
     WidgetsBinding.instance.removeObserver(this);
     appearance.removeListener(appearanceChanged);
     if (widget.appearanceAdapter == null) appearance.dispose();
@@ -180,56 +211,53 @@ class _NianxiaAppState extends State<NianxiaApp> with WidgetsBindingObserver {
       highContrast: appearance.value.increaseContrast,
     ),
     themeMode: mode,
-    themeAnimationDuration:
-        appearance.value.reduceMotion ||
-            WidgetsBinding
-                .instance
-                .platformDispatcher
-                .accessibilityFeatures
-                .disableAnimations
-        ? Duration.zero
-        : const Duration(milliseconds: 180),
+    // Switch the canvas immediately; avoid whole-page mixed-color frames.
+    themeAnimationDuration: Duration.zero,
     // Keep unsaved editors and their navigation stack while hiding the library.
     // Capsule confirmations use their own Navigator above the hidden pages.
-    builder: (context, child) => AppearanceScope(
-      appearance: appearance.value,
-      child: MediaQuery(
-        data: MediaQuery.of(context).copyWith(
-          disableAnimations:
-              MediaQuery.of(context).disableAnimations ||
-              appearance.value.reduceMotion,
-          highContrast:
-              MediaQuery.of(context).highContrast ||
-              appearance.value.increaseContrast,
-        ),
-        child: NativeCaptureScope(
-          capture: widget.captureSession,
-          child: Stack(
-            children: [
-              ExcludeFocus(
-                excluding: capsule,
-                child: Offstage(offstage: capsule, child: child),
-              ),
-              if (capsule)
-                HeroControllerScope.none(
-                  child: Navigator(
-                    key: capsuleNavigator,
-                    onGenerateRoute: (_) => PageRouteBuilder<void>(
-                      opaque: false,
-                      transitionDuration: Duration.zero,
-                      reverseTransitionDuration: Duration.zero,
-                      pageBuilder: (_, _, _) => CaptureCapsule(
-                        book: widget.book,
-                        captureSession: widget.captureSession,
-                        models: widget.models,
-                        microphone: widget.captureMicrophone,
-                        onReturn: returnFromCapsule,
-                        onWrite: writeFromCapsule,
+    builder: (context, child) => ThemePreferenceScope(
+      mode: mode,
+      child: AppearanceScope(
+        appearance: appearance.value,
+        child: MediaQuery(
+          data: MediaQuery.of(context).copyWith(
+            disableAnimations:
+                MediaQuery.of(context).disableAnimations ||
+                appearance.value.reduceMotion,
+            highContrast:
+                MediaQuery.of(context).highContrast ||
+                appearance.value.increaseContrast,
+          ),
+          child: NativeCaptureScope(
+            capture: widget.captureSession,
+            microphone: widget.captureMicrophone,
+            child: Stack(
+              children: [
+                ExcludeFocus(
+                  excluding: capsule,
+                  child: Offstage(offstage: capsule, child: child),
+                ),
+                if (capsule)
+                  HeroControllerScope.none(
+                    child: Navigator(
+                      key: capsuleNavigator,
+                      onGenerateRoute: (_) => PageRouteBuilder<void>(
+                        opaque: false,
+                        transitionDuration: Duration.zero,
+                        reverseTransitionDuration: Duration.zero,
+                        pageBuilder: (_, _, _) => CaptureCapsule(
+                          book: widget.book,
+                          captureSession: widget.captureSession,
+                          models: widget.models,
+                          microphone: widget.captureMicrophone,
+                          onReturn: returnFromCapsule,
+                          onWrite: writeFromCapsule,
+                        ),
                       ),
                     ),
                   ),
-                ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -244,6 +272,7 @@ class _NianxiaAppState extends State<NianxiaApp> with WidgetsBindingObserver {
       shortcut: widget.shortcut,
       themeMode: mode,
       onTheme: changeTheme,
+      captureMicrophone: widget.captureMicrophone,
     ),
   );
 }

@@ -2,6 +2,7 @@ import 'package:uuid/uuid.dart';
 
 enum DiagnosticKind {
   startup,
+  playback,
   capture,
   sourceWrite,
   transcription,

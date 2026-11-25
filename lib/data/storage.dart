@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:isolate';
 
 import '../domain/record.dart';
+import '../domain/deletion_scope.dart';
 import '../domain/local_job.dart';
 import 'local_job_store.dart';
 import '../domain/record_page.dart';
@@ -141,8 +142,10 @@ class Storage {
   Future<RecordDetail?> detail(
     String id, {
     RecordCursor? after,
+    RecordCursor? before,
+    String? aroundId,
     int? generation,
-  }) => _call(_Command.detail, [id, after, generation]);
+  }) => _call(_Command.detail, [id, after, generation, before, aroundId]);
   Future<int> childCount(String id) => _call(_Command.childCount, [id]);
   Future<List<Record>> children(String id) => _call(_Command.children, [id]);
   Future<List<String>> audioReferences() => _call(_Command.audioReferences);
@@ -160,11 +163,16 @@ class Storage {
   Future<void> ensureOrganizationVersion(String version) =>
       _call(_Command.ensureOrganization, [version]);
   Future<void> insert(Record record) => _call(_Command.insert, [record]);
+  Future<Record> insertText(Record record, {bool standalone = false}) =>
+      _call(_Command.insertText, [record, standalone]);
   Future<void> edit(String id, String text, int revision) =>
       _call(_Command.edit, [id, text, revision]);
   Future<void> favorite(String id, bool value) =>
       _call(_Command.favorite, [id, value]);
-  Future<void> delete(String id) => _call(_Command.delete, [id]);
+  Future<DeletionScope> deletionScope(String id) =>
+      _call(_Command.deletionScope, [id]);
+  Future<void> delete(String id, {DeletionScope? scope}) =>
+      _call(_Command.delete, [id, scope]);
   Future<void> transcriptionState(String id, String state) =>
       _call(_Command.transcriptionState, [id, state]);
   Future<bool> transcript(String id, int revision, String text) =>
@@ -276,8 +284,10 @@ enum _Command {
   ensureIndex,
   ensureOrganization,
   insert,
+  insertText,
   edit,
   favorite,
+  deletionScope,
   delete,
   transcriptionState,
   transcript,
@@ -371,8 +381,7 @@ Object? _execute(
     case _Command.claimJob:
       return jobs.claim(a[0] as Set<JobKind>, a[1] as String);
     case _Command.finishJob:
-      jobs.finish(a[0] as LocalJob, a[1] as JobOutcome);
-      return null;
+      return jobs.finish(a[0] as LocalJob, a[1] as JobOutcome);
     case _Command.get:
       return r.get(a[0] as String);
     case _Command.all:
@@ -390,6 +399,8 @@ Object? _execute(
         a[0] as String,
         after: a[1] as RecordCursor?,
         generation: a[2] as int?,
+        before: a[3] as RecordCursor?,
+        aroundId: a[4] as String?,
       );
     case _Command.childCount:
       return r.childCount(a[0] as String);
@@ -417,6 +428,8 @@ Object? _execute(
     case _Command.insert:
       r.insert(a[0] as Record);
       return null;
+    case _Command.insertText:
+      return r.insertText(a[0] as Record, standalone: a[1] as bool);
     case _Command.edit:
       r.edit(a[0] as String, a[1] as String, a[2] as int);
       return null;
@@ -424,8 +437,10 @@ Object? _execute(
       r.favorite(a[0] as String, a[1] as bool);
       return null;
     case _Command.delete:
-      r.delete(a[0] as String);
+      r.delete(a[0] as String, scope: a[1] as DeletionScope?);
       return null;
+    case _Command.deletionScope:
+      return r.deletionScope(a[0] as String);
     case _Command.transcriptionState:
       r.transcriptionState(a[0] as String, a[1] as String);
       return null;

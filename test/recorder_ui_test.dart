@@ -10,7 +10,8 @@ import 'package:nianxia/ui/recorder.dart';
 import 'package:nianxia/ui/theme.dart';
 
 import 'capsule_test.dart' show DeniedMicrophone;
-import 'capture_controller_test.dart' show TestMicrophone, QueryReadyStore;
+import 'capture_controller_test.dart'
+    show TestMicrophone, QueryReadyStore, PendingPermissionMicrophone;
 import 'support/async_storage_tester.dart';
 
 void main() {
@@ -91,6 +92,70 @@ void main() {
     await pumpStorageAndSettle(tester);
   }
 
+  testWidgets('准备期返回关闭页面并废止迟到授权', (tester) async {
+    final mic = PendingPermissionMicrophone();
+    await launch(tester, mic);
+    for (var i = 0; i < 20 && !mic.permissionRequested.isCompleted; i++) {
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 10)),
+      );
+      await tester.pump();
+    }
+    expect(mic.permissionRequested.isCompleted, isTrue);
+    await tester.binding.handlePopRoute();
+    await tester.pump();
+    mic.permission.complete(true);
+    for (var i = 0; i < 30 && !recorderClosed; i++) {
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 10)),
+      );
+      await tester.pump(const Duration(milliseconds: 20));
+    }
+    expect(mic.started, isFalse);
+    expect(recorderClosed, isTrue);
+    expect(await storageRead(tester, () => book.records), isEmpty);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+  testWidgets('点按追加授权等待期间父被删除，不能声称尚未开始的音频仍保留', (tester) async {
+    final parent = await storageRead(
+      tester,
+      () => book.saveText('synthetic parent'),
+    );
+    final mic = PendingPermissionMicrophone();
+    await launch(tester, mic, parentId: parent.id);
+    for (var i = 0; i < 50 && !mic.permissionRequested.isCompleted; i++) {
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 10)),
+      );
+      await tester.pump();
+    }
+    expect(mic.permissionRequested.isCompleted, isTrue);
+    await storageRead(tester, () => book.delete(parent.id));
+    mic.permission.complete(true);
+    await untilVisible(tester, '追加文字');
+    expect(mic.started, isFalse);
+    expect(find.textContaining('音频仍保留'), findsNothing);
+    expect(find.text('保存为独立记录'), findsNothing);
+    expect(await storageRead(tester, () => book.records), isEmpty);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+  testWidgets('失败片段按返回键也必须确认，不直接关闭', (tester) async {
+    final mic = TestMicrophone()..failStop = true;
+    await launch(tester, mic);
+    await untilVisible(tester, '停止并保存');
+    mic.chunks.add(Uint8List(32000));
+    await tester.tap(find.text('停止并保存'));
+    await untilVisible(tester, '重试保存');
+    await tester.binding.handlePopRoute();
+    await pumpStorageAndSettle(tester);
+    expect(find.text('确认丢弃'), findsOneWidget);
+    expect(recorderClosed, isFalse);
+    await tester.tap(find.text('取消'));
+    await pumpStorageAndSettle(tester);
+    expect(find.text('重试保存'), findsOneWidget);
+    expect(book.recoveryDrafts, hasLength(1));
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
   for (final append in [false, true]) {
     testWidgets('录音权限拒绝后可直接${append ? '追加文字并保留所属关系' : '写文字并保存'}', (
       tester,
@@ -112,6 +177,7 @@ void main() {
         find.byKey(const Key('body-editor')),
         '麦克风不可用时也能记住想法',
       );
+      await tester.pumpAndSettle();
       await tester.tap(find.text('保存'));
       await pumpStorageAndSettle(tester);
       final saved = (await storageRead(
@@ -166,11 +232,12 @@ void main() {
     await tester.tap(find.text('丢弃片段'));
     await pumpStorageAndSettle(tester);
     await tester.tap(find.text('确认丢弃'));
-    for (var i = 0; i < 50 && !recorderClosed; i++) {
+    final closeDeadline = DateTime.now().add(const Duration(seconds: 10));
+    while (!recorderClosed && DateTime.now().isBefore(closeDeadline)) {
       await tester.runAsync(
         () => Future<void>.delayed(const Duration(milliseconds: 10)),
       );
-      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
     }
     expect(recorderClosed, isTrue);
     expect(await tester.runAsync(() => File(draft.path).exists()), isFalse);

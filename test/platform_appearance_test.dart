@@ -168,7 +168,7 @@ void main() {
     });
     await tester.pumpWidget(NianxiaApp(book: book, captureSession: capture));
     await pumpStorageAndSettle(tester);
-    await tester.tap(find.text('记一下'));
+    await tester.tap(find.text('点按录音'));
     await pumpStorageAndSettle(tester);
     expect(find.byType(NativeRecorderPanel), findsOneWidget);
     expect(tester.takeException(), isNull);
@@ -253,7 +253,11 @@ void main() {
         });
       });
       await tester.pumpWidget(
-        NianxiaApp(book: book, appearanceAdapter: adapter),
+        NianxiaApp(
+          book: book,
+          appearanceAdapter: adapter,
+          initialTheme: ThemeMode.dark,
+        ),
       );
       await pumpStorageAndSettle(tester);
       expect(
@@ -262,7 +266,7 @@ void main() {
             .themeAnimationDuration,
         Duration.zero,
       );
-      final context = tester.element(find.text('记一下'));
+      final context = tester.element(find.text('按住说话'));
       expect(MediaQuery.of(context).disableAnimations, isTrue);
       await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
       expect(

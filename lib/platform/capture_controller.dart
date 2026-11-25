@@ -9,8 +9,11 @@ import 'package:flutter/services.dart' show MethodChannel;
 import 'package:record/record.dart';
 
 import '../app/notebook.dart';
+import '../domain/diagnostic_event.dart';
 import '../data/pcm_wave_writer.dart';
 import 'local_models.dart';
+import 'playback_coordinator.dart';
+import 'capture_device_fence.dart';
 
 abstract interface class MicrophoneInput {
   Future<bool> allowed();
@@ -23,7 +26,8 @@ abstract interface class MicrophoneInput {
 }
 
 class DeviceMicrophone implements MicrophoneInput {
-  final AudioRecorder recorder = AudioRecorder();
+  AudioRecorder? _recorder;
+  AudioRecorder get recorder => _recorder ??= AudioRecorder();
   @override
   Future<bool> allowed() => recorder.hasPermission();
   @override
@@ -37,13 +41,19 @@ class DeviceMicrophone implements MicrophoneInput {
   );
   @override
   Future<void> stop() async {
-    await recorder.stop();
+    await _recorder?.stop();
   }
 
   @override
-  Future<void> cancel() => recorder.cancel();
+  Future<void> cancel() async {
+    // The pinned platform_interface 2.1.0 cancel() drops its native Future.
+    // Streaming owns no plugin file: stop acknowledges device release, while
+    // Notebook remains responsible for discarding our private PCM/WAV.
+    await _recorder?.stop();
+  }
+
   @override
-  Future<void> close() => recorder.dispose();
+  Future<void> close() async => _recorder?.dispose();
   @override
   Stream<double> get levels => recorder
       .onAmplitudeChanged(const Duration(milliseconds: 150))
@@ -54,6 +64,8 @@ class DeviceMicrophone implements MicrophoneInput {
       .where((v) => v != RecordState.record)
       .map((_) {});
 }
+
+enum _DeviceStop { stopped, recovered, unconfirmed }
 
 class CaptureController extends ChangeNotifier with WidgetsBindingObserver {
   CaptureController(
@@ -83,11 +95,117 @@ class CaptureController extends ChangeNotifier with WidgetsBindingObserver {
   double amplitude = 0;
   Timer? _timer;
   PcmWaveWriter? _writer;
+  Future<void>? _closingWriter;
   StreamSubscription<double>? _amplitude;
   StreamSubscription<void>? _states;
   StreamSubscription<Uint8List>? _pcm;
   bool _disposed = false;
   bool _startInterrupted = false;
+  Future<void>? _starting;
+  Future<void>? _finishing;
+  Future<void>? _discarding;
+  Future<_DeviceStop>? _stoppingDevice;
+  bool _deviceMayBeActive = false, _deviceClosed = false;
+  bool _ownsCaptureLease = false;
+  DiagnosticTraceId? _diagnosticTrace;
+  bool _queryCleanupFailed = false;
+
+  void _recordOutcome(
+    DiagnosticPhase phase,
+    DiagnosticResult result,
+    Stopwatch watch, {
+    DiagnosticErrorCode code = DiagnosticErrorCode.none,
+  }) {
+    final diagnostics = book.diagnostics;
+    if (diagnostics == null) return;
+    try {
+      diagnostics.record(
+        DiagnosticEvent(
+          kind: DiagnosticKind.capture,
+          phase: phase,
+          result: result,
+          errorCode: result == DiagnosticResult.cancelled
+              ? DiagnosticErrorCode.none
+              : code,
+          elapsedMs: watch.elapsedMilliseconds,
+          traceId: _diagnosticTrace ??= DiagnosticTraceId(),
+        ),
+      );
+    } catch (_) {
+      // Optional instrumentation cannot affect device release or source saves.
+    }
+  }
+
+  void _recordTerminal(Stopwatch watch) {
+    _recordOutcome(
+      DiagnosticPhase.finalize,
+      state == 'done' ? DiagnosticResult.succeeded : DiagnosticResult.failed,
+      watch,
+      code: state == 'done'
+          ? DiagnosticErrorCode.none
+          : _deviceMayBeActive
+          ? DiagnosticErrorCode.interruption
+          : _queryCleanupFailed
+          ? DiagnosticErrorCode.ioFailure
+          : DiagnosticErrorCode.unknown,
+    );
+  }
+
+  Future<_DeviceStop> _stopDevice() {
+    if (!_deviceMayBeActive) return Future.value(_DeviceStop.stopped);
+    return _stoppingDevice ??= _tryStopDevice().whenComplete(
+      () => _stoppingDevice = null,
+    );
+  }
+
+  Future<_DeviceStop> _tryStopDevice() async {
+    var attempt = 0;
+    for (final action in [
+      microphone.stop,
+      microphone.cancel,
+      microphone.close,
+    ]) {
+      try {
+        await action();
+        if (attempt == 2) _deviceClosed = true;
+        _deviceMayBeActive = false;
+        CaptureDeviceFence.released(this);
+        return attempt == 0 ? _DeviceStop.stopped : _DeviceStop.recovered;
+      } catch (_) {
+        // A failed/late method call is not acknowledgement of device release.
+      }
+      attempt++;
+    }
+    return _DeviceStop.unconfirmed;
+  }
+
+  static const _stopUnconfirmed = '麦克风尚未确认停止，请重试停止或退出应用后重试。';
+
+  Future<_DeviceStop> _requireStopped() async {
+    final result = await _stopDevice();
+    if (result == _DeviceStop.unconfirmed) {
+      throw const NotebookException(_stopUnconfirmed);
+    }
+    return result;
+  }
+
+  void _releaseLeaseIfStopped() {
+    if (!_deviceMayBeActive && _ownsCaptureLease) {
+      _ownsCaptureLease = false;
+      book.captureActive = false;
+      models?.setCaptureActive(false);
+    }
+  }
+
+  Future<void> _retryDeviceRelease() async {
+    if (!_deviceMayBeActive) return;
+    if (!_disposed && active) {
+      throw const NotebookException('另一段录音尚未结束，请先处理当前录音。');
+    }
+    await _requireStopped();
+    _releaseLeaseIfStopped();
+  }
+
   bool get active =>
       state == 'recording' || state == 'starting' || state == 'saving';
   int get elapsed => _watch.elapsedMilliseconds.clamp(0, 120000);
@@ -97,24 +215,49 @@ class CaptureController extends ChangeNotifier with WidgetsBindingObserver {
     }
   }
 
-  Future<void> _closeWriter() async {
+  Future<void> _closeWriter() {
+    if (_closingWriter != null) return _closingWriter!;
     final writer = _writer;
     _writer = null;
-    await writer?.close();
+    if (writer == null) return Future.value();
+    return _closingWriter = writer.close().whenComplete(
+      () => _closingWriter = null,
+    );
   }
 
   Future<void> _cleanQuery() async {
-    if (query && draft != null) {
-      final file = File(draft!.path);
-      if (await file.exists()) {
-        await file.delete();
+    try {
+      if (query && draft != null) {
+        final file = File(draft!.path);
+        if (await file.exists()) await file.delete();
       }
+    } on FileSystemException {
+      _queryCleanupFailed = true;
+      queryText = null;
+      state = 'failed';
+      error = _deviceMayBeActive
+          ? '$_stopUnconfirmed 临时查询资料也未清理，请保留现场后重试。'
+          : '语音查询临时资料清理未完成，可改用文字，重新打开应用后将重试清理。';
     }
   }
 
-  Future<void> start() async {
-    book.captureActive = true;
+  Future<void> start() {
+    if (_disposed || state != 'starting') return _starting ?? Future.value();
+    return _starting ??= _start();
+  }
+
+  Future<void> _start() async {
+    final watch = Stopwatch()..start();
     try {
+      if (book.captureActive && CaptureDeviceFence.canRetryRelease) {
+        await CaptureDeviceFence.beforeStart();
+        _ensureStartAllowed();
+      }
+      if (book.captureActive) {
+        throw const NotebookException('另一段录音尚未结束，请先处理当前录音。');
+      }
+      _ownsCaptureLease = true;
+      book.captureActive = true;
       if (!await _recordingScreenAvailable()) {
         throw const NotebookException('请先解锁并保持屏幕亮起，再开始录音。');
       }
@@ -127,34 +270,43 @@ class CaptureController extends ChangeNotifier with WidgetsBindingObserver {
         throw const NotebookException('没有麦克风权限。可改用文字，或到系统设置允许麦克风。');
       }
       _ensureStartAllowed();
-      draft = await book.beginCapture(parentId: parentId, query: query);
-      _ensureStartAllowed();
-      models?.setCaptureActive(true);
-      _writer = await PcmWaveWriter.open(
-        draft!.path,
-        onLimit: () {
-          if (state == 'recording') {
-            finish();
-          }
-        },
-        onFailure: () {
-          if (state == 'recording') {
-            finish();
-          }
-        },
-      );
-      _ensureStartAllowed();
-      final stream = await microphone.start();
+      final stream = await PlaybackCoordinator.startCapture(book, () async {
+        _ensureStartAllowed();
+        draft = await book.beginCapture(parentId: parentId, query: query);
+        _ensureStartAllowed();
+        models?.setCaptureActive(true);
+        _writer = await PcmWaveWriter.open(
+          draft!.path,
+          onLimit: () {
+            if (!_disposed && state == 'recording') {
+              finish();
+            }
+          },
+          onFailure: () {
+            if (!_disposed && state == 'recording') {
+              finish();
+            }
+          },
+        );
+        _ensureStartAllowed();
+        CaptureDeviceFence.hold(
+          this,
+          _retryDeviceRelease,
+          canRetry: () => _disposed || !active,
+        );
+        _deviceMayBeActive = true;
+        return microphone.start();
+      });
       _ensureStartAllowed();
       state = 'recording';
       _watch.start();
       _pcm = stream.listen(
         (bytes) => _writer?.add(bytes),
         onError: (_) {
-          finish();
+          if (!_disposed) finish();
         },
         onDone: () {
-          if (state == 'recording') {
+          if (!_disposed && state == 'recording') {
             finish();
           }
         },
@@ -169,11 +321,19 @@ class CaptureController extends ChangeNotifier with WidgetsBindingObserver {
           _notify();
         },
       );
-      _states = microphone.interruptions.listen((_) {
-        if (state == 'recording') {
-          finish();
-        }
-      });
+      _states = microphone.interruptions.listen(
+        (_) {
+          if (state == 'recording') finish();
+        },
+        onError: (Object _, StackTrace _) {
+          if (state == 'recording') finish();
+        },
+      );
+      _recordOutcome(
+        DiagnosticPhase.prepare,
+        DiagnosticResult.succeeded,
+        watch,
+      );
       // Wall-clock fallback for interruptions and no-data device failures. The
       // sample writer independently enforces the exact persisted two-minute cap.
       _timer = Timer.periodic(const Duration(milliseconds: 150), (_) {
@@ -185,17 +345,30 @@ class CaptureController extends ChangeNotifier with WidgetsBindingObserver {
       });
       _notify();
     } catch (e) {
-      try {
-        await microphone.stop();
-      } catch (_) {}
+      final stopped = await _stopDevice();
       try {
         await _closeWriter();
       } catch (_) {}
+      if (state != 'discarding' && state != 'cancelled') {
+        state = 'failed';
+        error = stopped == _DeviceStop.unconfirmed
+            ? _stopUnconfirmed
+            : e is NotebookException
+            ? e.message
+            : '无法开始录音，请检查麦克风权限和剩余空间。';
+      }
       await _cleanQuery();
-      book.captureActive = false;
-      state = 'failed';
-      error = e is NotebookException ? e.message : '无法开始录音，请检查麦克风权限和剩余空间。';
-      models?.setCaptureActive(false);
+      _releaseLeaseIfStopped();
+      _recordOutcome(
+        DiagnosticPhase.prepare,
+        !_deviceMayBeActive && (_startInterrupted || _disposed)
+            ? DiagnosticResult.cancelled
+            : DiagnosticResult.failed,
+        watch,
+        code: _deviceMayBeActive
+            ? DiagnosticErrorCode.interruption
+            : DiagnosticErrorCode.unavailable,
+      );
       _notify();
     }
   }
@@ -206,16 +379,27 @@ class CaptureController extends ChangeNotifier with WidgetsBindingObserver {
     }
   }
 
-  Future<void> finish() async {
+  Future<void> finish() => _finishing ??= _finish();
+
+  Future<void> _finish() async {
+    if (_disposed) return;
+    if (state == 'starting') {
+      await discard();
+      return;
+    }
     if (state != 'recording') {
       return;
     }
+    final watch = Stopwatch()..start();
     state = 'saving';
     _watch.stop();
     _timer?.cancel();
     _notify();
     try {
-      await microphone.stop();
+      final stop = await _requireStopped();
+      if (stop == _DeviceStop.recovered) {
+        throw const NotebookException('停止录音时发生错误，有效片段可恢复。');
+      }
       await _pcm?.cancel();
       await _closeWriter();
       models?.setCaptureActive(false);
@@ -229,9 +413,6 @@ class CaptureController extends ChangeNotifier with WidgetsBindingObserver {
       }
       state = 'done';
     } catch (e) {
-      try {
-        await microphone.cancel();
-      } catch (_) {}
       await _pcm?.cancel();
       try {
         await _closeWriter();
@@ -256,49 +437,69 @@ class CaptureController extends ChangeNotifier with WidgetsBindingObserver {
         } catch (_) {}
         await _cleanQuery();
       }
-      book.captureActive = false;
-      models?.setCaptureActive(false);
+      _releaseLeaseIfStopped();
+      _recordTerminal(watch);
       _notify();
     }
   }
 
-  Future<void> retry() async {
-    if (draft == null || query) {
+  Future<void> retry({bool standalone = false}) async {
+    if (_disposed || state != 'failed' || draft == null || query) {
       return;
     }
+    final watch = Stopwatch()..start();
     state = 'saving';
     _notify();
     try {
-      try {
-        await microphone.stop();
-      } catch (_) {}
+      await _requireStopped();
       await _pcm?.cancel();
       await _closeWriter();
-      saved = await book.finishCapture(draft!, recovering: true);
+      saved = await book.finishCapture(
+        draft!,
+        recovering: true,
+        standalone: standalone,
+      );
       state = 'done';
       error = null;
     } catch (e) {
       state = 'failed';
       error = e is NotebookException ? e.message : '仍无法保存，请检查剩余空间。';
+    } finally {
+      _releaseLeaseIfStopped();
+      _recordTerminal(watch);
+      _notify();
     }
-    _notify();
   }
 
   Future<void> discard() async {
+    if (_discarding != null) return _discarding;
+    final work = _discard();
+    _discarding = work;
+    try {
+      await work;
+    } finally {
+      _discarding = null;
+    }
+  }
+
+  Future<void> _discard() async {
     if (state == 'saving' || state == 'done' || state == 'cancelled') {
       return;
     }
+    final watch = Stopwatch()..start();
+    _startInterrupted = true;
     state = 'discarding';
     _timer?.cancel();
     _watch.stop();
     _notify();
     try {
+      await _starting;
+      await _requireStopped();
       if (draft != null && !query) {
         await book.captures
             .marker(draft!.id)
             .writeAsString('{"discarded":true}', flush: true);
       }
-      await microphone.cancel();
       await _pcm?.cancel();
       try {
         await _closeWriter();
@@ -309,10 +510,19 @@ class CaptureController extends ChangeNotifier with WidgetsBindingObserver {
       state = 'cancelled';
     } catch (_) {
       state = 'failed';
-      error = '丢弃未完成，请重试。';
+      error = _deviceMayBeActive ? _stopUnconfirmed : '丢弃未完成，请重试。';
     } finally {
-      book.captureActive = false;
-      models?.setCaptureActive(false);
+      _releaseLeaseIfStopped();
+      _recordOutcome(
+        DiagnosticPhase.cleanup,
+        state == 'cancelled'
+            ? DiagnosticResult.cancelled
+            : DiagnosticResult.failed,
+        watch,
+        code: state == 'cancelled'
+            ? DiagnosticErrorCode.none
+            : DiagnosticErrorCode.unknown,
+      );
       _notify();
     }
   }
@@ -360,27 +570,64 @@ class CaptureController extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   Future<void> _release() async {
+    // Stop is requested before unsubscribing: some adapters need that request
+    // to acknowledge stream cancellation. Neither depends on the other's reply.
+    final stopping = _stopDevice();
     try {
       await _pcm?.cancel();
-      await microphone.close();
+    } catch (_) {
+      // Device acknowledgement and the private writer still need cleanup.
+    }
+    try {
+      await _closeWriter();
+    } catch (_) {
+      // Retain the source/recovery state even when finalizing the file fails.
+    }
+    try {
+      await stopping;
+      await _starting;
+      await _finishing;
+      await _discarding;
+    } catch (_) {
+      // Disposal still has to confirm the physical device after an operation fails.
+    }
+    try {
+      await _requireStopped();
+      await _pcm?.cancel();
+      if (!_deviceClosed) {
+        await microphone.close();
+        _deviceClosed = true;
+      }
       await _closeWriter();
     } catch (_) {
     } finally {
       await _cleanQuery();
+      _releaseLeaseIfStopped();
     }
   }
 
   @override
   void dispose() {
-    book.captureActive = false;
+    if (_disposed) return;
     _disposed = true;
     WidgetsBinding.instance.removeObserver(this);
     _screenOff.removeListener(_onScreenOff);
     _timer?.cancel();
-    _amplitude?.cancel();
-    _states?.cancel();
+    for (final cancel in [_amplitude?.cancel, _states?.cancel]) {
+      if (cancel == null) continue;
+      final watch = Stopwatch()..start();
+      unawaited(
+        Future<void>.sync(cancel).catchError((Object _) {
+          _recordOutcome(
+            DiagnosticPhase.cleanup,
+            DiagnosticResult.failed,
+            watch,
+            code: DiagnosticErrorCode.unavailable,
+          );
+        }),
+      );
+    }
     unawaited(_release());
-    models?.setCaptureActive(false);
     super.dispose();
   }
 }

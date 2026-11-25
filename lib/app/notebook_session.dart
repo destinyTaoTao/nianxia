@@ -36,6 +36,7 @@ class NotebookSession {
   final BackgroundTasks tasks;
   final LocalDiagnostics diagnostics;
   bool _closed = false;
+  Future<void>? _closing;
 
   static Future<NotebookSession> open(
     Directory home, {
@@ -50,7 +51,11 @@ class NotebookSession {
     );
     try {
       return await diagnostics.trace(DiagnosticKind.startup, () async {
-        final openedBook = await Notebook.open(home, deferMaintenance: true);
+        final openedBook = await Notebook.open(
+          home,
+          deferMaintenance: true,
+          diagnostics: diagnostics,
+        );
         book = openedBook;
         List<ModelSpec> manifest;
         String? modelNotice;
@@ -101,14 +106,28 @@ class NotebookSession {
     tasks.dispose();
     models.dispose();
     book.dispose();
-    unawaited(diagnostics.close());
+    _closing = _closeResources();
+    unawaited(_closing!.catchError((Object _) {}));
   }
 
-  Future<void> close() async {
+  Future<void> close() {
     dispose();
-    await maintenance;
-    await models.close();
-    await book.close();
-    await diagnostics.close();
+    return _closing!;
+  }
+
+  Future<void> _closeResources() async {
+    try {
+      await maintenance;
+    } finally {
+      try {
+        await models.close();
+      } finally {
+        try {
+          await book.close();
+        } finally {
+          await diagnostics.close();
+        }
+      }
+    }
   }
 }

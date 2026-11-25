@@ -11,6 +11,7 @@ import '../platform/local_models.dart';
 import '../platform/organizer.dart';
 import '../app/backup.dart';
 import 'common.dart';
+import 'theme.dart';
 import 'recovery.dart';
 import 'backup_password.dart';
 import '../app/diagnostics.dart';
@@ -50,7 +51,6 @@ class _SettingsPageState extends State<SettingsPage> {
   bool keyBusy = false;
   String? keyError;
   late ThemeMode mode = widget.themeMode;
-  Key themeFieldKey = UniqueKey();
   bool themeBusy = false;
   final Map<String, bool> ready = {};
   late final backup =
@@ -74,6 +74,27 @@ class _SettingsPageState extends State<SettingsPage> {
     loadKey();
     loadModels();
     widget.models?.store.addListener(modelChanged);
+  }
+
+  Future<void> changeTheme(ThemeMode? value) async {
+    if (value == null ||
+        themeBusy ||
+        value == (ThemePreferenceScope.maybeOf(context) ?? mode)) {
+      return;
+    }
+    setState(() => themeBusy = true);
+    var saved = false;
+    try {
+      saved = await widget.onTheme(value);
+    } catch (_) {
+      // Keep the last committed choice after persistence fails.
+    }
+    if (!mounted) return;
+    setState(() {
+      if (saved) mode = value;
+      themeBusy = false;
+    });
+    if (!saved) notice(context, '主题设置未保存，请重试。');
   }
 
   Future<void> loadKey() async {
@@ -482,55 +503,40 @@ class _SettingsPageState extends State<SettingsPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  Text('外观', style: Theme.of(context).textTheme.titleMedium),
+                  const SizedBox(height: 8),
+                  RadioGroup<ThemeMode>(
+                    groupValue: ThemePreferenceScope.maybeOf(context) ?? mode,
+                    onChanged: changeTheme,
+                    child: Column(
+                      children: [
+                        for (final choice in const [
+                          (ThemeMode.system, '跟随系统'),
+                          (ThemeMode.light, '浅色'),
+                          (ThemeMode.dark, '深色'),
+                        ])
+                          RadioListTile<ThemeMode>(
+                            key: Key('theme-choice-${choice.$1.name}'),
+                            value: choice.$1,
+                            title: Text(choice.$2),
+                            contentPadding: EdgeInsets.zero,
+                            enabled: !themeBusy,
+                          ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            PaperSurface(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
                   Text('保存在这里', style: Theme.of(context).textTheme.titleMedium),
                   const SizedBox(height: 12),
                   const Text(
                     '记录、音频、转写和查找保存在设备上，无需账号。模型下载完成后可离线记查。应用数据未声明加密；请保护设备访问权限。',
-                  ),
-                  const SizedBox(height: 28),
-                  DropdownButtonFormField<ThemeMode>(
-                    key: themeFieldKey,
-                    initialValue: mode,
-                    decoration: const InputDecoration(labelText: '外观'),
-                    items: const [
-                      DropdownMenuItem(
-                        value: ThemeMode.system,
-                        child: Text('跟随系统'),
-                      ),
-                      DropdownMenuItem(
-                        value: ThemeMode.light,
-                        child: Text('浅色'),
-                      ),
-                      DropdownMenuItem(
-                        value: ThemeMode.dark,
-                        child: Text('深色'),
-                      ),
-                    ],
-                    onChanged: themeBusy
-                        ? null
-                        : (v) async {
-                            if (v == null) return;
-                            setState(() {
-                              themeBusy = true;
-                              // Keep showing the persisted selection until saving succeeds.
-                              themeFieldKey = UniqueKey();
-                            });
-                            var saved = false;
-                            try {
-                              saved = await widget.onTheme(v);
-                            } catch (_) {
-                              // The previous selection stays active after a storage failure.
-                            }
-                            if (!mounted) return;
-                            setState(() {
-                              if (saved) mode = v;
-                              themeBusy = false;
-                              themeFieldKey = UniqueKey();
-                            });
-                            if (!saved && context.mounted) {
-                              notice(context, '主题设置未保存，请重试。');
-                            }
-                          },
                   ),
                 ],
               ),
