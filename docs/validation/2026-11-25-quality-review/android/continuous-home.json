@@ -1,0 +1,12 @@
+{
+  "applicationId": "app.nianxia.nianxia.test",
+  "runId": "6f4770e0-77b7-4788-83f2-da431634a12c",
+  "case": "continuous-home",
+  "passed": true,
+  "metrics": {
+    "sourceRows": 4,
+    "lightAndDarkScreens": 1,
+    "actualKeyboardInsetsObserved": 1,
+    "largeTextScale": 2
+  }
+}

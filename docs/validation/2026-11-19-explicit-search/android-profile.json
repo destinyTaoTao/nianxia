@@ -1,0 +1,17 @@
+{
+  "applicationId": "app.nianxia.nianxia.test",
+  "runId": "0917db63-b50e-4325-a623-6e689fba7e2c",
+  "case": "explicit-search",
+  "passed": true,
+  "metrics": {
+    "sourceRows": 3,
+    "themes": 2,
+    "screenshots": 20,
+    "explicitSubmission": 1,
+    "dateShortcuts": 1,
+    "oldResultsDuringLoading": 1,
+    "failureAndRetry": 1,
+    "detailReturn": 1,
+    "queryCreatedNoRecords": 1
+  }
+}

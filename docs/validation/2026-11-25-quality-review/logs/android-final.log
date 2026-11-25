@@ -1,0 +1,12 @@
+PASS engine-reconnect screenshots 0
+RECHECK hold-recording
+PASS hold-recording screenshots 10
+RECHECK voice-query
+PASS voice-query screenshots 12
+RECHECK detail-edit
+PASS detail-edit screenshots 24
+RECHECK voice-append
+PASS voice-append screenshots 20
+RECHECK continuous-workflow
+PASS continuous-workflow screenshots 8
+ALL AFFECTED FINAL CASES PASSED

@@ -1,0 +1,14 @@
+{
+  "applicationId": "app.nianxia.nianxia.test",
+  "runId": "e8a5194a-15f3-406a-b657-4833932e4f3d",
+  "case": "search-origin",
+  "passed": true,
+  "metrics": {
+    "screenshots": 18,
+    "themes": 2,
+    "realPlayer": 1,
+    "lazySource": 1,
+    "sourceRemoved": 1,
+    "sourceRefresh": 1
+  }
+}

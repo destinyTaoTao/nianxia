@@ -1,0 +1,17 @@
+{
+  "runId": "51f2bdf0-df31-4e23-81e3-edee81cfed7c",
+  "captured": {
+    "editor-keyboard-dark": {
+      "applicationId": "app.nianxia.nianxia.test",
+      "runId": "51f2bdf0-df31-4e23-81e3-edee81cfed7c",
+      "stage": "editor-keyboard-dark",
+      "keyboardInset": 883.0
+    },
+    "editor-keyboard-light": {
+      "applicationId": "app.nianxia.nianxia.test",
+      "runId": "51f2bdf0-df31-4e23-81e3-edee81cfed7c",
+      "stage": "editor-keyboard-light",
+      "keyboardInset": 883.0
+    }
+  }
+}

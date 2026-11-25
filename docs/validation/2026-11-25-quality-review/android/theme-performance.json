@@ -1,0 +1,11 @@
+{
+  "applicationId": "app.nianxia.nianxia.test",
+  "runId": "bf649b10-1c44-4d11-803a-ba8409948c2c",
+  "case": "theme-performance",
+  "passed": true,
+  "metrics": {
+    "switchCount": 30,
+    "sourceRows": 100,
+    "refreshRate": 60.000003814697266
+  }
+}

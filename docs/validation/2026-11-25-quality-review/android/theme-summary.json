@@ -1,0 +1,55 @@
+{
+  "note": "separate fresh OpenGL software emulator, not a matched comparison with the earlier ANGLE/Vulkan emulator",
+  "sampleWindowMs": 600,
+  "samples": {
+    "brightnessUsP95Ms": 63.933,
+    "canvasUsP95Ms": 63.934,
+    "frameKeys": [
+      "buildUs",
+      "rasterUs",
+      "totalUs",
+      "rasterEndOffsetUs",
+      "startOffsetUs"
+    ],
+    "frameCount": 407,
+    "buildUsP95Ms": 8.107,
+    "rasterUsP95Ms": 74.117,
+    "totalUsP95Ms": 129.696
+  },
+  "callbackControl": {
+    "brightnessUsP95Ms": 24.328,
+    "canvasUsP95Ms": 24.329,
+    "frameKeys": [
+      "buildUs",
+      "rasterUs",
+      "totalUs",
+      "rasterEndOffsetUs",
+      "startOffsetUs"
+    ],
+    "frameCount": 217,
+    "buildUsP95Ms": 5.634,
+    "rasterUsP95Ms": 69.142,
+    "totalUsP95Ms": 120.816
+  },
+  "sameChoiceControl": {
+    "brightnessUsP95Ms": 20.293,
+    "canvasUsP95Ms": 20.294,
+    "frameKeys": [
+      "buildUs",
+      "rasterUs",
+      "totalUs",
+      "rasterEndOffsetUs",
+      "startOffsetUs"
+    ],
+    "frameCount": 535,
+    "buildUsP95Ms": 0.589,
+    "rasterUsP95Ms": 46.915,
+    "totalUsP95Ms": 77.003
+  },
+  "storageOnlyUsP95Ms": 1.765,
+  "themePairConstructionUsP95Ms": 1.303,
+  "profile": true,
+  "sourceRows": 100,
+  "switchCount": 30,
+  "refreshRate": 60.000003814697266
+}

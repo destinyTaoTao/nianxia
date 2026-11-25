@@ -1,0 +1,37 @@
+{
+  "implementationCommit": "2a8f22d4acb84d626ee4a6987523e122801eb651",
+  "date": "2026-11-25",
+  "repository": "destinyTaoTao/nianxia",
+  "branch": "main",
+  "pythonPassed": 50,
+  "flutterAnalyze": "passed",
+  "flutterPassed": 505,
+  "flutterSkipped": 1,
+  "heapGateSeparatelyPassed": 1,
+  "retainedSearchResults": 0,
+  "heapSamples": 48,
+  "productionSourceDigestUnchanged": true,
+  "androidCasesReusedFromSameSource": 14,
+  "nativeTestsPreviouslyPassed": 17,
+  "noNewDeviceOperations": true,
+  "formalDataUntouched": true,
+  "userAuthorizedCommitPushIssueUpdates": true,
+  "completedChildIssues": [
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    23,
+    24,
+    25,
+    26,
+    27,
+    28
+  ],
+  "parentAndPlatformAcceptanceRemainOpen": [
+    16,
+    15
+  ]
+}

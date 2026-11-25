@@ -1,0 +1,11 @@
+{
+  "applicationId": "app.nianxia.nianxia.test",
+  "runId": "1d8758fd-7430-4682-a1ad-c091f9f160fb",
+  "sourceDigest": "50f2bff745a84d193a8426733da41e3dd6963a5908671483bf3dcd600c2e6ebe",
+  "apkSha256": "ba0495cf693ed2c67511ecb11b7a7a20c23ab4caa1cae953e8e91d223d0c44b8",
+  "entry": "integration_test/preview/main.dart",
+  "mode": "profile",
+  "ordinaryCapture": true,
+  "apkBytes": 71615876,
+  "artifact": "/Users/xiaodeng/chatgpt/nianxia/build/isolated-preview/1d8758fd-7430-4682-a1ad-c091f9f160fb/nianxia-continuous-preview.apk"
+}

@@ -1,0 +1,17 @@
+{
+  "applicationId": "app.nianxia.nianxia.test",
+  "runId": "5e620dc7-7ba7-452f-9b33-630b3e2f3c38",
+  "case": "text-append",
+  "passed": true,
+  "metrics": {
+    "themes": 2,
+    "screenshots": 22,
+    "initialAppendsPerTheme": 95,
+    "savedIdentityLocated": 1,
+    "boundedWindowMaximum": 40,
+    "previousAndNextWindows": 1,
+    "saveFailureRetry": 1,
+    "explicitStandaloneAfterParentDeletion": 1,
+    "parentBodyUnchanged": 1
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "applicationId": "app.nianxia.nianxia.test",
+  "runId": "9ea85da7-816d-4c81-a306-74662131938c",
+  "case": "voice-query",
+  "passed": true,
+  "metrics": {
+    "sourceRows": 2,
+    "deviceMicrophone": 1,
+    "controlledTranscription": 1,
+    "themes": 2,
+    "screenshots": 12,
+    "confirmBeforeLookup": 1,
+    "cancelAndFailureCleaned": 1,
+    "queryCreatedNoRecords": 1
+  }
+}

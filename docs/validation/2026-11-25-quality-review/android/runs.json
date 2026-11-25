@@ -1,0 +1,211 @@
+[
+  {
+    "case": "hold-recording",
+    "target": "acceptance",
+    "mode": "profile",
+    "runId": "412e5a2e-083f-4504-b806-e4431039ed93",
+    "passed": true,
+    "screenshots": 10,
+    "seconds": null,
+    "apkBytes": 71615876,
+    "apkSha256": "4d3aef5341cf64350c6b93193aea6c3bfc5bbbac1da4682e20958bb1c727b0e4"
+  },
+  {
+    "case": "voice-query",
+    "target": "acceptance",
+    "mode": "profile",
+    "runId": "62495e61-d982-490b-a00d-f9f6e46d9cf8",
+    "passed": true,
+    "screenshots": 12,
+    "seconds": 51.062235708,
+    "apkBytes": 71615876,
+    "apkSha256": "9eeffeccef12392a72a3489e4c4f3088d20d2b2904a8725acfa4ef7f0f168f6c"
+  },
+  {
+    "case": "detail-edit",
+    "target": "acceptance",
+    "mode": "profile",
+    "runId": "7dd1b3f1-c165-49b6-9981-b518be4a7fa8",
+    "passed": true,
+    "screenshots": 24,
+    "seconds": 91.86241829100001,
+    "apkBytes": 71746948,
+    "apkSha256": "4ae023e1cddf15b473247c05a3bae1cb37883a66f481e17aaae63274f6066685"
+  },
+  {
+    "case": "text-append",
+    "target": "acceptance",
+    "mode": "profile",
+    "runId": "5e620dc7-7ba7-452f-9b33-630b3e2f3c38",
+    "passed": true,
+    "screenshots": 22,
+    "seconds": 84.324516875,
+    "apkBytes": 71746948,
+    "apkSha256": "a31cecedce32c7bb12e11f837f3d00f430142b41a4cb0abaf7f7655d80f0bf83"
+  },
+  {
+    "case": "voice-append",
+    "target": "acceptance",
+    "mode": "profile",
+    "runId": "ee6b27ef-db55-4b91-b9d9-9a8302fbc16c",
+    "passed": true,
+    "screenshots": 20,
+    "seconds": 66.99771195900001,
+    "apkBytes": 71746948,
+    "apkSha256": "2c8bfcd1053c8639c4b0b6482c59347fa85e8d121aa564ea41ac68f01726178a"
+  },
+  {
+    "case": "search-origin",
+    "target": "acceptance",
+    "mode": "profile",
+    "runId": "e8a5194a-15f3-406a-b657-4833932e4f3d",
+    "passed": true,
+    "screenshots": 18,
+    "seconds": 58.310669916999984,
+    "apkBytes": 71681412,
+    "apkSha256": "dae93de3b91e40f5143e65494a0dbb77ed45e3450cd35b75dc47b2fcb459b6e5"
+  },
+  {
+    "case": "delete-confirmation",
+    "target": "acceptance",
+    "mode": "profile",
+    "runId": "1a293623-167d-46af-971f-672d4519d0fe",
+    "passed": true,
+    "screenshots": 14,
+    "seconds": 75.31954624999997,
+    "apkBytes": 71615876,
+    "apkSha256": "31baa45b6393c1b77623cee8692fbbb2dbb55700cf6d06046df1f4504abbf0d5"
+  },
+  {
+    "case": "explicit-search",
+    "target": "acceptance",
+    "mode": "profile",
+    "runId": "3eda6f0a-9ada-452a-a4c8-12b6d1ef3f81",
+    "passed": true,
+    "screenshots": 20,
+    "seconds": 49.59251504100001,
+    "apkBytes": 71746948,
+    "apkSha256": "328567ae0bafaa9acab0522cdcaf6d643bf5a1595863af05cab521ae6e906004"
+  },
+  {
+    "case": "continuous-home",
+    "target": "acceptance",
+    "mode": "profile",
+    "runId": "6f4770e0-77b7-4788-83f2-da431634a12c",
+    "passed": true,
+    "screenshots": 8,
+    "seconds": 50.07068583299997,
+    "apkBytes": 71615876,
+    "apkSha256": "421b048759f996a3fdb41c797db0b6fb32ff4d0dacc7d41266302eff0fc1715a"
+  },
+  {
+    "case": "local-jobs",
+    "target": "acceptance",
+    "mode": "profile",
+    "runId": "faa1b046-f657-4706-a7a4-c05f4c26ece5",
+    "passed": true,
+    "screenshots": 0,
+    "seconds": 19.267723791000094,
+    "apkBytes": 62506372,
+    "apkSha256": "4adc74a0019743f92c42b6c4f49274d78bc1c8a2205b40c6607eaf28b6f80e96"
+  },
+  {
+    "case": "diagnostics",
+    "target": "acceptance",
+    "mode": "profile",
+    "runId": "7ce6a633-663f-46f1-b24e-e6589c0c887b",
+    "passed": true,
+    "screenshots": 0,
+    "seconds": 19.030259541999953,
+    "apkBytes": 62506372,
+    "apkSha256": "3e904658f7fb554173e596751c90f5be83cc7161aa1602ffbf62afc68a98459b"
+  },
+  {
+    "case": "continuous-workflow",
+    "target": "acceptance",
+    "mode": "profile",
+    "runId": "eff7fc68-e445-4e08-9770-61604b917508",
+    "passed": true,
+    "screenshots": 8,
+    "seconds": 66.82440629199994,
+    "apkBytes": 72074628,
+    "apkSha256": "4d89418d3a8b2839fd52ae1d9cfa0f79c0e880a3166de625d020924e6c4b97f6"
+  },
+  {
+    "case": "theme-performance",
+    "target": "acceptance",
+    "mode": "profile",
+    "runId": "bf649b10-1c44-4d11-803a-ba8409948c2c",
+    "passed": true,
+    "screenshots": 0,
+    "seconds": 109.87137258299992,
+    "apkBytes": 71222660,
+    "apkSha256": "4b1615b3d9ec8335fe2fbc4ed8f54e928c7990cae5073ad272e0656ba824ad53"
+  },
+  {
+    "case": "engine-reconnect",
+    "target": "capture",
+    "mode": "release",
+    "runId": "f3d4ec11-6593-410c-b304-25f3de9cd8df",
+    "passed": true,
+    "screenshots": 0,
+    "seconds": null,
+    "apkBytes": 45333937,
+    "apkSha256": "d3163abd43d686fd969fd038b1efcd7bc3de5e33610eac6814d6e67f48340866"
+  },
+  {
+    "case": "hold-recording",
+    "target": "acceptance",
+    "mode": "profile",
+    "runId": "6e19aa52-2620-4703-bfee-84c0bc055c24",
+    "passed": true,
+    "screenshots": 10,
+    "seconds": 39.06484225,
+    "apkBytes": 71615876,
+    "apkSha256": "a1e7ab1c8f2f6be7790ed2aa2b10e15c4583bfe7a2cc093acf0ea7b34b24270e"
+  },
+  {
+    "case": "voice-query",
+    "target": "acceptance",
+    "mode": "profile",
+    "runId": "9ea85da7-816d-4c81-a306-74662131938c",
+    "passed": true,
+    "screenshots": 12,
+    "seconds": 51.53394525,
+    "apkBytes": 71615876,
+    "apkSha256": "b8e59199b9f45bbda37b2b23e1e737106591d4bf4900e2c7d19055a0d73fb837"
+  },
+  {
+    "case": "detail-edit",
+    "target": "acceptance",
+    "mode": "profile",
+    "runId": "c6c3e381-2762-4e76-8089-0710c3c0b4f7",
+    "passed": true,
+    "screenshots": 24,
+    "seconds": 91.35645204100001,
+    "apkBytes": 71746948,
+    "apkSha256": "97f35f4dbce80a1fe2f8e4d14ef6d0e1ce0635cb01373d4bf2940da22befbfb8"
+  },
+  {
+    "case": "voice-append",
+    "target": "acceptance",
+    "mode": "profile",
+    "runId": "1a1cfec7-38f9-4a90-bd3c-47c3f6a3386b",
+    "passed": true,
+    "screenshots": 20,
+    "seconds": 67.774816042,
+    "apkBytes": 71746948,
+    "apkSha256": "7a34dbd88df389520889e888aac8eba04ee69f9d6e37bfa3becb730ec76c819b"
+  },
+  {
+    "case": "continuous-workflow",
+    "target": "acceptance",
+    "mode": "profile",
+    "runId": "2e171e0e-1ffe-4b9d-81d3-920653db5582",
+    "passed": true,
+    "screenshots": 8,
+    "seconds": 66.36718095900002,
+    "apkBytes": 72074628,
+    "apkSha256": "717b1c1039c9a295bea5d8ac568eb265cf0d62293a44c3c6cf22590317142b68"
+  }
+]

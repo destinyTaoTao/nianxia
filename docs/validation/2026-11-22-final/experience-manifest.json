@@ -1,0 +1,9 @@
+{
+  "applicationId": "app.nianxia.nianxia.test",
+  "runId": "890b3f06-7bd4-4e78-937c-6a1af9ba9953",
+  "sourceDigest": "63541c31f2472b405d6d1f267ee9553a4c4b33f348e5de37e3c8026236aac349",
+  "apkSha256": "59e252710476bf607a4be5ba69eaf9f94819f820d3a01e3bc04f54d4e7c0d963",
+  "entry": "integration_test/preview/main.dart",
+  "mode": "profile",
+  "ordinaryCapture": true
+}

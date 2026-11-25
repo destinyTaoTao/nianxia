@@ -1,0 +1,20 @@
+{
+  "applicationId": "app.nianxia.nianxia.test",
+  "runId": "b9426dd4-1bcd-45f7-adc9-35262a91300e",
+  "case": "voice-append",
+  "passed": true,
+  "metrics": {
+    "themes": 2,
+    "capturePaths": 2,
+    "actualSavedAudio": 4,
+    "screenshots": 20,
+    "actualOrdinaryMicrophone": 1,
+    "actualNativeMicrophone": 1,
+    "actualPlayback": 1,
+    "appendsBeforeEachSave": 45,
+    "savedIdentityLocated": 1,
+    "originNavigation": 1,
+    "originalBodyUnchanged": 1,
+    "transcriptionControlled": 1
+  }
+}

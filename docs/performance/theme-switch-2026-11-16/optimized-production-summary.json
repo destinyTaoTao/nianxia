@@ -1,0 +1,60 @@
+{
+  "runId": "bbb8a282-9f80-4db3-9ba1-34c75f678094",
+  "scheduler": "production",
+  "idleFrames": 0,
+  "refreshRate": 60.000003814697266,
+  "selection": {
+    "first": {
+      "samples": 1,
+      "canvasFramework_p95_ms": 20.117,
+      "brightnessFramework_p95_ms": 20.116,
+      "frames": 9,
+      "build_p95_ms": 12.484,
+      "raster_p95_ms": 112.941,
+      "overBudgetFrames": 5,
+      "overBudgetPercent": 55.56
+    },
+    "warm": {
+      "samples": 29,
+      "canvasFramework_p95_ms": 54.736,
+      "brightnessFramework_p95_ms": 54.734,
+      "frames": 298,
+      "build_p95_ms": 4.996,
+      "raster_p95_ms": 85.545,
+      "overBudgetFrames": 225,
+      "overBudgetPercent": 75.5
+    },
+    "all": {
+      "samples": 30,
+      "canvasFramework_p95_ms": 54.736,
+      "brightnessFramework_p95_ms": 54.734,
+      "frames": 307,
+      "build_p95_ms": 4.996,
+      "raster_p95_ms": 86.461,
+      "overBudgetFrames": 230,
+      "overBudgetPercent": 74.92
+    }
+  },
+  "callbackControlWarm": {
+    "samples": 29,
+    "canvasFramework_p95_ms": 45.659,
+    "brightnessFramework_p95_ms": 45.658,
+    "frames": 183,
+    "build_p95_ms": 4.445,
+    "raster_p95_ms": 92.255,
+    "overBudgetFrames": 123,
+    "overBudgetPercent": 67.21
+  },
+  "sameChoiceControlWarm": {
+    "samples": 29,
+    "canvasFramework_p95_ms": 19.06,
+    "brightnessFramework_p95_ms": 19.059,
+    "frames": 425,
+    "build_p95_ms": 1.439,
+    "raster_p95_ms": 50.679,
+    "overBudgetFrames": 171,
+    "overBudgetPercent": 40.24
+  },
+  "storage_p95_ms": 2.494,
+  "themePairFactory_p95_ms": 1.123
+}

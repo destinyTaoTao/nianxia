@@ -1,0 +1,18 @@
+{
+  "date": "2026-11-22",
+  "hostCommand": "bash tool/check.sh",
+  "pythonTests": 48,
+  "analyzerIssues": 0,
+  "flutterTests": 462,
+  "hostPassed": true,
+  "nativeTests": 17,
+  "nativeFailures": 0,
+  "nativeExecutedDate": "2026-11-20",
+  "nativeUnchangedSince": true,
+  "themeRunId": "64e31458-c6ad-424b-9fc0-d9a935082308",
+  "offlineCombinedRunId": "962b7f0d-fdee-4cc5-ad42-66068c1db63a",
+  "experienceRunId": "890b3f06-7bd4-4e78-937c-6a1af9ba9953",
+  "formalContentsAccessed": false,
+  "committed": false,
+  "pushed": false
+}

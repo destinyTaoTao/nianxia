@@ -1,0 +1,27 @@
+PASS hold-recording screenshots 10
+RUN acceptance voice-query
+PASS voice-query screenshots 12
+RUN acceptance detail-edit
+PASS detail-edit screenshots 24
+RUN acceptance text-append
+PASS text-append screenshots 22
+RUN acceptance voice-append
+PASS voice-append screenshots 20
+RUN acceptance search-origin
+PASS search-origin screenshots 18
+RUN acceptance delete-confirmation
+PASS delete-confirmation screenshots 14
+RUN acceptance explicit-search
+PASS explicit-search screenshots 20
+RUN acceptance continuous-home
+PASS continuous-home screenshots 8
+RUN acceptance local-jobs
+PASS local-jobs screenshots 0
+RUN acceptance diagnostics
+PASS diagnostics screenshots 0
+RUN acceptance continuous-workflow
+PASS continuous-workflow screenshots 8
+RUN acceptance theme-performance
+PASS theme-performance screenshots 0
+RUN capture engine-reconnect
+FAILED engine-reconnect exit 1

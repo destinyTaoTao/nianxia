@@ -1,0 +1,15 @@
+{
+  "applicationId": "app.nianxia.nianxia.test",
+  "runId": "7ce6a633-663f-46f1-b24e-e6589c0c887b",
+  "case": "diagnostics",
+  "passed": true,
+  "metrics": {
+    "diagnosticBytes": 6144,
+    "previewBytes": 2285,
+    "diagnosticEntries": 9,
+    "dropped": 1744,
+    "retainedSourceRows": 2,
+    "futureStoreUnchanged": 1,
+    "contentSentinelsExported": 0
+  }
+}

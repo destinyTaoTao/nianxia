@@ -1,0 +1,32 @@
+{
+  "first": {
+    "fullColor_p95_ms": 75.671,
+    "brightness_p95_ms": 75.67,
+    "frames": 10,
+    "build_p95_ms": 7.893,
+    "raster_p95_ms": 165.044,
+    "overBudget": 9,
+    "totalSpanOver": 10
+  },
+  "warm": {
+    "fullColor_p95_ms": 179.372,
+    "brightness_p95_ms": 179.371,
+    "frames": 260,
+    "build_p95_ms": 9.502,
+    "raster_p95_ms": 110.636,
+    "overBudget": 225,
+    "totalSpanOver": 260
+  },
+  "all": {
+    "fullColor_p95_ms": 179.372,
+    "brightness_p95_ms": 179.371,
+    "frames": 270,
+    "build_p95_ms": 9.502,
+    "raster_p95_ms": 112.826,
+    "overBudget": 234,
+    "totalSpanOver": 270
+  },
+  "storage_p95_ms": 2.832,
+  "pair_factory_p95_ms": 1.48,
+  "refresh": 60.000003814697266
+}

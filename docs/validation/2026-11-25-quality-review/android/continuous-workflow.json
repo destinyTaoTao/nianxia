@@ -1,0 +1,15 @@
+{
+  "applicationId": "app.nianxia.nianxia.test",
+  "runId": "2e171e0e-1ffe-4b9d-81d3-920653db5582",
+  "case": "continuous-workflow",
+  "passed": true,
+  "metrics": {
+    "screenshots": 8,
+    "actualASR": 2,
+    "actualBGE": 1,
+    "networkAttempts": 0,
+    "textVoiceAppend": 1,
+    "failureRetry": 1,
+    "confirmedScopeDelete": 1
+  }
+}

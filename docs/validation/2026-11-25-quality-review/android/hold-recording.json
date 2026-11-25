@@ -1,0 +1,14 @@
+{
+  "applicationId": "app.nianxia.nianxia.test",
+  "runId": "6e19aa52-2620-4703-bfee-84c0bc055c24",
+  "case": "hold-recording",
+  "passed": true,
+  "metrics": {
+    "sourceRows": 4,
+    "normalSaves": 2,
+    "explicitCancels": 2,
+    "saveFailureAndRetry": 1,
+    "lightAndDarkScreens": 1,
+    "deviceMicrophone": 1
+  }
+}

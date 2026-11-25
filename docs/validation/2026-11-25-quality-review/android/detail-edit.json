@@ -1,0 +1,20 @@
+{
+  "applicationId": "app.nianxia.nianxia.test",
+  "runId": "c6c3e381-2762-4e76-8089-0710c3c0b4f7",
+  "case": "detail-edit",
+  "passed": true,
+  "metrics": {
+    "themes": 2,
+    "sourceRows": 4,
+    "screenshots": 24,
+    "actualPlayback": 1,
+    "pauseAndSeek": 1,
+    "actualKeyboard": 1,
+    "keyboardFontScale": 2,
+    "actualMicrophone": 1,
+    "casConflict": 1,
+    "originalAudioAndTranscriptUnchanged": 1,
+    "failedSwitchRecoveredCorrectParent": 1,
+    "noAutoplayAfterNavigation": 1
+  }
+}
