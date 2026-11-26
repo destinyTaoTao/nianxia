@@ -1,0 +1,185 @@
+{
+  "date": "2026-11-26",
+  "artifactChecksPassed": true,
+  "devicesTouched": false,
+  "candidates": [
+    {
+      "kind": "ordinary",
+      "applicationId": "app.nianxia.nianxia",
+      "label": "念下",
+      "mode": "release",
+      "entry": "lib/main.dart",
+      "artifact": "/Users/xiaodeng/chatgpt/nianxia/build/t14-candidates/2026-11-26/4dadd0dc-756d-42e8-8056-40a95589909b/nianxia-ordinary-release-INSPECTION-ONLY.apk",
+      "bytes": 51728673,
+      "sha256": "fbc24ecb96c46039f9996527a418ca1f4c9bcae18c56272d89b902b216ae1d55",
+      "abis": [
+        "arm64-v8a"
+      ],
+      "minSdk": 24,
+      "targetSdk": 36,
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_MICROPHONE",
+        "android.permission.INTERNET",
+        "android.permission.ACCESS_NETWORK_STATE",
+        "app.nianxia.nianxia.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
+      ],
+      "nativeLibraries": [
+        "lib/arm64-v8a/libapp.so",
+        "lib/arm64-v8a/libdartjni.so",
+        "lib/arm64-v8a/libflutter.so",
+        "lib/arm64-v8a/libonnxruntime.so",
+        "lib/arm64-v8a/libsherpa-onnx-c-api.so",
+        "lib/arm64-v8a/libsherpa-onnx-cxx-api.so",
+        "lib/arm64-v8a/libsqlite3.so"
+      ],
+      "signer": "C=US, O=Android, CN=Android Debug",
+      "certificateSha256": "19327ed06b9349ec0714b1e86a4a07fe67920394ce7ccc08fa6951349b120861",
+      "trialDebugSignature": true,
+      "validationProviderDeclared": false,
+      "built": true,
+      "installed": false,
+      "launched": false,
+      "runtimeAccepted": false,
+      "publicDistributionReady": false,
+      "checks": {
+        "applicationId": true,
+        "label": true,
+        "releaseNotDebuggable": true,
+        "minSdk24": true,
+        "targetSdk36": true,
+        "arm64Only": true,
+        "backupDisabled": true,
+        "cleartextDisabled": true,
+        "backupRulesExcludeAllDomains": true,
+        "cloudAndTransferExcludeAllDomains": true,
+        "noExperimentalCrypto": true,
+        "noModelWeights": true,
+        "noUserDataOrKeystoreFiles": true,
+        "modelManifestMatchesSource": true,
+        "modelLicenseFilesIncluded": true,
+        "expectedValidationProvider": true,
+        "signatureVerified": true,
+        "v2Signature": true,
+        "expectedPermissionSet": true
+      },
+      "backupResources": {
+        "fullBackupContent": {
+          "resourceId": "0x7f0e0000",
+          "apkPath": "res/Qq.xml"
+        },
+        "dataExtractionRules": {
+          "resourceId": "0x7f0e0001",
+          "apkPath": "res/4j.xml"
+        }
+      },
+      "sourceHead": "e6ba4689f7400c78e6e7d9dbd23b7e55aacee366",
+      "sourceDigest": "50f2bff745a84d193a8426733da41e3dd6963a5908671483bf3dcd600c2e6ebe",
+      "build": {
+        "exitCode": 0,
+        "seconds": 48.348,
+        "command": [
+          "flutter",
+          "build",
+          "apk",
+          "--release",
+          "--target-platform",
+          "android-arm64"
+        ]
+      }
+    },
+    {
+      "kind": "isolated",
+      "applicationId": "app.nianxia.nianxia.test",
+      "label": "念下·测试",
+      "mode": "release",
+      "entry": "integration_test/preview/main.dart",
+      "artifact": "/Users/xiaodeng/chatgpt/nianxia/build/t14-candidates/2026-11-26/4dadd0dc-756d-42e8-8056-40a95589909b/nianxia-test-release-candidate.apk",
+      "bytes": 51794281,
+      "sha256": "8648199431edecae6ca8b7f3de53ddcc9f7d2698e03e69aae5f120e53bc72f0e",
+      "abis": [
+        "arm64-v8a"
+      ],
+      "minSdk": 24,
+      "targetSdk": 36,
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_MICROPHONE",
+        "android.permission.INTERNET",
+        "android.permission.ACCESS_NETWORK_STATE",
+        "app.nianxia.nianxia.test.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
+      ],
+      "nativeLibraries": [
+        "lib/arm64-v8a/libapp.so",
+        "lib/arm64-v8a/libdartjni.so",
+        "lib/arm64-v8a/libflutter.so",
+        "lib/arm64-v8a/libonnxruntime.so",
+        "lib/arm64-v8a/libsherpa-onnx-c-api.so",
+        "lib/arm64-v8a/libsherpa-onnx-cxx-api.so",
+        "lib/arm64-v8a/libsqlite3.so"
+      ],
+      "signer": "C=US, O=Android, CN=Android Debug",
+      "certificateSha256": "19327ed06b9349ec0714b1e86a4a07fe67920394ce7ccc08fa6951349b120861",
+      "trialDebugSignature": true,
+      "validationProviderDeclared": true,
+      "built": true,
+      "installed": false,
+      "launched": false,
+      "runtimeAccepted": false,
+      "publicDistributionReady": false,
+      "checks": {
+        "applicationId": true,
+        "label": true,
+        "releaseNotDebuggable": true,
+        "minSdk24": true,
+        "targetSdk36": true,
+        "arm64Only": true,
+        "backupDisabled": true,
+        "cleartextDisabled": true,
+        "backupRulesExcludeAllDomains": true,
+        "cloudAndTransferExcludeAllDomains": true,
+        "noExperimentalCrypto": true,
+        "noModelWeights": true,
+        "noUserDataOrKeystoreFiles": true,
+        "modelManifestMatchesSource": true,
+        "modelLicenseFilesIncluded": true,
+        "expectedValidationProvider": true,
+        "signatureVerified": true,
+        "v2Signature": true,
+        "expectedPermissionSet": true
+      },
+      "backupResources": {
+        "fullBackupContent": {
+          "resourceId": "0x7f0e0000",
+          "apkPath": "res/Qq.xml"
+        },
+        "dataExtractionRules": {
+          "resourceId": "0x7f0e0001",
+          "apkPath": "res/4j.xml"
+        }
+      },
+      "sourceHead": "e6ba4689f7400c78e6e7d9dbd23b7e55aacee366",
+      "sourceDigest": "50f2bff745a84d193a8426733da41e3dd6963a5908671483bf3dcd600c2e6ebe",
+      "build": {
+        "exitCode": 0,
+        "seconds": 32.059,
+        "command": [
+          "flutter",
+          "build",
+          "apk",
+          "--release",
+          "--target",
+          "integration_test/preview/main.dart",
+          "--target-platform",
+          "android-arm64",
+          "--dart-define=UI_PREVIEW_RUN_ID=4dadd0dc-756d-42e8-8056-40a95589909b",
+          "--dart-define=UI_PREVIEW_SOURCE_DIGEST=50f2bff745a84d193a8426733da41e3dd6963a5908671483bf3dcd600c2e6ebe"
+        ],
+        "runId": "4dadd0dc-756d-42e8-8056-40a95589909b"
+      }
+    }
+  ],
+  "qualification": "build/package inspection only; debug-signed trials; no install/runtime/device acceptance"
+}

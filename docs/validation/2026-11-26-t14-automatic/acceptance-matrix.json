@@ -1,0 +1,1868 @@
+{
+  "issue": 15,
+  "sourceIssue": 1,
+  "sourceUrl": "https://github.com/destinyTaoTao/nianxia/issues/1",
+  "sourceHead": "e6ba4689f7400c78e6e7d9dbd23b7e55aacee366",
+  "date": "2026-11-26",
+  "scope": "evidence mapping and Android build inspection; no device operations",
+  "stories": [
+    {
+      "story": 1,
+      "requirement": "作为记录者，我希望无需注册即可记录，以便想到时直接开始。",
+      "implementation": [
+        "lib/main.dart",
+        "lib/app/notebook_session.dart"
+      ],
+      "automatedTests": [
+        "test/ui_test.dart",
+        "test/notebook_session_test.dart"
+      ],
+      "archivedAndroidEvidence": [
+        "docs/validation/2026-11-25-quality-review/android/continuous-home.json"
+      ],
+      "coverage": "host-and-isolated-android",
+      "archivedEvidenceDate": "2026-11-25",
+      "freshHostGate": "test/ and tool/tests references passed on 2026-11-26; integration_test references are archived only",
+      "targetDeviceAccepted": false,
+      "remainingAcceptance": "两端全新独立安装、无账号启动和隐私观察",
+      "testAnchors": [
+        {
+          "file": "test/ui_test.dart",
+          "namedTestsInFile": 23,
+          "sampleNames": [
+            "无正文的录音详情区分待处理、处理中和失败，不误报等待",
+            "合法JSON但字段损坏的整理缓存不影响打开详情",
+            "校验已有本地模型期间不提供重复下载入口"
+          ]
+        },
+        {
+          "file": "test/notebook_session_test.dart",
+          "namedTestsInFile": 3,
+          "sampleNames": [
+            "模型目录加载失败仍可记录和关键词查找",
+            "启动先返回资料库，完整孤儿维护可延后且不移动新录音",
+            "统一生命周期可重复关闭，持久内容保留"
+          ]
+        }
+      ]
+    },
+    {
+      "story": 2,
+      "requirement": "作为记录者，我希望点击“记一下”快速录音，以便不在打开工具时忘记想法。",
+      "implementation": [
+        "lib/ui/home_notebook.dart",
+        "lib/platform/capture_controller.dart"
+      ],
+      "automatedTests": [
+        "test/hold_recording_test.dart",
+        "test/recorder_ui_test.dart"
+      ],
+      "archivedAndroidEvidence": [
+        "docs/validation/2026-11-25-quality-review/android/hold-recording.json"
+      ],
+      "coverage": "host-and-isolated-android",
+      "archivedEvidenceDate": "2026-11-25",
+      "freshHostGate": "test/ and tool/tests references passed on 2026-11-26; integration_test references are archived only",
+      "targetDeviceAccepted": false,
+      "remainingAcceptance": "实际麦克风与点击至采集延迟",
+      "testAnchors": [
+        {
+          "file": "test/hold_recording_test.dart",
+          "namedTestsInFile": 20,
+          "sampleNames": [
+            "按住位置固定，模式禁用，松手只创建一条真实音频记录",
+            "上滑候选可移回且不重启，滞回内保持取消，区域松手不确认",
+            "系统pointer取消保留已采集音频，不能误作上滑丢弃"
+          ]
+        },
+        {
+          "file": "test/recorder_ui_test.dart",
+          "namedTestsInFile": 7,
+          "sampleNames": [
+            "准备期返回关闭页面并废止迟到授权",
+            "点按追加授权等待期间父被删除，不能声称尚未开始的音频仍保留",
+            "失败片段按返回键也必须确认，不直接关闭"
+          ]
+        }
+      ]
+    },
+    {
+      "story": 3,
+      "requirement": "作为记录者，我希望从系统快捷动作进入记录，以便减少启动步骤。",
+      "implementation": [
+        "lib/main.dart",
+        "lib/ui/capsule.dart"
+      ],
+      "automatedTests": [
+        "test/capsule_test.dart"
+      ],
+      "archivedAndroidEvidence": [
+        "docs/validation/2026-11-25-quality-review/android/continuous-workflow.json"
+      ],
+      "coverage": "host-and-isolated-android",
+      "archivedEvidenceDate": "2026-11-25",
+      "freshHostGate": "test/ and tool/tests references passed on 2026-11-26; integration_test references are archived only",
+      "targetDeviceAccepted": false,
+      "remainingAcceptance": "两端桌面快捷动作与OEM入口",
+      "testAnchors": [
+        {
+          "file": "test/capsule_test.dart",
+          "namedTestsInFile": 4,
+          "sampleNames": [
+            "外部呼出只显示录音胶囊，重复呼出不重启，保存后才可返回",
+            "热启动胶囊保存后保留尚未保存的文字编辑",
+            "权限拒绝明确告知且没有虚假保存，仍可退出"
+          ]
+        }
+      ]
+    },
+    {
+      "story": 4,
+      "requirement": "作为记录者，我希望直接输入文字，以便不方便说话时仍能记录。",
+      "implementation": [
+        "lib/ui/home_notebook.dart",
+        "lib/app/notebook.dart"
+      ],
+      "automatedTests": [
+        "test/continuous_home_test.dart",
+        "test/text_submission_test.dart"
+      ],
+      "archivedAndroidEvidence": [
+        "docs/validation/2026-11-25-quality-review/android/continuous-home.json"
+      ],
+      "coverage": "host-and-isolated-android",
+      "archivedEvidenceDate": "2026-11-25",
+      "freshHostGate": "test/ and tool/tests references passed on 2026-11-26; integration_test references are archived only",
+      "targetDeviceAccepted": false,
+      "remainingAcceptance": "两端中文输入法与保存体验",
+      "testAnchors": [
+        {
+          "file": "test/continuous_home_test.dart",
+          "namedTestsInFile": 4,
+          "sampleNames": [
+            "首页按原当地日期分组并显示时间列，底部文字保存失败可重试",
+            "文字草稿遇快捷录音收起仍保留，隐藏输入不能持有焦点",
+            "跨页同日不重复标题，按创建offset展示日期而不重新排序"
+          ]
+        },
+        {
+          "file": "test/text_submission_test.dart",
+          "namedTestsInFile": 4,
+          "sampleNames": [
+            "同一文字保存意图并发与超时观察重试共享身份，成功后删除也不复活",
+            "失败可重试，父消失只在明确独立保存后转换且继续复用身份",
+            "已提交但未收到回执的身份只返回现有记录，不覆盖后续编辑"
+          ]
+        }
+      ]
+    },
+    {
+      "story": 5,
+      "requirement": "作为记录者，我希望看见真实录音状态、时长和停止按钮，以便知道设备确实正在采集。",
+      "implementation": [
+        "lib/platform/capture_controller.dart",
+        "lib/ui/recorder.dart"
+      ],
+      "automatedTests": [
+        "test/device_microphone_test.dart",
+        "test/capture_controller_test.dart"
+      ],
+      "archivedAndroidEvidence": [
+        "docs/validation/2026-11-25-quality-review/android/hold-recording.json"
+      ],
+      "coverage": "host-and-isolated-android",
+      "archivedEvidenceDate": "2026-11-25",
+      "freshHostGate": "test/ and tool/tests references passed on 2026-11-26; integration_test references are archived only",
+      "targetDeviceAccepted": false,
+      "remainingAcceptance": "真实输入音量、计时和录音完整性",
+      "testAnchors": [
+        {
+          "file": "test/device_microphone_test.dart",
+          "namedTestsInFile": 2,
+          "sampleNames": [
+            "流式采集的取消必须等待真实设备停止回执",
+            "未进入设备阶段的适配器关闭不初始化原生录音器"
+          ]
+        },
+        {
+          "file": "test/capture_controller_test.dart",
+          "namedTestsInFile": 16,
+          "sampleNames": [
+            "设备状态流错误由录音收口，停止并保存有效PCM而不产生未捕获异常",
+            "准备期结束会废止迟到授权，不再启动采集",
+            "重复启动共享准备过程，不再次请求授权"
+          ]
+        }
+      ]
+    },
+    {
+      "story": 6,
+      "requirement": "作为记录者，我希望两分钟上限提前可见并在到达时自动停止保存，以便避免悄悄截断或无限占用资源。",
+      "implementation": [
+        "lib/data/pcm_wave_writer.dart",
+        "lib/ui/common.dart"
+      ],
+      "automatedTests": [
+        "test/hold_recording_test.dart",
+        "test/capture_limit_hint_test.dart"
+      ],
+      "archivedAndroidEvidence": [
+        "docs/validation/2026-11-25-quality-review/android/hold-recording.json"
+      ],
+      "coverage": "host-and-isolated-android",
+      "archivedEvidenceDate": "2026-11-25",
+      "freshHostGate": "test/ and tool/tests references passed on 2026-11-26; integration_test references are archived only",
+      "targetDeviceAccepted": false,
+      "remainingAcceptance": "两端自然录音两分钟截止、提示及终态",
+      "testAnchors": [
+        {
+          "file": "test/hold_recording_test.dart",
+          "namedTestsInFile": 20,
+          "sampleNames": [
+            "按住位置固定，模式禁用，松手只创建一条真实音频记录",
+            "上滑候选可移回且不重启，滞回内保持取消，区域松手不确认",
+            "系统pointer取消保留已采集音频，不能误作上滑丢弃"
+          ]
+        },
+        {
+          "file": "test/capture_limit_hint_test.dart",
+          "namedTestsInFile": 1,
+          "sampleNames": [
+            "${brightness.name} 截止提示只在临近且仍录音时播报，窄屏大字不溢出"
+          ]
+        }
+      ]
+    },
+    {
+      "story": 7,
+      "requirement": "作为记录者，我希望停止后先保存，再进行模型处理，以便无需等转写就能离开。",
+      "implementation": [
+        "lib/platform/capture_controller.dart",
+        "lib/app/background_tasks.dart"
+      ],
+      "automatedTests": [
+        "test/recording_search_test.dart",
+        "test/background_tasks_test.dart"
+      ],
+      "archivedAndroidEvidence": [
+        "docs/validation/2026-11-25-quality-review/android/continuous-workflow.json"
+      ],
+      "coverage": "host-and-isolated-android",
+      "archivedEvidenceDate": "2026-11-25",
+      "freshHostGate": "test/ and tool/tests references passed on 2026-11-26; integration_test references are archived only",
+      "targetDeviceAccepted": false,
+      "remainingAcceptance": "两端真实模型负载下先保存后处理",
+      "testAnchors": [
+        {
+          "file": "test/recording_search_test.dart",
+          "namedTestsInFile": 9,
+          "sampleNames": [
+            "录音先验证落盘，转写不覆盖并发编辑，删除后不复活",
+            "重启恢复中断的有效 WAV，取消及查询不会产生记录",
+            "追加可查，日期可筛选，编辑删除与收藏持久一致"
+          ]
+        },
+        {
+          "file": "test/background_tasks_test.dart",
+          "namedTestsInFile": 3,
+          "sampleNames": [
+            "切换模型代际后重新索引上一代失败的同修订记录",
+            "就绪检查I/O失败被调度器收口，状态恢复后可继续处理",
+            "模型处理中保存的新录音会接续转写，不必重启应用"
+          ]
+        }
+      ]
+    },
+    {
+      "story": 8,
+      "requirement": "作为记录者，我希望取消录音明确表示丢弃，以便不会因导航误丢内容。",
+      "implementation": [
+        "lib/ui/recorder.dart",
+        "lib/ui/hold_recorder.dart"
+      ],
+      "automatedTests": [
+        "test/recorder_ui_test.dart",
+        "test/hold_recording_test.dart"
+      ],
+      "archivedAndroidEvidence": [
+        "docs/validation/2026-11-25-quality-review/android/hold-recording.json"
+      ],
+      "coverage": "host-and-isolated-android",
+      "archivedEvidenceDate": "2026-11-25",
+      "freshHostGate": "test/ and tool/tests references passed on 2026-11-26; integration_test references are archived only",
+      "targetDeviceAccepted": false,
+      "remainingAcceptance": "自然手势与辅助技术取消确认",
+      "testAnchors": [
+        {
+          "file": "test/recorder_ui_test.dart",
+          "namedTestsInFile": 7,
+          "sampleNames": [
+            "准备期返回关闭页面并废止迟到授权",
+            "点按追加授权等待期间父被删除，不能声称尚未开始的音频仍保留",
+            "失败片段按返回键也必须确认，不直接关闭"
+          ]
+        },
+        {
+          "file": "test/hold_recording_test.dart",
+          "namedTestsInFile": 20,
+          "sampleNames": [
+            "按住位置固定，模式禁用，松手只创建一条真实音频记录",
+            "上滑候选可移回且不重启，滞回内保持取消，区域松手不确认",
+            "系统pointer取消保留已采集音频，不能误作上滑丢弃"
+          ]
+        }
+      ]
+    },
+    {
+      "story": 9,
+      "requirement": "作为记录者，我希望来电或进程中断后尽量恢复有效片段，以便了解哪些内容已经保住。",
+      "implementation": [
+        "lib/app/notebook.dart",
+        "lib/platform/capture_controller.dart"
+      ],
+      "automatedTests": [
+        "test/recording_search_test.dart",
+        "test/capture_release_safety_test.dart"
+      ],
+      "archivedAndroidEvidence": [
+        "docs/validation/2026-11-25-quality-review/android/engine-reconnect.json"
+      ],
+      "coverage": "host-and-isolated-android",
+      "archivedEvidenceDate": "2026-11-25",
+      "freshHostGate": "test/ and tool/tests references passed on 2026-11-26; integration_test references are archived only",
+      "targetDeviceAccepted": false,
+      "remainingAcceptance": "来电、锁屏、撤权、系统回收及OEM后台策略；不承诺强杀无损",
+      "testAnchors": [
+        {
+          "file": "test/recording_search_test.dart",
+          "namedTestsInFile": 9,
+          "sampleNames": [
+            "录音先验证落盘，转写不覆盖并发编辑，删除后不复活",
+            "重启恢复中断的有效 WAV，取消及查询不会产生记录",
+            "追加可查，日期可筛选，编辑删除与收藏持久一致"
+          ]
+        },
+        {
+          "file": "test/capture_release_safety_test.dart",
+          "namedTestsInFile": 8,
+          "sampleNames": [
+            "停止取消关闭均失败，仍占用设备且重试不能假报保存成功",
+            "dispose等待真实关闭，其他入口及资料库不能绕过未确认设备",
+            "重试确认停录后保存仍失败，也释放设备占用并保留可重试音频"
+          ]
+        }
+      ],
+      "evidenceQualification": "engine-reconnect是受控原生路径，不能证明默认录音后台持续采集或强杀无损。"
+    },
+    {
+      "story": 10,
+      "requirement": "作为记录者，我希望保存失败显示具体原因且不虚报成功，以便及时处理空间或设备问题。",
+      "implementation": [
+        "lib/platform/capture_controller.dart",
+        "lib/app/notebook.dart"
+      ],
+      "automatedTests": [
+        "test/capture_release_safety_test.dart",
+        "test/transcription_recovery_test.dart"
+      ],
+      "archivedAndroidEvidence": [
+        "docs/validation/2026-11-25-quality-review/android/voice-append.json"
+      ],
+      "coverage": "host-and-isolated-android",
+      "archivedEvidenceDate": "2026-11-25",
+      "freshHostGate": "test/ and tool/tests references passed on 2026-11-26; integration_test references are archived only",
+      "targetDeviceAccepted": false,
+      "remainingAcceptance": "目标设备磁盘/权限/设备异常的实际反馈",
+      "testAnchors": [
+        {
+          "file": "test/capture_release_safety_test.dart",
+          "namedTestsInFile": 8,
+          "sampleNames": [
+            "停止取消关闭均失败，仍占用设备且重试不能假报保存成功",
+            "dispose等待真实关闭，其他入口及资料库不能绕过未确认设备",
+            "重试确认停录后保存仍失败，也释放设备占用并保留可重试音频"
+          ]
+        },
+        {
+          "file": "test/transcription_recovery_test.dart",
+          "namedTestsInFile": 2,
+          "sampleNames": [
+            "running写入失败后释放在途标记，原音和正文保留，同会话可再转写",
+            "失败状态写入也失败时保留推理原始错误，之后仍能重试"
+          ]
+        }
+      ]
+    },
+    {
+      "story": 11,
+      "requirement": "作为记录者，我希望离线转写中文和混合技术词，以便没有网络时也能回看文字。",
+      "implementation": [
+        "lib/platform/local_models.dart",
+        "assets/models.json"
+      ],
+      "automatedTests": [
+        "test/models_test.dart",
+        "test/inference_lifecycle_test.dart"
+      ],
+      "archivedAndroidEvidence": [
+        "docs/validation/2026-11-25-quality-review/android/continuous-workflow.json"
+      ],
+      "coverage": "host-and-isolated-android",
+      "archivedEvidenceDate": "2026-11-25",
+      "freshHostGate": "test/ and tool/tests references passed on 2026-11-26; integration_test references are archived only",
+      "targetDeviceAccepted": false,
+      "remainingAcceptance": "50条自然口述：术语、数字、噪声、否定和改口",
+      "testAnchors": [
+        {
+          "file": "test/models_test.dart",
+          "namedTestsInFile": 4,
+          "sampleNames": [
+            "识别引擎未就绪错误不承诺调用方音频的保留状态",
+            "下载文件大小及 SHA-256 都正确后才原子启用，损坏重试保留旧版本",
+            "BGE tokenizer 保留大小写，中文拆字，WordPiece 与特殊 token 对齐"
+          ]
+        },
+        {
+          "file": "test/inference_lifecycle_test.dart",
+          "namedTestsInFile": 2,
+          "sampleNames": [
+            "closeWaitsForNativeRelease even after pending caller is rejected",
+            "capturePriorityPausesQueuedWork and preserves foreground ordering on resume"
+          ]
+        }
+      ],
+      "evidenceQualification": "公开PCM/合成资料只证明实现闭环，不能替代自然口述或人工标注质量。"
+    },
+    {
+      "story": 12,
+      "requirement": "作为记录者，我希望保留音频和原始转写，以便核查识别错误。",
+      "implementation": [
+        "lib/domain/record.dart",
+        "lib/ui/detail.dart"
+      ],
+      "automatedTests": [
+        "test/recording_search_test.dart",
+        "test/edit_conflict_test.dart"
+      ],
+      "archivedAndroidEvidence": [
+        "docs/validation/2026-11-25-quality-review/android/detail-edit.json"
+      ],
+      "coverage": "host-and-isolated-android",
+      "archivedEvidenceDate": "2026-11-25",
+      "freshHostGate": "test/ and tool/tests references passed on 2026-11-26; integration_test references are archived only",
+      "targetDeviceAccepted": false,
+      "remainingAcceptance": "真机原音回放与识别原文核对",
+      "testAnchors": [
+        {
+          "file": "test/recording_search_test.dart",
+          "namedTestsInFile": 9,
+          "sampleNames": [
+            "录音先验证落盘，转写不覆盖并发编辑，删除后不复活",
+            "重启恢复中断的有效 WAV，取消及查询不会产生记录",
+            "追加可查，日期可筛选，编辑删除与收藏持久一致"
+          ]
+        },
+        {
+          "file": "test/edit_conflict_test.dart",
+          "namedTestsInFile": 8,
+          "sampleNames": [
+            "正文恢复原样视为未改，返回不确认也不写新revision",
+            "CAS冲突保留草稿，可查看新正文及复制，确认载入后用新revision保存",
+            "编辑期间记录被删时保留草稿供复制，不复活或另存记录"
+          ]
+        }
+      ]
+    },
+    {
+      "story": 13,
+      "requirement": "作为记录者，我希望修订正文且重试不覆盖我的编辑，以便修正结果可靠保留。",
+      "implementation": [
+        "lib/app/notebook.dart",
+        "lib/data/record_repository.dart"
+      ],
+      "automatedTests": [
+        "test/recording_search_test.dart",
+        "test/transcription_recovery_test.dart"
+      ],
+      "archivedAndroidEvidence": [
+        "docs/validation/2026-11-25-quality-review/android/detail-edit.json"
+      ],
+      "coverage": "host-and-isolated-android",
+      "archivedEvidenceDate": "2026-11-25",
+      "freshHostGate": "test/ and tool/tests references passed on 2026-11-26; integration_test references are archived only",
+      "targetDeviceAccepted": false,
+      "remainingAcceptance": "两端实际推理与编辑交错",
+      "testAnchors": [
+        {
+          "file": "test/recording_search_test.dart",
+          "namedTestsInFile": 9,
+          "sampleNames": [
+            "录音先验证落盘，转写不覆盖并发编辑，删除后不复活",
+            "重启恢复中断的有效 WAV，取消及查询不会产生记录",
+            "追加可查，日期可筛选，编辑删除与收藏持久一致"
+          ]
+        },
+        {
+          "file": "test/transcription_recovery_test.dart",
+          "namedTestsInFile": 2,
+          "sampleNames": [
+            "running写入失败后释放在途标记，原音和正文保留，同会话可再转写",
+            "失败状态写入也失败时保留推理原始错误，之后仍能重试"
+          ]
+        }
+      ]
+    },
+    {
+      "story": 14,
+      "requirement": "作为记录者，我希望向已有记录追加文字或音频并保留独立时间，以便继续同一条思路。",
+      "implementation": [
+        "lib/ui/voice_append.dart",
+        "lib/ui/editor.dart"
+      ],
+      "automatedTests": [
+        "test/text_append_test.dart",
+        "test/voice_append_test.dart"
+      ],
+      "archivedAndroidEvidence": [
+        "docs/validation/2026-11-25-quality-review/android/voice-append.json"
+      ],
+      "coverage": "host-and-isolated-android",
+      "archivedEvidenceDate": "2026-11-25",
+      "freshHostGate": "test/ and tool/tests references passed on 2026-11-26; integration_test references are archived only",
+      "targetDeviceAccepted": false,
+      "remainingAcceptance": "真机追加录音、时区及返回定位",
+      "testAnchors": [
+        {
+          "file": "test/text_append_test.dart",
+          "namedTestsInFile": 6,
+          "sampleNames": [
+            "追加持续显示所属，空白和放弃均不改变原记录",
+            "95次追加后保存直接定位本次内容，重复点击只保存一次，前后窗口可继续浏览",
+            "追加保存故障保留正文，重试成功不覆盖原记录"
+          ]
+        },
+        {
+          "file": "test/voice_append_test.dart",
+          "namedTestsInFile": 13,
+          "sampleNames": [
+            "按住前所属已删除，不宣称保留音频或提供无片段的独立保存",
+            "默认不开麦，95次后按住松手定位实际音频，转写失败仍可回放",
+            "上滑取消不追加也不改变原正文"
+          ]
+        }
+      ]
+    },
+    {
+      "story": 15,
+      "requirement": "作为记录者，我希望按时间回看和收藏记录，以便快速定位近期或重要内容。",
+      "implementation": [
+        "lib/ui/home.dart",
+        "lib/ui/home_notebook.dart"
+      ],
+      "automatedTests": [
+        "test/continuous_home_test.dart",
+        "test/ui_test.dart"
+      ],
+      "archivedAndroidEvidence": [
+        "docs/validation/2026-11-25-quality-review/android/continuous-home.json"
+      ],
+      "coverage": "host-and-isolated-android",
+      "archivedEvidenceDate": "2026-11-25",
+      "freshHostGate": "test/ and tool/tests references passed on 2026-11-26; integration_test references are archived only",
+      "targetDeviceAccepted": false,
+      "remainingAcceptance": "两端大量真实长度合成记录的滚动手感",
+      "testAnchors": [
+        {
+          "file": "test/continuous_home_test.dart",
+          "namedTestsInFile": 4,
+          "sampleNames": [
+            "首页按原当地日期分组并显示时间列，底部文字保存失败可重试",
+            "文字草稿遇快捷录音收起仍保留，隐藏输入不能持有焦点",
+            "跨页同日不重复标题，按创建offset展示日期而不重新排序"
+          ]
+        },
+        {
+          "file": "test/ui_test.dart",
+          "namedTestsInFile": 23,
+          "sampleNames": [
+            "无正文的录音详情区分待处理、处理中和失败，不误报等待",
+            "合法JSON但字段损坏的整理缓存不影响打开详情",
+            "校验已有本地模型期间不提供重复下载入口"
+          ]
+        }
+      ]
+    },
+    {
+      "story": 16,
+      "requirement": "作为记录者，我希望删除时明确整组范围，并清理音频、派生结果和索引，以便删除真实生效。",
+      "implementation": [
+        "lib/data/record_repository.dart",
+        "lib/ui/detail.dart"
+      ],
+      "automatedTests": [
+        "test/delete_scope_test.dart",
+        "test/delete_confirmation_test.dart"
+      ],
+      "archivedAndroidEvidence": [
+        "docs/validation/2026-11-25-quality-review/android/delete-confirmation.json"
+      ],
+      "coverage": "host-and-isolated-android",
+      "archivedEvidenceDate": "2026-11-25",
+      "freshHostGate": "test/ and tool/tests references passed on 2026-11-26; integration_test references are archived only",
+      "targetDeviceAccepted": false,
+      "remainingAcceptance": "真机整组/单次删除及后续重启一致性",
+      "testAnchors": [
+        {
+          "file": "test/delete_scope_test.dart",
+          "namedTestsInFile": 3,
+          "sampleNames": [
+            "确认后新增或移除使旧范围失效，必须重新确认",
+            "数量相同但成员替换以及同ID同版本改写都使确认失效",
+            "删除失败整组和音频均保留，单次删除不影响所属及其他追加"
+          ]
+        },
+        {
+          "file": "test/delete_confirmation_test.dart",
+          "namedTestsInFile": 6,
+          "sampleNames": [
+            "取消整组确认不改任何记录或所属",
+            "确认期间新增追加使确认失效，留页重新确认后才整组删除",
+            "真实SQL删除失败留页并保留内容，解除故障可重试"
+          ]
+        }
+      ]
+    },
+    {
+      "story": 17,
+      "requirement": "作为查找者，我希望通过文字关键词查找，以便精确找到技术名词或产品名。",
+      "implementation": [
+        "lib/ui/search.dart",
+        "lib/app/record_search.dart"
+      ],
+      "automatedTests": [
+        "test/explicit_search_test.dart",
+        "test/search_baseline_test.dart"
+      ],
+      "archivedAndroidEvidence": [
+        "docs/validation/2026-11-25-quality-review/android/explicit-search.json"
+      ],
+      "coverage": "host-and-isolated-android",
+      "archivedEvidenceDate": "2026-11-25",
+      "freshHostGate": "test/ and tool/tests references passed on 2026-11-26; integration_test references are archived only",
+      "targetDeviceAccepted": false,
+      "remainingAcceptance": "目标设备热/冷关键词性能",
+      "testAnchors": [
+        {
+          "file": "test/explicit_search_test.dart",
+          "namedTestsInFile": 12,
+          "sampleNames": [
+            "输入不自动查找，键盘提交才展示结果，清空立即撤销结果",
+            "改词保留旧结果并注明所属查询，失败保留输入和旧结果，恢复后可重试",
+            "日期快捷项包含日历端点并按各记录创建offset筛选"
+          ]
+        },
+        {
+          "file": "test/search_baseline_test.dart",
+          "namedTestsInFile": 1,
+          "sampleNames": [
+            "1000 条短记录的关键词查找基线，编辑后结果可观察更新"
+          ]
+        }
+      ]
+    },
+    {
+      "story": 18,
+      "requirement": "作为查找者，我希望用语音说出查询，以便随时找回想法。",
+      "implementation": [
+        "lib/ui/voice_query.dart",
+        "lib/platform/capture_controller.dart"
+      ],
+      "automatedTests": [
+        "test/voice_query_test.dart"
+      ],
+      "archivedAndroidEvidence": [
+        "docs/validation/2026-11-25-quality-review/android/voice-query.json"
+      ],
+      "coverage": "host-and-isolated-android",
+      "archivedEvidenceDate": "2026-11-25",
+      "freshHostGate": "test/ and tool/tests references passed on 2026-11-26; integration_test references are archived only",
+      "targetDeviceAccepted": false,
+      "remainingAcceptance": "两端真实麦克风语音线索",
+      "testAnchors": [
+        {
+          "file": "test/voice_query_test.dart",
+          "namedTestsInFile": 20,
+          "sampleNames": [
+            "语音入口不自动开麦，按住松手识别仅供校对，确认才查找且清理临时音频",
+            "上滑取消不识别不入库，改用文字保留原输入",
+            "准备期松手废止迟到授权，不稍后启动查询"
+          ]
+        }
+      ]
+    },
+    {
+      "story": 19,
+      "requirement": "作为查找者，我希望修改识别后的查询文字，以便纠正口误或转写错误。",
+      "implementation": [
+        "lib/ui/search.dart",
+        "lib/ui/voice_query.dart"
+      ],
+      "automatedTests": [
+        "test/voice_query_test.dart",
+        "test/explicit_search_test.dart"
+      ],
+      "archivedAndroidEvidence": [
+        "docs/validation/2026-11-25-quality-review/android/voice-query.json"
+      ],
+      "coverage": "host-and-isolated-android",
+      "archivedEvidenceDate": "2026-11-25",
+      "freshHostGate": "test/ and tool/tests references passed on 2026-11-26; integration_test references are archived only",
+      "targetDeviceAccepted": false,
+      "remainingAcceptance": "中文输入法校对与焦点体验",
+      "testAnchors": [
+        {
+          "file": "test/voice_query_test.dart",
+          "namedTestsInFile": 20,
+          "sampleNames": [
+            "语音入口不自动开麦，按住松手识别仅供校对，确认才查找且清理临时音频",
+            "上滑取消不识别不入库，改用文字保留原输入",
+            "准备期松手废止迟到授权，不稍后启动查询"
+          ]
+        },
+        {
+          "file": "test/explicit_search_test.dart",
+          "namedTestsInFile": 12,
+          "sampleNames": [
+            "输入不自动查找，键盘提交才展示结果，清空立即撤销结果",
+            "改词保留旧结果并注明所属查询，失败保留输入和旧结果，恢复后可重试",
+            "日期快捷项包含日历端点并按各记录创建offset筛选"
+          ]
+        }
+      ]
+    },
+    {
+      "story": 20,
+      "requirement": "作为查找者，我希望不同表达也能找到语义相关内容，以便不必记住原话。",
+      "implementation": [
+        "lib/app/record_search.dart",
+        "lib/platform/local_models.dart"
+      ],
+      "automatedTests": [
+        "test/recording_search_test.dart",
+        "test/indexed_search_test.dart"
+      ],
+      "archivedAndroidEvidence": [
+        "docs/validation/2026-11-25-quality-review/android/continuous-workflow.json"
+      ],
+      "coverage": "host-and-isolated-android",
+      "archivedEvidenceDate": "2026-11-25",
+      "freshHostGate": "test/ and tool/tests references passed on 2026-11-26; integration_test references are archived only",
+      "targetDeviceAccepted": false,
+      "remainingAcceptance": "至少30条人工标注有答案查询Top-3≥90%，独立验收集",
+      "testAnchors": [
+        {
+          "file": "test/recording_search_test.dart",
+          "namedTestsInFile": 9,
+          "sampleNames": [
+            "录音先验证落盘，转写不覆盖并发编辑，删除后不复活",
+            "重启恢复中断的有效 WAV，取消及查询不会产生记录",
+            "追加可查，日期可筛选，编辑删除与收藏持久一致"
+          ]
+        },
+        {
+          "file": "test/indexed_search_test.dart",
+          "namedTestsInFile": 11,
+          "sampleNames": [
+            "关键词保留一字、二字、长子串以及全半角和大小写兼容",
+            "候选字符全部存在也不能把非连续子串误当精确命中",
+            "长正文尾部的中文子串可查并返回原文片段"
+          ]
+        }
+      ],
+      "evidenceQualification": "公开PCM/合成资料只证明实现闭环，不能替代自然口述或人工标注质量。"
+    },
+    {
+      "story": 21,
+      "requirement": "作为查找者，我希望显式选择和清除日期条件，以便控制搜索范围。",
+      "implementation": [
+        "lib/ui/search.dart",
+        "lib/domain/search_page.dart"
+      ],
+      "automatedTests": [
+        "test/explicit_search_test.dart"
+      ],
+      "archivedAndroidEvidence": [
+        "docs/validation/2026-11-25-quality-review/android/explicit-search.json"
+      ],
+      "coverage": "host-and-isolated-android",
+      "archivedEvidenceDate": "2026-11-25",
+      "freshHostGate": "test/ and tool/tests references passed on 2026-11-26; integration_test references are archived only",
+      "targetDeviceAccepted": false,
+      "remainingAcceptance": "两端时区/日期选择器实际交互",
+      "testAnchors": [
+        {
+          "file": "test/explicit_search_test.dart",
+          "namedTestsInFile": 12,
+          "sampleNames": [
+            "输入不自动查找，键盘提交才展示结果，清空立即撤销结果",
+            "改词保留旧结果并注明所属查询，失败保留输入和旧结果，恢复后可重试",
+            "日期快捷项包含日历端点并按各记录创建offset筛选"
+          ]
+        }
+      ]
+    },
+    {
+      "story": 22,
+      "requirement": "作为查找者，我希望结果展示日期、命中正文和音频入口，以便核对来源。",
+      "implementation": [
+        "lib/ui/search.dart",
+        "lib/ui/result_playback.dart"
+      ],
+      "automatedTests": [
+        "test/search_origin_test.dart",
+        "test/search_projection_test.dart"
+      ],
+      "archivedAndroidEvidence": [
+        "docs/validation/2026-11-25-quality-review/android/search-origin.json"
+      ],
+      "coverage": "host-and-isolated-android",
+      "archivedEvidenceDate": "2026-11-25",
+      "freshHostGate": "test/ and tool/tests references passed on 2026-11-26; integration_test references are archived only",
+      "targetDeviceAccepted": false,
+      "remainingAcceptance": "真机结果回放、原文与日期核对",
+      "testAnchors": [
+        {
+          "file": "test/search_origin_test.dart",
+          "namedTestsInFile": 7,
+          "sampleNames": [
+            "所属链接打开原记录，命中标题打开追加，返回保留查询且不预载音频",
+            "音频按需播放、暂停及两条互斥，清空查找停止旧回放",
+            "跨页所属导航返回保留日期关键词及像素位置"
+          ]
+        },
+        {
+          "file": "test/search_projection_test.dart",
+          "namedTestsInFile": 1,
+          "sampleNames": [
+            "同页父摘要与命中片段有界，不改变分页排名和完整原文"
+          ]
+        }
+      ]
+    },
+    {
+      "story": 23,
+      "requirement": "作为查找者，我希望追加内容同样可查且能返回所属记录，以便找回完整上下文。",
+      "implementation": [
+        "lib/ui/search.dart",
+        "lib/ui/detail.dart"
+      ],
+      "automatedTests": [
+        "test/search_origin_test.dart",
+        "test/text_append_test.dart"
+      ],
+      "archivedAndroidEvidence": [
+        "docs/validation/2026-11-25-quality-review/android/search-origin.json"
+      ],
+      "coverage": "host-and-isolated-android",
+      "archivedEvidenceDate": "2026-11-25",
+      "freshHostGate": "test/ and tool/tests references passed on 2026-11-26; integration_test references are archived only",
+      "targetDeviceAccepted": false,
+      "remainingAcceptance": "两端追加来源导航与返回状态",
+      "testAnchors": [
+        {
+          "file": "test/search_origin_test.dart",
+          "namedTestsInFile": 7,
+          "sampleNames": [
+            "所属链接打开原记录，命中标题打开追加，返回保留查询且不预载音频",
+            "音频按需播放、暂停及两条互斥，清空查找停止旧回放",
+            "跨页所属导航返回保留日期关键词及像素位置"
+          ]
+        },
+        {
+          "file": "test/text_append_test.dart",
+          "namedTestsInFile": 6,
+          "sampleNames": [
+            "追加持续显示所属，空白和放弃均不改变原记录",
+            "95次追加后保存直接定位本次内容，重复点击只保存一次，前后窗口可继续浏览",
+            "追加保存故障保留正文，重试成功不覆盖原记录"
+          ]
+        }
+      ]
+    },
+    {
+      "story": 24,
+      "requirement": "作为查找者，我希望无结果时可改查询且不会收到编造答案，以便信任系统。",
+      "implementation": [
+        "lib/ui/search.dart",
+        "lib/app/record_search.dart"
+      ],
+      "automatedTests": [
+        "test/explicit_search_test.dart",
+        "test/recording_search_test.dart"
+      ],
+      "archivedAndroidEvidence": [
+        "docs/validation/2026-11-25-quality-review/android/explicit-search.json"
+      ],
+      "coverage": "host-and-isolated-android",
+      "archivedEvidenceDate": "2026-11-25",
+      "freshHostGate": "test/ and tool/tests references passed on 2026-11-26; integration_test references are archived only",
+      "targetDeviceAccepted": false,
+      "remainingAcceptance": "人工无答案/相互矛盾查询集，不能用合成向量质量代替",
+      "testAnchors": [
+        {
+          "file": "test/explicit_search_test.dart",
+          "namedTestsInFile": 12,
+          "sampleNames": [
+            "输入不自动查找，键盘提交才展示结果，清空立即撤销结果",
+            "改词保留旧结果并注明所属查询，失败保留输入和旧结果，恢复后可重试",
+            "日期快捷项包含日历端点并按各记录创建offset筛选"
+          ]
+        },
+        {
+          "file": "test/recording_search_test.dart",
+          "namedTestsInFile": 9,
+          "sampleNames": [
+            "录音先验证落盘，转写不覆盖并发编辑，删除后不复活",
+            "重启恢复中断的有效 WAV，取消及查询不会产生记录",
+            "追加可查，日期可筛选，编辑删除与收藏持久一致"
+          ]
+        }
+      ],
+      "evidenceQualification": "公开PCM/合成资料只证明实现闭环，不能替代自然口述或人工标注质量。"
+    },
+    {
+      "story": 25,
+      "requirement": "作为查找者，我希望查询不自动存成笔记且临时音频被清理，以便保持记录整洁与隐私。",
+      "implementation": [
+        "lib/platform/capture_controller.dart",
+        "lib/app/notebook.dart"
+      ],
+      "automatedTests": [
+        "test/query_cleanup_safety_test.dart",
+        "test/voice_query_test.dart"
+      ],
+      "archivedAndroidEvidence": [
+        "docs/validation/2026-11-25-quality-review/android/voice-query.json"
+      ],
+      "coverage": "host-and-isolated-android",
+      "archivedEvidenceDate": "2026-11-25",
+      "freshHostGate": "test/ and tool/tests references passed on 2026-11-26; integration_test references are archived only",
+      "targetDeviceAccepted": false,
+      "remainingAcceptance": "真实权限/中断场景下查询清理和不入库",
+      "testAnchors": [
+        {
+          "file": "test/query_cleanup_safety_test.dart",
+          "namedTestsInFile": 1,
+          "sampleNames": [
+            "query cleanup never deletes source audio introduced while recognition runs"
+          ]
+        },
+        {
+          "file": "test/voice_query_test.dart",
+          "namedTestsInFile": 20,
+          "sampleNames": [
+            "语音入口不自动开麦，按住松手识别仅供校对，确认才查找且清理临时音频",
+            "上滑取消不识别不入库，改用文字保留原输入",
+            "准备期松手废止迟到授权，不稍后启动查询"
+          ]
+        }
+      ]
+    },
+    {
+      "story": 26,
+      "requirement": "作为离线用户，我希望模型下载前仍可打字、录音和关键词查找，以便首次使用不被下载阻塞。",
+      "implementation": [
+        "lib/app/notebook_session.dart",
+        "lib/ui/recorder.dart"
+      ],
+      "automatedTests": [
+        "test/notebook_session_test.dart",
+        "test/recorder_ui_test.dart"
+      ],
+      "archivedAndroidEvidence": [
+        "docs/validation/2026-11-25-quality-review/android/continuous-home.json"
+      ],
+      "coverage": "host-and-isolated-android",
+      "archivedEvidenceDate": "2026-11-25",
+      "freshHostGate": "test/ and tool/tests references passed on 2026-11-26; integration_test references are archived only",
+      "targetDeviceAccepted": false,
+      "remainingAcceptance": "两端首次无模型、无网络启动闭环",
+      "testAnchors": [
+        {
+          "file": "test/notebook_session_test.dart",
+          "namedTestsInFile": 3,
+          "sampleNames": [
+            "模型目录加载失败仍可记录和关键词查找",
+            "启动先返回资料库，完整孤儿维护可延后且不移动新录音",
+            "统一生命周期可重复关闭，持久内容保留"
+          ]
+        },
+        {
+          "file": "test/recorder_ui_test.dart",
+          "namedTestsInFile": 7,
+          "sampleNames": [
+            "准备期返回关闭页面并废止迟到授权",
+            "点按追加授权等待期间父被删除，不能声称尚未开始的音频仍保留",
+            "失败片段按返回键也必须确认，不直接关闭"
+          ]
+        }
+      ]
+    },
+    {
+      "story": 27,
+      "requirement": "作为离线用户，我希望看到下载大小、进度、失败与重试，以便管理存储和网络。",
+      "implementation": [
+        "lib/data/model_store.dart",
+        "lib/ui/settings.dart"
+      ],
+      "automatedTests": [
+        "test/models_test.dart",
+        "test/ui_test.dart"
+      ],
+      "archivedAndroidEvidence": [
+        "docs/validation/2026-11-25-quality-review/android/continuous-home.json"
+      ],
+      "coverage": "host-and-isolated-android",
+      "archivedEvidenceDate": "2026-11-25",
+      "freshHostGate": "test/ and tool/tests references passed on 2026-11-26; integration_test references are archived only",
+      "targetDeviceAccepted": false,
+      "remainingAcceptance": "真实网络下载进度、断点/失败、空间不足提示",
+      "testAnchors": [
+        {
+          "file": "test/models_test.dart",
+          "namedTestsInFile": 4,
+          "sampleNames": [
+            "识别引擎未就绪错误不承诺调用方音频的保留状态",
+            "下载文件大小及 SHA-256 都正确后才原子启用，损坏重试保留旧版本",
+            "BGE tokenizer 保留大小写，中文拆字，WordPiece 与特殊 token 对齐"
+          ]
+        },
+        {
+          "file": "test/ui_test.dart",
+          "namedTestsInFile": 23,
+          "sampleNames": [
+            "无正文的录音详情区分待处理、处理中和失败，不误报等待",
+            "合法JSON但字段损坏的整理缓存不影响打开详情",
+            "校验已有本地模型期间不提供重复下载入口"
+          ]
+        }
+      ]
+    },
+    {
+      "story": 28,
+      "requirement": "作为离线用户，我希望下载文件校验成功后才启用，以便损坏模型不破坏已有功能。",
+      "implementation": [
+        "lib/data/model_store.dart",
+        "assets/models.json"
+      ],
+      "automatedTests": [
+        "test/models_test.dart"
+      ],
+      "archivedAndroidEvidence": [
+        "docs/validation/2026-11-25-quality-review/android/continuous-workflow.json"
+      ],
+      "coverage": "host-and-isolated-android",
+      "archivedEvidenceDate": "2026-11-25",
+      "freshHostGate": "test/ and tool/tests references passed on 2026-11-26; integration_test references are archived only",
+      "targetDeviceAccepted": false,
+      "remainingAcceptance": "两端文件系统损坏/空间不足恢复；现有实际模型SHA校验可复用",
+      "testAnchors": [
+        {
+          "file": "test/models_test.dart",
+          "namedTestsInFile": 4,
+          "sampleNames": [
+            "识别引擎未就绪错误不承诺调用方音频的保留状态",
+            "下载文件大小及 SHA-256 都正确后才原子启用，损坏重试保留旧版本",
+            "BGE tokenizer 保留大小写，中文拆字，WordPiece 与特殊 token 对齐"
+          ]
+        }
+      ]
+    },
+    {
+      "story": 29,
+      "requirement": "作为离线用户，我希望模型准备后飞行模式完成记录与查找，以便不依赖网络或云端密钥。",
+      "implementation": [
+        "lib/platform/local_models.dart",
+        "lib/app/notebook.dart"
+      ],
+      "automatedTests": [
+        "test/recording_search_test.dart",
+        "integration_test/continuous_workflow_test.dart"
+      ],
+      "archivedAndroidEvidence": [
+        "docs/validation/2026-11-25-quality-review/android/continuous-workflow.json"
+      ],
+      "coverage": "host-and-isolated-android",
+      "archivedEvidenceDate": "2026-11-25",
+      "freshHostGate": "test/ and tool/tests references passed on 2026-11-26; integration_test references are archived only",
+      "targetDeviceAccepted": false,
+      "remainingAcceptance": "两台真机飞行模式全闭环及网络检查",
+      "testAnchors": [
+        {
+          "file": "test/recording_search_test.dart",
+          "namedTestsInFile": 9,
+          "sampleNames": [
+            "录音先验证落盘，转写不覆盖并发编辑，删除后不复活",
+            "重启恢复中断的有效 WAV，取消及查询不会产生记录",
+            "追加可查，日期可筛选，编辑删除与收藏持久一致"
+          ]
+        },
+        {
+          "file": "integration_test/continuous_workflow_test.dart",
+          "namedTestsInFile": 1,
+          "sampleNames": [
+            "offline combined continuous notebook with real models"
+          ]
+        }
+      ],
+      "evidenceQualification": "公开PCM/合成资料只证明实现闭环，不能替代自然口述或人工标注质量。"
+    },
+    {
+      "story": 30,
+      "requirement": "作为可选云端用户，我希望自己配置并清除 API Key，以便控制服务使用和费用。",
+      "implementation": [
+        "lib/platform/organizer.dart",
+        "lib/ui/settings.dart"
+      ],
+      "automatedTests": [
+        "test/cloud_calendar_test.dart"
+      ],
+      "archivedAndroidEvidence": [],
+      "coverage": "host-controlled-boundaries",
+      "archivedEvidenceDate": "2026-11-25",
+      "freshHostGate": "test/ and tool/tests references passed on 2026-11-26; integration_test references are archived only",
+      "targetDeviceAccepted": false,
+      "remainingAcceptance": "真机Keychain/Keystore配置、清除及非敏感测试Key（需另行授权）",
+      "testAnchors": [
+        {
+          "file": "test/cloud_calendar_test.dart",
+          "namedTestsInFile": 4,
+          "sampleNames": [
+            "逐次确认只发送单条正文，结果独立绑定修订，编辑后过期",
+            "并发删除和重复点击不会复活记录或重放付费请求",
+            "错误、重定向、空白、截断和无来源结果均失败且不自动重试"
+          ]
+        }
+      ],
+      "evidenceQualification": "受控host边界只证明程序规则，不证明真实云服务、安全存储、系统日历或系统分享界面。"
+    },
+    {
+      "story": 31,
+      "requirement": "作为可选云端用户，我希望发送前看到文本和服务商，以便主动决定哪些内容离开设备。",
+      "implementation": [
+        "lib/ui/detail.dart",
+        "lib/app/notebook.dart"
+      ],
+      "automatedTests": [
+        "test/cloud_calendar_test.dart"
+      ],
+      "archivedAndroidEvidence": [],
+      "coverage": "host-controlled-boundaries",
+      "archivedEvidenceDate": "2026-11-25",
+      "freshHostGate": "test/ and tool/tests references passed on 2026-11-26; integration_test references are archived only",
+      "targetDeviceAccepted": false,
+      "remainingAcceptance": "授权后一次真实请求仅发送确认单条文本",
+      "testAnchors": [
+        {
+          "file": "test/cloud_calendar_test.dart",
+          "namedTestsInFile": 4,
+          "sampleNames": [
+            "逐次确认只发送单条正文，结果独立绑定修订，编辑后过期",
+            "并发删除和重复点击不会复活记录或重放付费请求",
+            "错误、重定向、空白、截断和无来源结果均失败且不自动重试"
+          ]
+        }
+      ],
+      "evidenceQualification": "受控host边界只证明程序规则，不证明真实云服务、安全存储、系统日历或系统分享界面。"
+    },
+    {
+      "story": 32,
+      "requirement": "作为可选云端用户，我希望轻整理保留否定、条件和不确定性，以便原意不被润色改变。",
+      "implementation": [
+        "lib/domain/organization.dart",
+        "lib/platform/organizer.dart"
+      ],
+      "automatedTests": [
+        "test/cloud_calendar_test.dart",
+        "test/architecture_contract_test.dart"
+      ],
+      "archivedAndroidEvidence": [],
+      "coverage": "host-controlled-boundaries",
+      "archivedEvidenceDate": "2026-11-25",
+      "freshHostGate": "test/ and tool/tests references passed on 2026-11-26; integration_test references are archived only",
+      "targetDeviceAccepted": false,
+      "remainingAcceptance": "人工评审实际供应商输出的否定/条件/犹豫；需测试调用授权",
+      "testAnchors": [
+        {
+          "file": "test/cloud_calendar_test.dart",
+          "namedTestsInFile": 4,
+          "sampleNames": [
+            "逐次确认只发送单条正文，结果独立绑定修订，编辑后过期",
+            "并发删除和重复点击不会复活记录或重放付费请求",
+            "错误、重定向、空白、截断和无来源结果均失败且不自动重试"
+          ]
+        },
+        {
+          "file": "test/architecture_contract_test.dart",
+          "namedTestsInFile": 11,
+          "sampleNames": [
+            "并发保存同一录音只提交一次，所有调用返回同一记录",
+            "保存与丢弃交错时，迟到的丢弃不能删除已提交音频",
+            "查询推理期间切换模型代际，不与新索引混算"
+          ]
+        }
+      ],
+      "evidenceQualification": "受控host边界只证明程序规则，不证明真实云服务、安全存储、系统日历或系统分享界面。"
+    },
+    {
+      "story": 33,
+      "requirement": "作为可选云端用户，我希望整理结果与正文并存，以便比较且不丢原文。",
+      "implementation": [
+        "lib/app/notebook.dart",
+        "lib/ui/detail.dart"
+      ],
+      "automatedTests": [
+        "test/cloud_calendar_test.dart",
+        "test/derived_isolation_test.dart"
+      ],
+      "archivedAndroidEvidence": [],
+      "coverage": "host-controlled-boundaries",
+      "archivedEvidenceDate": "2026-11-25",
+      "freshHostGate": "test/ and tool/tests references passed on 2026-11-26; integration_test references are archived only",
+      "targetDeviceAccepted": false,
+      "remainingAcceptance": "真实供应商结果与正文并存核对",
+      "testAnchors": [
+        {
+          "file": "test/cloud_calendar_test.dart",
+          "namedTestsInFile": 4,
+          "sampleNames": [
+            "逐次确认只发送单条正文，结果独立绑定修订，编辑后过期",
+            "并发删除和重复点击不会复活记录或重放付费请求",
+            "错误、重定向、空白、截断和无来源结果均失败且不自动重试"
+          ]
+        },
+        {
+          "file": "test/derived_isolation_test.dart",
+          "namedTestsInFile": 9,
+          "sampleNames": [
+            "legal JSON with invalid organization fields is discarded on read",
+            "invalid input vector cannot poison original record",
+            "v1 bad derived JSON cannot block raw listing or get"
+          ]
+        }
+      ],
+      "evidenceQualification": "受控host边界只证明程序规则，不证明真实云服务、安全存储、系统日历或系统分享界面。"
+    },
+    {
+      "story": 34,
+      "requirement": "作为可选云端用户，我希望限流、超时或无效响应不影响本地记录，也不自动重试付费请求，以便费用和数据可控。",
+      "implementation": [
+        "lib/platform/organizer.dart",
+        "lib/app/notebook.dart"
+      ],
+      "automatedTests": [
+        "test/cloud_calendar_test.dart"
+      ],
+      "archivedAndroidEvidence": [],
+      "coverage": "host-controlled-boundaries",
+      "archivedEvidenceDate": "2026-11-25",
+      "freshHostGate": "test/ and tool/tests references passed on 2026-11-26; integration_test references are archived only",
+      "targetDeviceAccepted": false,
+      "remainingAcceptance": "授权真实服务错误/费用边界；本地错误注入可复用",
+      "testAnchors": [
+        {
+          "file": "test/cloud_calendar_test.dart",
+          "namedTestsInFile": 4,
+          "sampleNames": [
+            "逐次确认只发送单条正文，结果独立绑定修订，编辑后过期",
+            "并发删除和重复点击不会复活记录或重放付费请求",
+            "错误、重定向、空白、截断和无来源结果均失败且不自动重试"
+          ]
+        }
+      ],
+      "evidenceQualification": "受控host边界只证明程序规则，不证明真实云服务、安全存储、系统日历或系统分享界面。"
+    },
+    {
+      "story": 35,
+      "requirement": "作为安排事项的用户，我希望没有云端配置也能手动加入日历，以便提醒功能始终可用。",
+      "implementation": [
+        "lib/platform/calendar.dart",
+        "lib/ui/calendar_form.dart"
+      ],
+      "automatedTests": [
+        "test/cloud_calendar_test.dart",
+        "test/ui_test.dart"
+      ],
+      "archivedAndroidEvidence": [],
+      "coverage": "host-controlled-boundaries",
+      "archivedEvidenceDate": "2026-11-25",
+      "freshHostGate": "test/ and tool/tests references passed on 2026-11-26; integration_test references are archived only",
+      "targetDeviceAccepted": false,
+      "remainingAcceptance": "两端测试日历实际新增并收到提醒",
+      "testAnchors": [
+        {
+          "file": "test/cloud_calendar_test.dart",
+          "namedTestsInFile": 4,
+          "sampleNames": [
+            "逐次确认只发送单条正文，结果独立绑定修订，编辑后过期",
+            "并发删除和重复点击不会复活记录或重放付费请求",
+            "错误、重定向、空白、截断和无来源结果均失败且不自动重试"
+          ]
+        },
+        {
+          "file": "test/ui_test.dart",
+          "namedTestsInFile": 23,
+          "sampleNames": [
+            "无正文的录音详情区分待处理、处理中和失败，不误报等待",
+            "合法JSON但字段损坏的整理缓存不影响打开详情",
+            "校验已有本地模型期间不提供重复下载入口"
+          ]
+        }
+      ],
+      "evidenceQualification": "受控host边界只证明程序规则，不证明真实云服务、安全存储、系统日历或系统分享界面。"
+    },
+    {
+      "story": 36,
+      "requirement": "作为安排事项的用户，我希望从事项候选进入日期与提醒核对，以便减少搬运步骤。",
+      "implementation": [
+        "lib/ui/detail.dart",
+        "lib/ui/calendar_form.dart"
+      ],
+      "automatedTests": [
+        "test/cloud_calendar_test.dart"
+      ],
+      "archivedAndroidEvidence": [],
+      "coverage": "host-controlled-boundaries",
+      "archivedEvidenceDate": "2026-11-25",
+      "freshHostGate": "test/ and tool/tests references passed on 2026-11-26; integration_test references are archived only",
+      "targetDeviceAccepted": false,
+      "remainingAcceptance": "授权真实整理候选后进入系统核对",
+      "testAnchors": [
+        {
+          "file": "test/cloud_calendar_test.dart",
+          "namedTestsInFile": 4,
+          "sampleNames": [
+            "逐次确认只发送单条正文，结果独立绑定修订，编辑后过期",
+            "并发删除和重复点击不会复活记录或重放付费请求",
+            "错误、重定向、空白、截断和无来源结果均失败且不自动重试"
+          ]
+        }
+      ],
+      "evidenceQualification": "受控host边界只证明程序规则，不证明真实云服务、安全存储、系统日历或系统分享界面。"
+    },
+    {
+      "story": 37,
+      "requirement": "作为安排事项的用户，我希望具体日期、开始结束时间和提醒分别可见，以便不把模糊表达误设为确定安排。",
+      "implementation": [
+        "lib/platform/calendar.dart",
+        "lib/ui/calendar_form.dart"
+      ],
+      "automatedTests": [
+        "test/cloud_calendar_test.dart"
+      ],
+      "archivedAndroidEvidence": [],
+      "coverage": "host-controlled-boundaries",
+      "archivedEvidenceDate": "2026-11-25",
+      "freshHostGate": "test/ and tool/tests references passed on 2026-11-26; integration_test references are archived only",
+      "targetDeviceAccepted": false,
+      "remainingAcceptance": "两端实际日期/时段/提醒编辑器与时区",
+      "testAnchors": [
+        {
+          "file": "test/cloud_calendar_test.dart",
+          "namedTestsInFile": 4,
+          "sampleNames": [
+            "逐次确认只发送单条正文，结果独立绑定修订，编辑后过期",
+            "并发删除和重复点击不会复活记录或重放付费请求",
+            "错误、重定向、空白、截断和无来源结果均失败且不自动重试"
+          ]
+        }
+      ],
+      "evidenceQualification": "受控host边界只证明程序规则，不证明真实云服务、安全存储、系统日历或系统分享界面。"
+    },
+    {
+      "story": 38,
+      "requirement": "作为安排事项的用户，我希望系统编辑页由我决定保存或取消，以便不会被 AI 自动创建事件。",
+      "implementation": [
+        "lib/platform/calendar.dart",
+        "ios/Runner/AppDelegate.swift"
+      ],
+      "automatedTests": [
+        "test/cloud_calendar_test.dart",
+        "test/ui_test.dart"
+      ],
+      "archivedAndroidEvidence": [],
+      "coverage": "host-controlled-boundaries",
+      "archivedEvidenceDate": "2026-11-25",
+      "freshHostGate": "test/ and tool/tests references passed on 2026-11-26; integration_test references are archived only",
+      "targetDeviceAccepted": false,
+      "remainingAcceptance": "系统编辑页保存和取消；只用测试日历",
+      "testAnchors": [
+        {
+          "file": "test/cloud_calendar_test.dart",
+          "namedTestsInFile": 4,
+          "sampleNames": [
+            "逐次确认只发送单条正文，结果独立绑定修订，编辑后过期",
+            "并发删除和重复点击不会复活记录或重放付费请求",
+            "错误、重定向、空白、截断和无来源结果均失败且不自动重试"
+          ]
+        },
+        {
+          "file": "test/ui_test.dart",
+          "namedTestsInFile": 23,
+          "sampleNames": [
+            "无正文的录音详情区分待处理、处理中和失败，不误报等待",
+            "合法JSON但字段损坏的整理缓存不影响打开详情",
+            "校验已有本地模型期间不提供重复下载入口"
+          ]
+        }
+      ],
+      "evidenceQualification": "受控host边界只证明程序规则，不证明真实云服务、安全存储、系统日历或系统分享界面。"
+    },
+    {
+      "story": 39,
+      "requirement": "作为安排事项的用户，我希望不确定保存结果时如实提示，以便检查日历并避免重复创建。",
+      "implementation": [
+        "lib/platform/calendar.dart",
+        "lib/ui/calendar_form.dart"
+      ],
+      "automatedTests": [
+        "test/cloud_calendar_test.dart"
+      ],
+      "archivedAndroidEvidence": [],
+      "coverage": "host-controlled-boundaries",
+      "archivedEvidenceDate": "2026-11-25",
+      "freshHostGate": "test/ and tool/tests references passed on 2026-11-26; integration_test references are archived only",
+      "targetDeviceAccepted": false,
+      "remainingAcceptance": "Android未知回执不误报；iOS实际saved/cancel回调",
+      "testAnchors": [
+        {
+          "file": "test/cloud_calendar_test.dart",
+          "namedTestsInFile": 4,
+          "sampleNames": [
+            "逐次确认只发送单条正文，结果独立绑定修订，编辑后过期",
+            "并发删除和重复点击不会复活记录或重放付费请求",
+            "错误、重定向、空白、截断和无来源结果均失败且不自动重试"
+          ]
+        }
+      ],
+      "evidenceQualification": "受控host边界只证明程序规则，不证明真实云服务、安全存储、系统日历或系统分享界面。"
+    },
+    {
+      "story": 40,
+      "requirement": "作为管理私人数据的用户，我希望导出文字与原音频，并从备份恢复记录关系，以便数据可带走。",
+      "implementation": [
+        "lib/app/backup.dart",
+        "lib/ui/settings.dart"
+      ],
+      "automatedTests": [
+        "test/backup_test.dart",
+        "test/readable_export_test.dart"
+      ],
+      "archivedAndroidEvidence": [],
+      "coverage": "host-controlled-boundaries",
+      "archivedEvidenceDate": "2026-11-25",
+      "freshHostGate": "test/ and tool/tests references passed on 2026-11-26; integration_test references are archived only",
+      "targetDeviceAccepted": false,
+      "remainingAcceptance": "两端真实文件选择/分享/恢复，合成文本音频关系完整",
+      "testAnchors": [
+        {
+          "file": "test/backup_test.dart",
+          "namedTestsInFile": 7,
+          "sampleNames": [
+            "备份带走文本音频收藏关系，凭证和模型排除，重复恢复幂等",
+            "ID冲突保留副本且重映射父子，重复冲突导入不再造副本",
+            "拒绝路径穿越、压缩炸弹格式和损坏备份，保留已有数据"
+          ]
+        },
+        {
+          "file": "test/readable_export_test.dart",
+          "namedTestsInFile": 1,
+          "sampleNames": [
+            "readableExportContainsOnlyTextAndAudio and preserves append relationship"
+          ]
+        }
+      ],
+      "evidenceQualification": "受控host边界只证明程序规则，不证明真实云服务、安全存储、系统日历或系统分享界面。"
+    },
+    {
+      "story": 41,
+      "requirement": "作为管理私人数据的用户，我希望重复导入跳过相同内容、冲突保留副本，以便现有数据不被静默覆盖。",
+      "implementation": [
+        "lib/app/backup.dart",
+        "lib/data/storage.dart"
+      ],
+      "automatedTests": [
+        "test/backup_v2_test.dart",
+        "test/backup_test.dart"
+      ],
+      "archivedAndroidEvidence": [],
+      "coverage": "host-controlled-boundaries",
+      "archivedEvidenceDate": "2026-11-25",
+      "freshHostGate": "test/ and tool/tests references passed on 2026-11-26; integration_test references are archived only",
+      "targetDeviceAccepted": false,
+      "remainingAcceptance": "目标设备重复/冲突导入和空间失败；原始资料不覆盖",
+      "testAnchors": [
+        {
+          "file": "test/backup_v2_test.dart",
+          "namedTestsInFile": 13,
+          "sampleNames": [
+            "本地音频丢失仍可恢复有效备份，保留旧行并恢复带音频的副本",
+            "冻结v1读取保留原始字段并兼容已有restored指纹别名",
+            "新版导出只包含原始DTO，损坏派生缓存不影响备份"
+          ]
+        },
+        {
+          "file": "test/backup_test.dart",
+          "namedTestsInFile": 7,
+          "sampleNames": [
+            "备份带走文本音频收藏关系，凭证和模型排除，重复恢复幂等",
+            "ID冲突保留副本且重映射父子，重复冲突导入不再造副本",
+            "拒绝路径穿越、压缩炸弹格式和损坏备份，保留已有数据"
+          ]
+        }
+      ],
+      "evidenceQualification": "受控host边界只证明程序规则，不证明真实云服务、安全存储、系统日历或系统分享界面。"
+    },
+    {
+      "story": 42,
+      "requirement": "作为管理私人数据的用户，我希望密钥不进入备份、日志或诊断，以便凭证不被意外暴露。",
+      "implementation": [
+        "lib/app/backup.dart",
+        "lib/app/diagnostics.dart"
+      ],
+      "automatedTests": [
+        "test/backup_test.dart",
+        "test/diagnostics_privacy_test.dart"
+      ],
+      "archivedAndroidEvidence": [],
+      "coverage": "host-controlled-boundaries",
+      "archivedEvidenceDate": "2026-11-25",
+      "freshHostGate": "test/ and tool/tests references passed on 2026-11-26; integration_test references are archived only",
+      "targetDeviceAccepted": false,
+      "remainingAcceptance": "设备安全存储/系统备份边界实测，不读取现有凭证",
+      "testAnchors": [
+        {
+          "file": "test/backup_test.dart",
+          "namedTestsInFile": 7,
+          "sampleNames": [
+            "备份带走文本音频收藏关系，凭证和模型排除，重复恢复幂等",
+            "ID冲突保留副本且重映射父子，重复冲突导入不再造副本",
+            "拒绝路径穿越、压缩炸弹格式和损坏备份，保留已有数据"
+          ]
+        },
+        {
+          "file": "test/diagnostics_privacy_test.dart",
+          "namedTestsInFile": 5,
+          "sampleNames": [
+            "contentNeverSerialized even when a failing operation contains secrets",
+            "ioFailureCannotFailSavedOperation or successful backup",
+            "unknown fields or future diagnostics are never copied into an export"
+          ]
+        }
+      ],
+      "evidenceQualification": "受控host边界只证明程序规则，不证明真实云服务、安全存储、系统日历或系统分享界面。"
+    },
+    {
+      "story": 43,
+      "requirement": "作为管理私人数据的用户，我希望明确区分本地处理、云端整理与同步日历，以便了解隐私边界。",
+      "implementation": [
+        "lib/ui/settings.dart",
+        "lib/ui/calendar_form.dart"
+      ],
+      "automatedTests": [
+        "test/ui_test.dart",
+        "test/cloud_calendar_test.dart"
+      ],
+      "archivedAndroidEvidence": [],
+      "coverage": "host-controlled-boundaries",
+      "archivedEvidenceDate": "2026-11-25",
+      "freshHostGate": "test/ and tool/tests references passed on 2026-11-26; integration_test references are archived only",
+      "targetDeviceAccepted": false,
+      "remainingAcceptance": "用户可理解性、测试日历同步及真实网络边界",
+      "testAnchors": [
+        {
+          "file": "test/ui_test.dart",
+          "namedTestsInFile": 23,
+          "sampleNames": [
+            "无正文的录音详情区分待处理、处理中和失败，不误报等待",
+            "合法JSON但字段损坏的整理缓存不影响打开详情",
+            "校验已有本地模型期间不提供重复下载入口"
+          ]
+        },
+        {
+          "file": "test/cloud_calendar_test.dart",
+          "namedTestsInFile": 4,
+          "sampleNames": [
+            "逐次确认只发送单条正文，结果独立绑定修订，编辑后过期",
+            "并发删除和重复点击不会复活记录或重放付费请求",
+            "错误、重定向、空白、截断和无来源结果均失败且不自动重试"
+          ]
+        }
+      ],
+      "evidenceQualification": "受控host边界只证明程序规则，不证明真实云服务、安全存储、系统日历或系统分享界面。"
+    },
+    {
+      "story": 44,
+      "requirement": "作为手机用户，我希望首页动作直接、字体清晰、图标带明确语义，以便无需学习复杂结构。",
+      "implementation": [
+        "lib/ui/home.dart",
+        "lib/ui/home_notebook.dart"
+      ],
+      "automatedTests": [
+        "test/approved_ui_flows_test.dart",
+        "test/visual_test.dart"
+      ],
+      "archivedAndroidEvidence": [
+        "docs/validation/2026-11-25-quality-review/android/continuous-home.json"
+      ],
+      "coverage": "host-and-isolated-android",
+      "archivedEvidenceDate": "2026-11-25",
+      "freshHostGate": "test/ and tool/tests references passed on 2026-11-26; integration_test references are archived only",
+      "targetDeviceAccepted": false,
+      "remainingAcceptance": "两端自然操作、辅助技术和错误恢复手感",
+      "testAnchors": [
+        {
+          "file": "test/approved_ui_flows_test.dart",
+          "namedTestsInFile": 15,
+          "sampleNames": [
+            "homeUsesTopSearchAndBottomTextAndVoiceModes",
+            "searchUsesBoundedSummaryPages and preserves results on index-only events",
+            "expired search cursor reloads actual first page instead of showing no results"
+          ]
+        },
+        {
+          "file": "test/visual_test.dart",
+          "namedTestsInFile": 5,
+          "sampleNames": [
+            "${mode.name} 320宽双倍字体的临近截止反馈保持按住位置",
+            "${mode.name} 追加开始前父删除的反馈不会声称保留音频",
+            "${mode.name} 手机首页、查找、详情与表单布局"
+          ]
+        }
+      ]
+    },
+    {
+      "story": 45,
+      "requirement": "作为手机用户，我希望应用具有专业的黑白灰浅深色主题和原创图标，以便日常使用安静、一致、易辨识。",
+      "implementation": [
+        "lib/ui/theme.dart",
+        "android/app/src/main/res/drawable/ic_mark.xml"
+      ],
+      "automatedTests": [
+        "test/theme_preferences_test.dart",
+        "test/visual_test.dart"
+      ],
+      "archivedAndroidEvidence": [
+        "docs/validation/2026-11-25-quality-review/android/theme-performance.json"
+      ],
+      "coverage": "host-and-isolated-android",
+      "archivedEvidenceDate": "2026-11-25",
+      "freshHostGate": "test/ and tool/tests references passed on 2026-11-26; integration_test references are archived only",
+      "targetDeviceAccepted": false,
+      "remainingAcceptance": "两端启动器图标小尺寸/遮罩/单色与实际主题呈现",
+      "testAnchors": [
+        {
+          "file": "test/theme_preferences_test.dart",
+          "namedTestsInFile": 7,
+          "sampleNames": [
+            "成功保存后的首帧直接呈现目标主题，不经过整页混色",
+            "目标背景色生效时，内容面板也同步到目标色",
+            "新安装默认跟随系统，系统变化立即生效且不写成显式偏好"
+          ]
+        },
+        {
+          "file": "test/visual_test.dart",
+          "namedTestsInFile": 5,
+          "sampleNames": [
+            "${mode.name} 320宽双倍字体的临近截止反馈保持按住位置",
+            "${mode.name} 追加开始前父删除的反馈不会声称保留音频",
+            "${mode.name} 手机首页、查找、详情与表单布局"
+          ]
+        }
+      ]
+    },
+    {
+      "story": 46,
+      "requirement": "作为有可访问性需求的用户，我希望字体放大、屏幕阅读和减少动态效果可用，以便不因视觉或动效影响操作。",
+      "implementation": [
+        "lib/platform/appearance.dart",
+        "lib/ui/platform_controls.dart"
+      ],
+      "automatedTests": [
+        "test/platform_appearance_test.dart",
+        "test/visual_test.dart"
+      ],
+      "archivedAndroidEvidence": [
+        "docs/validation/2026-11-25-quality-review/android/hold-recording.json"
+      ],
+      "coverage": "host-and-isolated-android",
+      "archivedEvidenceDate": "2026-11-25",
+      "freshHostGate": "test/ and tool/tests references passed on 2026-11-26; integration_test references are archived only",
+      "targetDeviceAccepted": false,
+      "remainingAcceptance": "TalkBack/VoiceOver人工播报、系统缩放/高对比/减少动态",
+      "testAnchors": [
+        {
+          "file": "test/platform_appearance_test.dart",
+          "namedTestsInFile": 8,
+          "sampleNames": [
+            "reducedTransparencyForcesOpaqueSurface and unverified glass stays opaque",
+            "iosReduceMotionIndependentOfDisableAnimations updates system preference",
+            "oldIosRetainsActions with opaque operation surface"
+          ]
+        },
+        {
+          "file": "test/visual_test.dart",
+          "namedTestsInFile": 5,
+          "sampleNames": [
+            "${mode.name} 320宽双倍字体的临近截止反馈保持按住位置",
+            "${mode.name} 追加开始前父删除的反馈不会声称保留音频",
+            "${mode.name} 手机首页、查找、详情与表单布局"
+          ]
+        }
+      ]
+    },
+    {
+      "story": 47,
+      "requirement": "作为试用者，我希望动效及时说明录音、保存和页面变化而不拖延操作，以便感到明确反馈。",
+      "implementation": [
+        "lib/ui/theme.dart",
+        "lib/ui/hold_recorder.dart"
+      ],
+      "automatedTests": [
+        "test/theme_preferences_test.dart",
+        "test/hold_recording_test.dart"
+      ],
+      "archivedAndroidEvidence": [
+        "docs/validation/2026-11-25-quality-review/android/theme-performance.json"
+      ],
+      "coverage": "host-and-isolated-android",
+      "archivedEvidenceDate": "2026-11-25",
+      "freshHostGate": "test/ and tool/tests references passed on 2026-11-26; integration_test references are archived only",
+      "targetDeviceAccepted": false,
+      "remainingAcceptance": "真实触控与物理帧呈现，目标设备主题/键盘性能",
+      "testAnchors": [
+        {
+          "file": "test/theme_preferences_test.dart",
+          "namedTestsInFile": 7,
+          "sampleNames": [
+            "成功保存后的首帧直接呈现目标主题，不经过整页混色",
+            "目标背景色生效时，内容面板也同步到目标色",
+            "新安装默认跟随系统，系统变化立即生效且不写成显式偏好"
+          ]
+        },
+        {
+          "file": "test/hold_recording_test.dart",
+          "namedTestsInFile": 20,
+          "sampleNames": [
+            "按住位置固定，模式禁用，松手只创建一条真实音频记录",
+            "上滑候选可移回且不重启，滞回内保持取消，区域松手不确认",
+            "系统pointer取消保留已采集音频，不能误作上滑丢弃"
+          ]
+        }
+      ]
+    },
+    {
+      "story": 48,
+      "requirement": "作为试用者，我希望收到真实可安装的双端版本及已知限制，以便检验是否持续愿意记录和找回。",
+      "implementation": [
+        "tool/run_isolated_preview.py",
+        "android/app/build.gradle"
+      ],
+      "automatedTests": [
+        "tool/tests/test_isolated_preview.py",
+        "test/isolated_validation_test.dart"
+      ],
+      "archivedAndroidEvidence": [
+        "docs/validation/2026-11-25-quality-review/android/continuous-home.json"
+      ],
+      "coverage": "host-and-isolated-android",
+      "archivedEvidenceDate": "2026-11-25",
+      "freshHostGate": "test/ and tool/tests references passed on 2026-11-26; integration_test references are archived only",
+      "targetDeviceAccepted": false,
+      "remainingAcceptance": "iOS构建签名安装、两端Release试用和两周反馈；Android本轮只做构建检查",
+      "testAnchors": [
+        {
+          "file": "tool/tests/test_isolated_preview.py",
+          "namedTestsInFile": 2,
+          "sampleNames": [
+            "test_rejects_formal_or_missing_identity_and_missing_label",
+            "test_accepts_only_test_identity_with_distinct_label"
+          ]
+        },
+        {
+          "file": "test/isolated_validation_test.dart",
+          "namedTestsInFile": 2,
+          "sampleNames": [
+            "真实测试包及其私有缓存才能通过验证边界",
+            "iOS同时核对原生Bundle身份和真实容器路径"
+          ]
+        }
+      ]
+    }
+  ],
+  "criteria": [
+    {
+      "criterion": 1,
+      "requirement": "核验父规格48条用户故事及已完成切片，缺陷在所属能力修复并复测；各切片测试与可访问性不拖到本票才首次实现。",
+      "complete": false,
+      "status": "partial-evidence-device-or-external-acceptance-remains",
+      "automaticProgress": "48/48故事已映射实现、测试和缺口；当前主机门禁通过。",
+      "remainingAcceptance": "两端真实操作及平台验收仍未完成。",
+      "evidence": "acceptance-matrix.json"
+    },
+    {
+      "criterion": 2,
+      "requirement": "两台真机记录实际OS、硬件配置、运行时/模型版本、签名安装条件；缺少设备或权限报告阻塞，模拟器/编译不替代通过。",
+      "complete": false,
+      "status": "partial-evidence-device-or-external-acceptance-remains",
+      "automaticProgress": "已核验当前HEAD和模型清单摘要；本次只构建，不操作设备。",
+      "remainingAcceptance": "Magic8/iPhone17系统、硬件、签名安装条件；完整Xcode。",
+      "evidence": "environment.json"
+    },
+    {
+      "criterion": 3,
+      "requirement": "飞行模式完成记录→转写→文字/语音/语义查找→回放/编辑/追加；核验任务恢复、删除一致性、导出恢复和云端关闭无内容外发。",
+      "complete": false,
+      "status": "partial-evidence-device-or-external-acceptance-remains",
+      "automaticProgress": "复用11/25同源码隔离Android组合：实际ASR2/BGE1、网络尝试0；本次主机恢复回归。",
+      "remainingAcceptance": "两端真实麦克风、飞行模式闭环、中断/回收、导出恢复。",
+      "evidence": "../2026-11-25-quality-review/android/continuous-workflow.json"
+    },
+    {
+      "criterion": 4,
+      "requirement": "验证真实日历提醒、取消/未知回执；可选云端仅发送确认文本，不自动重放，Key不泄漏；付费真实调用仅在已授权测试条件下进行。",
+      "complete": false,
+      "status": "partial-evidence-device-or-external-acceptance-remains",
+      "automaticProgress": "主机transport和日历bridge规则测试通过；没有付费调用或系统日历写入。",
+      "remainingAcceptance": "真实日历保存/取消/提醒；测试Key和预算另行授权后验证单条云整理。",
+      "evidence": "logs/host-gate.log"
+    },
+    {
+      "criterion": 5,
+      "requirement": "验证至少50条口述、30条有答案查询及无答案集；Top-3≥90%目标，性能按父规格的500ms/1s/15s/1s目标实测，注明冷/热与样本量，报告内存/发热。",
+      "complete": false,
+      "status": "partial-evidence-device-or-external-acceptance-remains",
+      "automaticProgress": "已有算法/规模基线；合成向量Recall不能当自然中文Top-3质量。",
+      "remainingAcceptance": "至少50条自然口述、30条有答案标注查询及无答案集；双端P95、内存、温升/耗电。",
+      "evidence": "../2026-11-25-quality-review/README.md"
+    },
+    {
+      "criterion": 6,
+      "requirement": "frontend-design完成浅深色、字体缩放、屏幕阅读、减少动态效果、键盘和异常状态的运行截图与交互检查，确认黑白灰主题、图标小尺寸/遮罩/单色正确。",
+      "complete": false,
+      "status": "partial-evidence-device-or-external-acceptance-remains",
+      "automaticProgress": "复用浅深、320宽/双倍字体、键盘、语义回归证据；当前源码一致。",
+      "remainingAcceptance": "TalkBack/VoiceOver人工操作、iOS外观、图标小尺寸/遮罩/单色、主题真机手感。",
+      "evidence": "../2026-11-25-quality-review/screenshots/host"
+    },
+    {
+      "criterion": 7,
+      "requirement": "生成可安装试用包、可重复构建说明与已知限制，支持两周小范围反馈；不执行应用商店发布、生产部署、Git提交或推送。",
+      "complete": false,
+      "status": "partial-evidence-device-or-external-acceptance-remains",
+      "automaticProgress": "普通/隔离ARM64 Release构建、各19项包体检查及身份负向对照通过。",
+      "remainingAcceptance": "双端实际安装、iOS产物/签名、两周试用；Debug签名不作正式分发通过。",
+      "evidence": "android-candidates.json"
+    }
+  ]
+}

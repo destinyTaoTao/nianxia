@@ -1,0 +1,29 @@
+{
+  "tests": 17,
+  "failures": 0,
+  "errors": 0,
+  "skipped": 0,
+  "cases": [
+    "failedStartRemainsBusyUntilPreviousSourceReleased",
+    "pcmLimitClipsWholeFramesAndFinalizes",
+    "oddReadBoundaryPreservesCompletePcmFrames",
+    "explicitlyDiscardedClaimedRecoveryKeepsTombstoneUntilCleanupCompletes",
+    "interruptedAudioKeepsValidFragmentAndDoesNotRestart",
+    "unavailableJournalCannotPreventMicrophoneRelease",
+    "cancellingAbsentSessionIsIdempotentAndDoesNotStopAnotherSession",
+    "failedFinalJournalCanRetryAfterIoRecoversAndStartAnotherRecording",
+    "duplicateStartOwnsOnlyOneAudioFile",
+    "queryCompletionRemovesOnlyQueryTemporaryFiles",
+    "monotonicDeadlineStopsWithoutFlutter",
+    "failedQueryCleanupPreservesDurableIntentForRetry",
+    "unreadableJournalsDoNotBlockValidPendingAndArePreserved",
+    "failedFinalJournalCanBeExplicitlyDiscardedAfterIoRecovers",
+    "failedDiscardCleanupPreservesTombstoneForRetry",
+    "claimedRecordCannotBeDiscardedAndAckDoesNotDeleteItsAudio",
+    "newStartWaitsForDiscardToReleaseThePreviousSource"
+  ],
+  "execution": "fresh test task via ./gradlew :app:testDebugUnitTest --rerun; prerequisites may be cached; no device",
+  "gradleTestTaskUpToDate": false,
+  "xmlTimestamp": "2026-11-26T02:29:59.682Z",
+  "firstInvocation": "UP-TO-DATE, archived separately"
+}

@@ -1,0 +1,32 @@
+{
+  "body": "## Parent\n\n#1 — [nianxia MVP 规格](https://github.com/destinyTaoTao/nianxia/issues/1)\n\n## What to build\n\n为荣耀Magic8和iPhone17提供可安装试用版本，用完整场景证明离线记查、日历与可选整理可用，并明确实际性能和已知限制。\n\n所有界面改动均使用 frontend-design:frontend-design，遵循父规格的简洁专业黑白灰浅深主题、可访问性和克制动效。测试优先应用公开操作及可观察持久结果，真实平台能力另做真机验证；不以替身或编译成功冒充真机通过。\n\n## Acceptance criteria\n\n- [ ] 核验父规格48条用户故事及已完成切片，缺陷在所属能力修复并复测；各切片测试与可访问性不拖到本票才首次实现。\n- [ ] 两台真机记录实际OS、硬件配置、运行时/模型版本、签名安装条件；缺少设备或权限报告阻塞，模拟器/编译不替代通过。\n- [ ] 飞行模式完成记录→转写→文字/语音/语义查找→回放/编辑/追加；核验任务恢复、删除一致性、导出恢复和云端关闭无内容外发。\n- [ ] 验证真实日历提醒、取消/未知回执；可选云端仅发送确认文本，不自动重放，Key不泄漏；付费真实调用仅在已授权测试条件下进行。\n- [ ] 验证至少50条口述、30条有答案查询及无答案集；Top-3≥90%目标，性能按父规格的500ms/1s/15s/1s目标实测，注明冷/热与样本量，报告内存/发热。\n- [ ] frontend-design完成浅深色、字体缩放、屏幕阅读、减少动态效果、键盘和异常状态的运行截图与交互检查，确认黑白灰主题、图标小尺寸/遮罩/单色正确。\n- [ ] 生成可安装试用包、可重复构建说明与已知限制，支持两周小范围反馈；不执行应用商店发布、生产部署、Git提交或推送。\n\n",
+  "comments": [
+    {
+      "id": "IC_kwDOVmx0ts8AAAABqy3jMA",
+      "author": {
+        "login": "destinyTaoTao"
+      },
+      "authorAssociation": "OWNER",
+      "body": "补充关联验收资料：连续手记 #17–#28 实现及隔离验收已完成，用户手动体验认可，代码已整理提交。实现 [2a8f22d](https://github.com/destinyTaoTao/nianxia/commit/2a8f22d4acb84d626ee4a6987523e122801eb651)，证据 [e6ba468](https://github.com/destinyTaoTao/nianxia/commit/e6ba4689f7400c78e6e7d9dbd23b7e55aacee366)；[最终报告](https://github.com/destinyTaoTao/nianxia/blob/e6ba4689f7400c78e6e7d9dbd23b7e55aacee366/docs/validation/2026-11-25-quality-review/README.md)。\n\n本票仍开放，未将模拟器当成双端真机：Magic8/iPhone17和完整iOS/Xcode、至少50条自然口述/30条标注查询及无答案集、TalkBack/VoiceOver、系统日历真实保存/提醒、真实可选云调用、长时温耗均待实际验收；软件raster慢帧不能宣称真机60FPS。未对这些未执行项勾选或关闭。\n\n用户本次授权Git提交推送只替代此前相关限制，不扩展为上架、部署、正式数据操作或付费真实调用授权。\n",
+      "createdAt": "2026-11-25T15:27:42Z",
+      "includesCreatedEdit": false,
+      "isMinimized": false,
+      "minimizedReason": "",
+      "reactionGroups": [],
+      "url": "https://github.com/destinyTaoTao/nianxia/issues/15#issuecomment-7166878512",
+      "viewerDidAuthor": true
+    }
+  ],
+  "labels": [
+    {
+      "id": "LA_kwDOVmx0ts8AAAADBthUGg",
+      "name": "ready-for-human",
+      "description": "Requires human implementation",
+      "color": "1D76DB"
+    }
+  ],
+  "number": 15,
+  "state": "OPEN",
+  "title": "T14：双端完整验收并生成试用安装包",
+  "url": "https://github.com/destinyTaoTao/nianxia/issues/15"
+}

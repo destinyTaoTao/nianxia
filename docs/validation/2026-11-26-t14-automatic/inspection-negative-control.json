@@ -1,0 +1,12 @@
+{
+  "test": "actual ordinary/isolated APKs swapped via temporary links",
+  "exitCode": 1,
+  "rejectedFor": [
+    "applicationId",
+    "label",
+    "expectedValidationProvider",
+    "expectedPermissionSet"
+  ],
+  "passed": true,
+  "deviceOperations": 0
+}
